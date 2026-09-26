@@ -1,8 +1,8 @@
 import { apiClient } from "@/lib/api";
+import { env } from "@/config/env";
 
 /**
  * Service contracts for the Python/FastAPI Orchestration Layer.
- * Future backend endpoints will integrate seamlessly with these interfaces.
  */
 export const orchestratorService = {
   /**
@@ -10,6 +10,96 @@ export const orchestratorService = {
    */
   async getHealth() {
     return apiClient("/health");
+  },
+
+  /**
+   * Fetch available models and provider status from the backend abstraction layer
+   */
+  async getModels() {
+    return apiClient("/models");
+  },
+
+  /**
+   * Execute standard completion via LLM abstraction layer
+   */
+  async generate(payload) {
+    return apiClient("/llm/generate", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
+   * Execute streaming completion via Server-Sent Events (SSE)
+   */
+  async generateStream(payload, { onChunk, onError, onComplete, signal }) {
+    const url = `${env.orchestrator.apiUrl}/llm/generate/stream`;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          ...(env.orchestrator.apiSecret
+            ? { Authorization: `Bearer ${env.orchestrator.apiSecret}` }
+            : {}),
+        },
+        body: JSON.stringify(payload),
+        signal,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData?.error?.message ||
+            errorData?.detail ||
+            `Streaming request failed with HTTP ${response.status}`
+        );
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+
+          const dataStr = trimmed.slice(5).trim();
+          if (dataStr === "[DONE]") {
+            onComplete?.();
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (parsed.error) {
+              onError?.(new Error(parsed.error.message || "Streaming error from provider"));
+              return;
+            }
+            onChunk?.(parsed);
+          } catch (err) {
+            console.error("[StreamParser] Error parsing chunk:", err, dataStr);
+          }
+        }
+      }
+
+      onComplete?.();
+    } catch (err) {
+      if (err.name === "AbortError") {
+        console.log("[Stream] Aborted by user");
+        return;
+      }
+      onError?.(err);
+    }
   },
 
   /**

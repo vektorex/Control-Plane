@@ -31,6 +31,12 @@ export const siteConfig = {
       description: "Organize work streams, knowledge contexts, and toolsets",
     },
     {
+      label: "Playground",
+      href: "/app/playground",
+      icon: "Terminal",
+      description: "Internal developer testbed for LLM abstraction & streaming",
+    },
+    {
       label: "Settings",
       href: "/app/settings",
       icon: "Settings",

@@ -21,6 +21,7 @@ const iconMap = {
   LayoutDashboard,
   ListTodo,
   FolderKanban,
+  Terminal,
   Settings,
 };
 

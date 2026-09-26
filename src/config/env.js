@@ -14,8 +14,8 @@ export const env = {
   },
 
   orchestrator: {
-    // URL pointing to the future Python/FastAPI orchestration backend
-    apiUrl: process.env.NEXT_PUBLIC_ORCHESTRATION_API_URL || "http://localhost:8000/api/v1",
+    // URL pointing to the Python/FastAPI orchestration backend
+    apiUrl: process.env.NEXT_PUBLIC_ORCHESTRATION_API_URL || "http://localhost:8000/api",
     apiSecret: process.env.ORCHESTRATION_API_SECRET || "",
     timeoutMs: 30000,
   },

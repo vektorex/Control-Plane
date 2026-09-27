@@ -70,8 +70,9 @@ async def llm_error_handler(request: Request, exc: LLMError) -> JSONResponse:
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    status_code = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY)
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status_code,
         content=format_error_response(
             "VALIDATION_ERROR",
             "Invalid request parameters",

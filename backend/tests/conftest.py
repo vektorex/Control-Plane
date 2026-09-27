@@ -1,8 +1,18 @@
+import asyncio
 import pytest
 from typing import AsyncIterator, List
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.pool import StaticPool
 
 from backend.app.main import app
+from backend.app.db.base import Base
+from backend.app.db.database import get_db
+import backend.app.db.models  # Register all models
 from backend.app.schemas.llm import (
     LLMGenerateRequest,
     LLMGenerateResponse,
@@ -102,6 +112,49 @@ class MockTestProvider(BaseLLMProvider):
             )
 
 
+# Async in-memory test database engine for fast, isolated tests
+test_engine = create_async_engine(
+    "sqlite+aiosqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+test_async_session_factory = async_sessionmaker(
+    bind=test_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_db():
+    async def _init_tables():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(_init_tables())
+    yield
+    
+    async def _drop_tables():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await test_engine.dispose()
+
+    asyncio.run(_drop_tables())
+
+
+async def override_get_db():
+    async with test_async_session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
 @pytest.fixture
 def mock_factory():
     factory = LLMProviderFactory()
@@ -113,6 +166,7 @@ def mock_factory():
 @pytest.fixture
 def client(mock_factory):
     app.dependency_overrides[get_llm_factory] = lambda: mock_factory
+    app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

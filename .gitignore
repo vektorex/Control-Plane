@@ -46,3 +46,9 @@ htmlcov/
 venv/
 ENV/
 env/
+
+# databases
+*.db
+*.sqlite
+*.sqlite3
+

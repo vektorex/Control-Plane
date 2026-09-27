@@ -5,72 +5,75 @@ import { Modal } from "@/components/ui/Modal";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { Cpu, Sparkles, Sliders, AlertCircle } from "lucide-react";
+import { Plus, AlertCircle, Loader2 } from "lucide-react";
+import { projectService } from "@/services/projects";
 
-export function CreateTaskModal({ isOpen, onClose, onSubmitTask, projects = [] }) {
-  const [formData, setFormData] = useState({
-    title: "",
-    prompt: "",
-    projectId: projects[0]?.id || "proj-1",
-    executionMode: "auto",
-    priority: "medium",
-    retrievalStrategy: "hybrid_rag",
-  });
+export function CreateTaskModal({ isOpen, onClose, projects = [], onTaskCreated }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [projectId, setProjectId] = useState(projects[0]?.id || "");
+  const [status, setStatus] = useState("draft");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  React.useEffect(() => {
+    if (projects.length > 0 && !projectId) {
+      setProjectId(projects[0].id);
+    }
+  }, [projects, projectId]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim()) {
+    if (!title.trim()) {
       setError("Please enter a task title");
       return;
     }
-    if (!formData.prompt.trim()) {
-      setError("Please enter task prompt or specification");
+    const targetProjId = projectId || projects[0]?.id;
+    if (!targetProjId) {
+      setError("No project selected. Please create a project first.");
       return;
     }
 
-    setIsSubmitting(true);
-    setError("");
-
-    // Package payload
-    const newTask = {
-      id: `task-${Math.floor(100 + Math.random() * 900)}`,
-      title: formData.title.trim(),
-      prompt: formData.prompt.trim(),
-      projectId: formData.projectId,
-      projectName: projects.find((p) => p.id === formData.projectId)?.name || "Default Workspace",
-      modelAssigned: formData.executionMode === "deep_reasoning" ? "Claude 3.5 Sonnet / o1" : "Auto-Routing",
-      priority: formData.priority,
-      status: "PENDING",
-      retrievalStrategy: formData.retrievalStrategy,
-      createdAt: new Date().toISOString(),
-    };
-
-    onSubmitTask?.(newTask);
-    setIsSubmitting(false);
-    onClose();
+    try {
+      setIsSubmitting(true);
+      setError("");
+      const payload = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        status: status,
+      };
+      const created = await projectService.createProjectTask(targetProjId, payload);
+      setTitle("");
+      setDescription("");
+      setStatus("draft");
+      onTaskCreated?.(created);
+      onClose();
+    } catch (err) {
+      setError(err.message || "Failed to create task");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Dispatch Work Task"
-      description="Submit a new goal for orchestrator intent analysis, model selection, and tool execution."
+      title="Create Work Task"
+      description="Define a new task unit within a project scope to organize goals and execution runs."
       footer={
         <>
-          <Button variant="outline" size="sm" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
             variant="primary"
             size="sm"
             onClick={handleSubmit}
-            isLoading={isSubmitting}
-            icon={Sparkles}
+            disabled={isSubmitting || !title.trim() || (!projectId && projects.length === 0)}
+            icon={isSubmitting ? Loader2 : Plus}
           >
-            Dispatch to Orchestrator
+            {isSubmitting ? "Creating..." : "Create Task"}
           </Button>
         </>
       }
@@ -84,64 +87,43 @@ export function CreateTaskModal({ isOpen, onClose, onSubmitTask, projects = [] }
         )}
 
         <Input
-          label="Task Title / Goal Summary"
-          placeholder="e.g. Audit microservices API contract changes"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          label="Task Title / Goal"
+          placeholder="e.g. Implement PostgreSQL persistence layer"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           required
+          autoFocus
         />
 
         <Textarea
-          label="Task Specification & Instructions"
-          placeholder="Provide the complete prompt, goal description, inputs, and expected output format..."
-          value={formData.prompt}
-          onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
-          rows={4}
-          required
+          label="Task Description & Scope"
+          placeholder="Describe task goals, constraints, and instructions..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select
-            label="Project Scope"
-            value={formData.projectId}
-            onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
-            options={projects.map((p) => ({ value: p.id, label: p.name }))}
+            label="Target Project"
+            value={projectId || projects[0]?.id || ""}
+            onChange={(e) => setProjectId(e.target.value)}
+            options={
+              projects.length > 0
+                ? projects.map((p) => ({ value: p.id, label: p.name }))
+                : [{ value: "", label: "No projects available" }]
+            }
           />
 
           <Select
-            label="Priority Level"
-            value={formData.priority}
-            onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+            label="Initial Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
             options={[
-              { value: "low", label: "Low Priority" },
-              { value: "medium", label: "Medium Priority" },
-              { value: "high", label: "High Priority" },
-              { value: "critical", label: "Critical Priority" },
-            ]}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Select
-            label="Execution Routing Mode"
-            value={formData.executionMode}
-            onChange={(e) => setFormData({ ...formData, executionMode: e.target.value })}
-            options={[
-              { value: "auto", label: "Auto Orchestration (Recommended)" },
-              { value: "fast", label: "Low Latency / High Speed" },
-              { value: "deep_reasoning", label: "Deep Reasoning Tier" },
-              { value: "cost_optimized", label: "Cost Optimized" },
-            ]}
-          />
-
-          <Select
-            label="Retrieval Strategy"
-            value={formData.retrievalStrategy}
-            onChange={(e) => setFormData({ ...formData, retrievalStrategy: e.target.value })}
-            options={[
-              { value: "hybrid_rag", label: "Hybrid RAG (Dense + BM25)" },
-              { value: "hierarchical_graph", label: "Knowledge Graph Hierarchy" },
-              { value: "direct_context", label: "Direct Context Window" },
+              { value: "draft", label: "Draft" },
+              { value: "active", label: "Active" },
+              { value: "completed", label: "Completed" },
+              { value: "archived", label: "Archived" },
             ]}
           />
         </div>

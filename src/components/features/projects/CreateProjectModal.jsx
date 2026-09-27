@@ -4,38 +4,46 @@ import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { FolderPlus, AlertCircle } from "lucide-react";
+import { FolderPlus, AlertCircle, Loader2 } from "lucide-react";
+import { workspaceService } from "@/services/workspaces";
 
-export function CreateProjectModal({ isOpen, onClose, onSubmitProject }) {
+export function CreateProjectModal({ isOpen, onClose, workspaceId, onProjectCreated }) {
   const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Please enter a project name");
       return;
     }
+    if (!workspaceId) {
+      setError("Active workspace not selected");
+      return;
+    }
 
-    setIsSubmitting(true);
-    setError("");
-
-    const newProject = {
-      id: `proj-${Math.floor(100 + Math.random() * 900)}`,
-      name: name.trim(),
-      description: description.trim(),
-      taskCount: 0,
-      contextSourcesCount: 0,
-      createdAt: new Date().toISOString(),
-    };
-
-    onSubmitProject?.(newProject);
-    setName("");
-    setDescription("");
-    setIsSubmitting(false);
-    onClose();
+    try {
+      setIsSubmitting(true);
+      setError("");
+      const payload = {
+        name: name.trim(),
+        slug: slug.trim() || undefined,
+        description: description.trim() || undefined,
+      };
+      const created = await workspaceService.createWorkspaceProject(workspaceId, payload);
+      setName("");
+      setSlug("");
+      setDescription("");
+      onProjectCreated?.(created);
+      onClose();
+    } catch (err) {
+      setError(err.message || "Failed to create project");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -43,20 +51,20 @@ export function CreateProjectModal({ isOpen, onClose, onSubmitProject }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Create Project Scope"
-      description="Initialize a dedicated workspace container for specialized LLM tasks, context sets, and tools."
+      description="Initialize a dedicated workspace container for specialized LLM tasks and context."
       footer={
         <>
-          <Button variant="outline" size="sm" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
             variant="primary"
             size="sm"
             onClick={handleSubmit}
-            isLoading={isSubmitting}
-            icon={FolderPlus}
+            disabled={isSubmitting || !name.trim()}
+            icon={isSubmitting ? Loader2 : FolderPlus}
           >
-            Create Project
+            {isSubmitting ? "Creating..." : "Create Project"}
           </Button>
         </>
       }
@@ -75,6 +83,14 @@ export function CreateProjectModal({ isOpen, onClose, onSubmitProject }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+          autoFocus
+        />
+
+        <Input
+          label="Custom Slug (Optional)"
+          placeholder="e.g. legal-compliance-extraction"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
         />
 
         <Textarea

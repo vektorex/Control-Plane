@@ -2,18 +2,49 @@ from typing import Any, Optional
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from pydantic import ValidationError
 
 
-class LLMError(Exception):
-    """Base exception for all LLM abstraction errors."""
-    code: str = "LLM_ERROR"
+class AppError(Exception):
+    """Base application exception."""
+    code: str = "APP_ERROR"
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    def __init__(self, message: str, details: Optional[Any] = None):
+    def __init__(self, message: str, details: Optional[Any] = None, status_code: Optional[int] = None):
         super().__init__(message)
         self.message = message
         self.details = details
+        if status_code is not None:
+            self.status_code = status_code
+
+
+class NotFoundError(AppError):
+    """Raised when a requested resource is not found."""
+    code = "NOT_FOUND"
+    status_code = status.HTTP_404_NOT_FOUND
+
+
+class ConflictError(AppError):
+    """Raised when a uniqueness or integrity conflict occurs (e.g. duplicate slug)."""
+    code = "CONFLICT"
+    status_code = status.HTTP_409_CONFLICT
+
+
+class InvalidStateError(AppError):
+    """Raised when an invalid state transition or operation is requested."""
+    code = "INVALID_STATE"
+    status_code = status.HTTP_400_BAD_REQUEST
+
+
+class DatabaseError(AppError):
+    """Raised when an unexpected database execution error occurs."""
+    code = "DATABASE_ERROR"
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class LLMError(AppError):
+    """Base exception for all LLM abstraction errors."""
+    code = "LLM_ERROR"
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class ProviderNotConfiguredError(LLMError):
@@ -62,11 +93,15 @@ def format_error_response(code: str, message: str, details: Optional[Any] = None
     }
 
 
-async def llm_error_handler(request: Request, exc: LLMError) -> JSONResponse:
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content=format_error_response(exc.code, exc.message, exc.details),
     )
+
+
+# Backward compatibility alias
+llm_error_handler = app_error_handler
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -86,6 +121,6 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=format_error_response(
             "INTERNAL_SERVER_ERROR",
-            str(exc) if not isinstance(exc, Exception) else "An unexpected error occurred processing your request.",
+            "An unexpected error occurred processing your request." if not isinstance(exc, AppError) else str(exc),
         ),
     )

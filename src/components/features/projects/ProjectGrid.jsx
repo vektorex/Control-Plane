@@ -1,17 +1,16 @@
 import React from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
-import { FolderKanban, Layers, ListTodo, Database, ArrowRight, Plus } from "lucide-react";
+import { FolderKanban, ListTodo, ArrowRight, Layers } from "lucide-react";
 
 export function ProjectGrid({ projects = [], onOpenCreateProject, onSelectProject }) {
   if (projects.length === 0) {
     return (
       <EmptyState
         icon={FolderKanban}
-        title="No project workspaces found"
+        title="No projects found in this workspace"
         description="Create a project to group related LLM tasks, context sources, and knowledge repositories."
         actionLabel="Create Project"
         onAction={onOpenCreateProject}
@@ -34,7 +33,7 @@ export function ProjectGrid({ projects = [], onOpenCreateProject, onSelectProjec
                 <FolderKanban className="w-5 h-5" />
               </div>
               <Badge variant="outline" className="text-[10px] font-mono">
-                {project.id}
+                /{project.slug}
               </Badge>
             </div>
             <CardTitle className="mt-3 group-hover:text-indigo-300 transition-colors">
@@ -49,19 +48,23 @@ export function ProjectGrid({ projects = [], onOpenCreateProject, onSelectProjec
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/60 flex items-center gap-2">
                 <ListTodo className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-slate-300 font-medium">{project.taskCount || 0} Tasks</span>
+                <span className="text-slate-300 font-medium">
+                  {project.task_count ?? project.taskCount ?? 0} Tasks
+                </span>
               </div>
               <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/60 flex items-center gap-2">
-                <Database className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-slate-300 font-medium">{project.contextSourcesCount || 0} Contexts</span>
+                <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-slate-300 font-medium font-mono text-[11px] truncate">
+                  {project.id.slice(0, 8)}...
+                </span>
               </div>
             </div>
           </CardContent>
 
           <CardFooter className="pt-3 flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/60">
-            <span>Created {formatDate(project.createdAt)}</span>
+            <span>Created {formatDate(project.created_at || project.createdAt || new Date())}</span>
             <div className="flex items-center gap-1 text-indigo-400 group-hover:translate-x-0.5 transition-transform font-medium">
-              <span>Enter Project</span>
+              <span>Open Project</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </div>
           </CardFooter>

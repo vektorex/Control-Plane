@@ -6,7 +6,7 @@ import json
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=("backend/.env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -43,6 +43,21 @@ class Settings(BaseSettings):
     OPENAI_DEFAULT_MODEL: str = "gpt-4o-mini"
     OPENAI_BASE_URL: Optional[str] = None
     OPENAI_TIMEOUT_SECONDS: float = 60.0
+
+    # Database Settings (PostgreSQL + AsyncPG)
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_work_layer"
+    DATABASE_ECHO: bool = False
+    DATABASE_POOL_SIZE: int = 10
+    DATABASE_MAX_OVERFLOW: int = 20
+
+    @property
+    def async_database_url(self) -> str:
+        url = self.DATABASE_URL
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        return url
 
     # Security
     ORCHESTRATION_API_SECRET: Optional[str] = None

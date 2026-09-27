@@ -7,6 +7,34 @@ from backend.app.schemas.llm import (
     LLMGenerateResponse,
     LLMStreamChunk,
 )
+from backend.app.schemas.workspace import (
+    WorkspaceBase,
+    WorkspaceCreate,
+    WorkspaceUpdate,
+    WorkspaceResponse,
+    WorkspaceListResponse,
+    slugify,
+)
+from backend.app.schemas.project import (
+    ProjectBase,
+    ProjectCreate,
+    ProjectUpdate,
+    ProjectResponse,
+    ProjectListResponse,
+)
+from backend.app.schemas.task import (
+    TaskBase,
+    TaskCreate,
+    TaskUpdate,
+    TaskResponse,
+    TaskListResponse,
+)
+from backend.app.schemas.run import (
+    RunBase,
+    RunCreate,
+    RunResponse,
+    RunListResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -18,4 +46,24 @@ __all__ = [
     "TokenUsage",
     "LLMGenerateResponse",
     "LLMStreamChunk",
+    "WorkspaceBase",
+    "WorkspaceCreate",
+    "WorkspaceUpdate",
+    "WorkspaceResponse",
+    "WorkspaceListResponse",
+    "slugify",
+    "ProjectBase",
+    "ProjectCreate",
+    "ProjectUpdate",
+    "ProjectResponse",
+    "ProjectListResponse",
+    "TaskBase",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskResponse",
+    "TaskListResponse",
+    "RunBase",
+    "RunCreate",
+    "RunResponse",
+    "RunListResponse",
 ]

@@ -1,4 +1,5 @@
 import { env } from "@/config/env";
+import { supabase } from "./supabaseClient";
 
 export class ApiError extends Error {
   constructor(message, status = 500, details = null) {
@@ -10,8 +11,7 @@ export class ApiError extends Error {
 }
 
 /**
- * Base HTTP client configured to talk to the backend service.
- * Ready for connection to the Python/FastAPI orchestration backend.
+ * Base HTTP client configured to talk to the backend service with Supabase Auth token injection.
  */
 export async function apiClient(endpoint, options = {}) {
   const {
@@ -42,12 +42,21 @@ export async function apiClient(endpoint, options = {}) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
 
+  // Retrieve current active Supabase Auth token if not provided explicitly
+  let authHeader = headers["Authorization"] || headers["authorization"];
+  if (!authHeader && supabase?.auth) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.access_token) {
+        authHeader = `Bearer ${data.session.access_token}`;
+      }
+    } catch {}
+  }
+
   const defaultHeaders = {
     "Content-Type": "application/json",
     Accept: "application/json",
-    ...(env.orchestrator.apiSecret
-      ? { Authorization: `Bearer ${env.orchestrator.apiSecret}` }
-      : {}),
+    ...(authHeader ? { Authorization: authHeader } : {}),
     ...headers,
   };
 
@@ -65,11 +74,18 @@ export async function apiClient(endpoint, options = {}) {
     const data = isJson ? await response.json() : await response.text();
 
     if (!response.ok) {
-      throw new ApiError(
-        data?.detail || data?.message || `HTTP Error ${response.status}: ${response.statusText}`,
-        response.status,
-        data
-      );
+      const errorMsg =
+        data?.error?.message ||
+        data?.detail ||
+        data?.message ||
+        `HTTP Error ${response.status}: ${response.statusText}`;
+
+      // Handle 401 Unauthorized redirect in browser
+      if (response.status === 401 && typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        // Optional: window.location.href = "/login";
+      }
+
+      throw new ApiError(errorMsg, response.status, data);
     }
 
     return data;

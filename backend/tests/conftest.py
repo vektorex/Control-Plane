@@ -1,4 +1,5 @@
 import asyncio
+import time
 import pytest
 from typing import AsyncIterator, List
 from fastapi.testclient import TestClient
@@ -13,6 +14,7 @@ from backend.app.main import app
 from backend.app.db.base import Base
 from backend.app.db.database import get_db
 import backend.app.db.models  # Register all models
+from backend.app.core.auth import create_access_token, DEV_JWT_SECRET
 from backend.app.schemas.llm import (
     LLMGenerateRequest,
     LLMGenerateResponse,
@@ -134,7 +136,7 @@ def setup_test_db():
 
     asyncio.run(_init_tables())
     yield
-    
+
     async def _drop_tables():
         async with test_engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
@@ -164,9 +166,64 @@ def mock_factory():
 
 
 @pytest.fixture
+def user1_auth():
+    auth_user_id = "user-auth-001-uuid"
+    email = "user1@example.com"
+    token = create_access_token(auth_user_id=auth_user_id, email=email)
+    headers = {"Authorization": f"Bearer {token}"}
+    return {
+        "auth_user_id": auth_user_id,
+        "email": email,
+        "token": token,
+        "headers": headers,
+    }
+
+
+@pytest.fixture
+def user2_auth():
+    auth_user_id = "user-auth-002-uuid"
+    email = "user2@example.com"
+    token = create_access_token(auth_user_id=auth_user_id, email=email)
+    headers = {"Authorization": f"Bearer {token}"}
+    return {
+        "auth_user_id": auth_user_id,
+        "email": email,
+        "token": token,
+        "headers": headers,
+    }
+
+
+@pytest.fixture
 def client(mock_factory):
     app.dependency_overrides[get_llm_factory] = lambda: mock_factory
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_client(client, user1_auth):
+    """Test client pre-configured with User 1 authorization header."""
+    class AuthenticatedClient:
+        def __init__(self, c, headers):
+            self._c = c
+            self.headers = headers
+
+        def get(self, url, **kwargs):
+            h = {**self.headers, **kwargs.pop("headers", {})}
+            return self._c.get(url, headers=h, **kwargs)
+
+        def post(self, url, **kwargs):
+            h = {**self.headers, **kwargs.pop("headers", {})}
+            return self._c.post(url, headers=h, **kwargs)
+
+        def patch(self, url, **kwargs):
+            h = {**self.headers, **kwargs.pop("headers", {})}
+            return self._c.patch(url, headers=h, **kwargs)
+
+        def delete(self, url, **kwargs):
+            h = {**self.headers, **kwargs.pop("headers", {})}
+            return self._c.delete(url, headers=h, **kwargs)
+
+    return AuthenticatedClient(client, user1_auth["headers"])

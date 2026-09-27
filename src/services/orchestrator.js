@@ -35,18 +35,26 @@ export const orchestratorService = {
   async generateStream(payload, { onChunk, onError, onComplete, signal }) {
     const url = `${env.orchestrator.apiUrl}/llm/generate/stream`;
     try {
+      let authHeader = env.orchestrator.apiSecret ? `Bearer ${env.orchestrator.apiSecret}` : "";
+      try {
+        const { supabase } = await import("@/lib/supabaseClient");
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.access_token) {
+          authHeader = `Bearer ${data.session.access_token}`;
+        }
+      } catch {}
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "text/event-stream",
-          ...(env.orchestrator.apiSecret
-            ? { Authorization: `Bearer ${env.orchestrator.apiSecret}` }
-            : {}),
+          ...(authHeader ? { Authorization: authHeader } : {}),
         },
         body: JSON.stringify(payload),
         signal,
       });
+
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

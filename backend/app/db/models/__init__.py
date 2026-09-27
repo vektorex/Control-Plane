@@ -1,6 +1,7 @@
 from backend.app.db.base import Base
 from backend.app.db.models.guid import GUID
 from backend.app.db.models.enums import TaskStatus, RunStatus
+from backend.app.db.models.user import User
 from backend.app.db.models.workspace import Workspace
 from backend.app.db.models.project import Project
 from backend.app.db.models.task import Task
@@ -11,6 +12,7 @@ __all__ = [
     "GUID",
     "TaskStatus",
     "RunStatus",
+    "User",
     "Workspace",
     "Project",
     "Task",

@@ -7,7 +7,14 @@ from backend.app.schemas.llm import (
     LLMGenerateResponse,
     LLMStreamChunk,
 )
+from backend.app.schemas.user import (
+    UserBase,
+    UserCreate,
+    UserResponse,
+    UserProfileResponse,
+)
 from backend.app.schemas.workspace import (
+
     WorkspaceBase,
     WorkspaceCreate,
     WorkspaceUpdate,

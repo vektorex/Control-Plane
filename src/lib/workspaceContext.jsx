@@ -1,34 +1,30 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { workspaceService } from "@/services/workspaces";
+import { useAuth } from "@/lib/authContext";
 
 const WorkspaceContext = createContext(null);
 
 export function WorkspaceProvider({ children }) {
+  const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState([]);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchWorkspaces = async () => {
+  const fetchWorkspaces = useCallback(async () => {
+    if (!user) {
+      setWorkspaces([]);
+      setActiveWorkspace(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const res = await workspaceService.listWorkspaces();
-      let list = res?.workspaces || [];
-      
-      // Auto-create default development workspace if empty
-      if (list.length === 0) {
-        try {
-          const created = await workspaceService.createWorkspace({
-            name: "Default Workspace",
-            slug: "default-workspace",
-          });
-          list = [created];
-        } catch (createErr) {
-          console.warn("[WorkspaceProvider] Default creation skipped:", createErr);
-        }
-      }
+      const list = res?.workspaces || [];
 
       setWorkspaces(list);
       setActiveWorkspace((prev) => {
@@ -44,11 +40,11 @@ export function WorkspaceProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchWorkspaces();
-  }, []);
+  }, [fetchWorkspaces]);
 
   const createWorkspace = async ({ name, slug }) => {
     const ws = await workspaceService.createWorkspace({ name, slug });

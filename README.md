@@ -2,7 +2,7 @@
 
 > **"One workspace for getting real work done with LLMs."**
 
-A universal, production-oriented LLM work orchestration platform that accepts complex user tasks and coordinates optimal LLMs, context sources, retrieval strategies, persistent project data, and specialized execution tools.
+A universal, production-oriented LLM work orchestration platform that accepts complex user tasks and coordinates optimal LLMs, context sources, retrieval strategies, persistent project data, multi-tenant workspace isolation, and specialized execution tools.
 
 ---
 
@@ -12,16 +12,19 @@ A universal, production-oriented LLM work orchestration platform that accepts co
 ┌────────────────────────────────────────────────────────────┐
 │                    Next.js Frontend                        │
 │   • Modern App Router (JavaScript + Tailwind CSS)          │
-│   • Landing Page (/) & App Shell (/app, /tasks, /projects) │
+│   • Supabase Auth Provider & Session Lifecycle             │
+│   • Protected App Shell (/app, /tasks, /projects, /settings)│
 │   • Developer Playground (/app/playground)                 │
 └─────────────────────────────┬──────────────────────────────┘
-                              │ HTTP / SSE
+                              │ HTTP (Bearer JWT) / SSE Stream
                               ▼
 ┌────────────────────────────────────────────────────────────┐
 │                   Python FastAPI Backend                   │
+│   • JWT Signature & Expiry Verification (Independent Auth) │
+│   • Multi-Tenant Resource Ownership Authorization Layer    │
 │   • Health & Model Metadata (/api/health, /api/models)     │
 │   • Synchronous & SSE Streaming (/api/llm/generate)        │
-│   • Workspace, Project, Task & Run CRUD API Endpoints      │
+│   • User Profile, Workspace, Project, Task & Run Endpoints │
 │   • Request Validation & Structured Error Handling         │
 └─────────────────────────────┬──────────────────────────────┘
                               │
@@ -29,20 +32,43 @@ A universal, production-oriented LLM work orchestration platform that accepts co
                ▼                             ▼
 ┌─────────────────────────────┐┌─────────────────────────────┐
 │    LLM Abstraction Layer    ││      Repository Layer       │
-│  • Provider Factory         ││  • WorkspaceRepository      │
-│  • AsyncOpenAI SDK Adapter  ││  • ProjectRepository        │
-│  • Model Resolution         ││  • TaskRepository           │
-│  • Token Normalization      ││  • RunRepository            │
+│  • Provider Factory         ││  • UserRepository           │
+│  • AsyncOpenAI SDK Adapter  ││  • WorkspaceRepository      │
+│  • Model Resolution         ││  • ProjectRepository        │
+│  • Token Normalization      ││  • TaskRepository           │
+│                             ││  • RunRepository            │
 └──────────────┬──────────────┘└─────────────┬───────────────┘
                │                             │
                ▼                             ▼
 ┌─────────────────────────────┐┌─────────────────────────────┐
 │       LLM Providers         ││    PostgreSQL Database      │
 │   (OpenAI, Anthropic, etc.) ││ (SQLAlchemy 2.x + Alembic)  │
+│                             ││ Multi-Tenant User Isolation │
 └─────────────────────────────┘└─────────────────────────────┘
 ```
 
-> **Note on Authentication:** Authentication and multi-user tenant isolation will be implemented in a subsequent step. Currently, the system uses a development-only workspace context to establish the core data model.
+---
+
+## 🔐 Authentication & Multi-Tenant Authorization Model
+
+### Architectural Flow
+Every backend operation strictly enforces the following pipeline:
+```
+Request ──► Authentication ──► Authorization / Ownership ──► Validation ──► Service ──► Repository ──► Database
+```
+
+1. **Authentication**:
+   - The frontend authenticates via **Supabase Auth** (`email/password`).
+   - Requests to `/api/*` automatically attach `Authorization: Bearer <access_token>`.
+   - The FastAPI backend independently verifies token signature, claims (`sub`, `email`, `aud`), and expiration using `SUPABASE_JWT_SECRET` (or dev secret fallback). No client-provided user IDs or workspace IDs are trusted.
+2. **First-Visit Workspace Bootstrap**:
+   - Upon first valid authenticated call, the backend idempotently creates a `User` profile and provisions a default `Workspace` (`Default Workspace`, slug: `default`) with a starter `Project`.
+   - Repeated logins never create duplicate workspaces.
+3. **Multi-Tenant Ownership & Resource Isolation**:
+   - Hierarchical data model:
+     $$\text{Authenticated User} \longrightarrow \text{Workspace} \longrightarrow \text{Project} \longrightarrow \text{Task} \longrightarrow \text{Run}$$
+   - When User A requests a resource belonging to User B, the backend returns a `404 Not Found` (never leaking whether another tenant's resource exists).
+   - Compound unique constraint on `(owner_user_id, slug)` allows distinct users to independently own workspaces and projects with identical names or slugs without collisions.
 
 ---
 
@@ -53,94 +79,112 @@ LLM Layer/
 ├── backend/                         # Python FastAPI Backend Service
 │   ├── alembic/                     # Alembic Database Migrations
 │   │   ├── env.py                   # Async Alembic environment runner
-│   │   ├── script.py.mako           # Migration template
 │   │   └── versions/
-│   │       └── 001_initial_schema.py# Initial migration (workspaces, projects, tasks, runs)
+│   │       ├── 001_initial_schema.py# Initial schema (workspaces, projects, tasks, runs)
+│   │       └── 002_user_and_workspace_ownership.py # User profile & multi-tenant ownership
 │   ├── alembic.ini                  # Alembic CLI configuration
 │   ├── app/
 │   │   ├── main.py                  # FastAPI entry point, CORS, and lifespan
-│   │   ├── config.py                # Pydantic Settings & Environment Variables
+│   │   ├── config.py                # Pydantic Settings & Supabase/JWT Config
 │   │   ├── api/
-│   │   │   ├── deps.py              # Dependency Injection
 │   │   │   └── routes/
+│   │   │       ├── auth.py          # GET /api/auth/me profile & workspace bootstrap
 │   │   │       ├── health.py        # GET /api/health
 │   │   │       ├── models.py        # GET /api/models
-│   │   │       ├── llm.py           # POST /api/llm/generate & /generate/stream
-│   │   │       ├── workspaces.py    # CRUD /api/workspaces & nested projects
-│   │   │       ├── projects.py      # CRUD /api/projects & nested tasks
-│   │   │       └── tasks.py         # CRUD /api/tasks & /runs
+│   │   │       ├── llm.py           # Authenticated /api/llm/generate & stream
+│   │   │       ├── workspaces.py    # Multi-tenant /api/workspaces CRUD
+│   │   │       ├── projects.py      # Multi-tenant /api/projects CRUD
+│   │   │       └── tasks.py         # Multi-tenant /api/tasks & /runs CRUD
 │   │   ├── core/
-│   │   │   ├── errors.py            # Error hierarchy & Exception handlers
+│   │   │   ├── auth.py              # JWT verification & get_current_user dependency
+│   │   │   ├── authorization.py     # Hierarchical ownership verification dependencies
+│   │   │   ├── errors.py            # Structured errors (AuthenticationError, NotFoundError, etc.)
 │   │   │   └── logging.py           # Structured logger setup
 │   │   ├── db/
 │   │   │   ├── base.py              # SQLAlchemy 2.0 DeclarativeBase
 │   │   │   ├── database.py          # Async engine, session factory, get_db
 │   │   │   └── models/
-│   │   │       ├── enums.py         # TaskStatus and RunStatus Enums
-│   │   │       ├── guid.py          # Cross-dialect GUID/UUID type
-│   │   │       ├── workspace.py     # Workspace entity
+│   │   │       ├── user.py          # User/Profile entity
+│   │   │       ├── workspace.py     # Workspace entity (with owner_user_id)
 │   │   │       ├── project.py       # Project entity
 │   │   │       ├── task.py          # Task entity
 │   │   │       └── run.py           # Run telemetry entity
-│   │   ├── repositories/            # Repository data access layer
-│   │   │   ├── workspace.py         # Workspace CRUD
-│   │   │   ├── project.py           # Project CRUD
-│   │   │   ├── task.py              # Task CRUD
-│   │   │   └── run.py               # Run telemetry CRUD
+│   │   ├── repositories/            # Multi-tenant repository data access layer
+│   │   │   ├── user.py              # User profile persistence
+│   │   │   ├── workspace.py         # Workspace CRUD scoped to owner
+│   │   │   ├── project.py           # Project CRUD scoped to owner workspace
+│   │   │   ├── task.py              # Task CRUD scoped to owner project
+│   │   │   └── run.py               # Run telemetry CRUD scoped to owner task
 │   │   ├── schemas/                 # Pydantic validation schemas
-│   │   │   ├── health.py
-│   │   │   ├── models.py
-│   │   │   ├── llm.py
-│   │   │   ├── workspace.py
-│   │   │   ├── project.py
-│   │   │   ├── task.py
-│   │   │   └── run.py
-│   │   └── services/
-│   │       └── llm/
-│   │           ├── base.py          # BaseLLMProvider abstract interface
-│   │           ├── factory.py       # LLMProviderFactory registry & router
-│   │           └── providers/
-│   │               └── openai.py    # OpenAI AsyncOpenAI provider adapter
-│   ├── tests/                       # Pytest test suite (33 passing unit tests)
+│   │   └── services/                # Business logic & LLM abstraction
+│   ├── tests/                       # Pytest test suite (44 passing tests)
 │   ├── requirements.txt             # Backend Python dependencies
 │   ├── .env.example                 # Backend environment variable template
 │   └── README.md                    # Backend specific documentation
 ├── src/                             # Next.js Frontend Application
 │   ├── app/                         # App Router pages and layouts
 │   │   ├── page.jsx                 # SaaS landing page (/)
-│   │   ├── layout.jsx               # Root layout & design tokens
+│   │   ├── login/page.jsx           # Sign in page (/login)
+│   │   ├── signup/page.jsx          # Create account page (/signup)
 │   │   └── app/
-│   │       ├── layout.jsx           # Authenticated App Shell with WorkspaceProvider
+│   │       ├── layout.jsx           # Authenticated App Shell with route protection
 │   │       ├── page.jsx             # Live Workspace Dashboard (/app)
-│   │       ├── playground/page.jsx  # LLM Abstraction Playground (/app/playground)
+│   │       ├── playground/page.jsx  # Protected LLM Abstraction Playground (/app/playground)
 │   │       ├── tasks/page.jsx       # Real-time Tasks Management (/app/tasks)
 │   │       ├── projects/page.jsx    # Projects & Context Scopes (/app/projects)
-│   │       └── settings/page.jsx    # Platform & Engine Settings (/app/settings)
-│   ├── components/
-│   │   ├── landing/                 # Hero, Architecture, Capabilities, Navbar, Footer
-│   │   ├── shell/                   # AppSidebar, AppHeader, WorkspaceSelector
-│   │   ├── ui/                      # Reusable Button, Card, Badge, Input, Select, Modal, Table
-│   │   └── features/                # Domain-specific components (Projects, Tasks, Dashboard)
-│   ├── config/                      # Site, env, and constants configs
-│   ├── lib/                         # API client and WorkspaceContext
-│   ├── services/                    # Frontend services (workspaces, projects, tasks, orchestrator)
-│   └── styles/                      # Tailwind CSS v4 & custom dark theme tokens
+│   │       └── settings/page.jsx    # Platform & Auth Settings (/app/settings)
+│   ├── components/                  # UI components, layout shell, and settings tabs
+│   ├── lib/
+│   │   ├── authContext.jsx          # AuthProvider & useAuth hook
+│   │   ├── supabaseClient.js        # Supabase client with offline dev fallback
+│   │   ├── workspaceContext.jsx     # User-scoped workspace context
+│   │   └── api.js                   # Authenticated HTTP client
+│   └── services/                    # Frontend service adapters
 ├── package.json
 └── README.md
 ```
 
 ---
 
-## ⚡ Getting Started
+## ⚡ Environment Variables
 
-### 1. Prerequisites
-- **Node.js**: `v20+` (Tested on `v24`)
-- **Python**: `3.10+` (Tested on `3.12`)
-- **PostgreSQL**: `14+`
+### Frontend (`.env.local` / `.env`)
+```bash
+NEXT_PUBLIC_APP_NAME="AI Work Layer"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_PUBLIC_ORCHESTRATION_API_URL="http://localhost:8000/api"
+
+# Supabase Auth
+NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
+```
+
+### Backend (`backend/.env`)
+```bash
+ENVIRONMENT="development"
+DEBUG=true
+HOST="0.0.0.0"
+PORT=8000
+CORS_ORIGINS=["http://localhost:3000", "http://127.0.0.1:3000"]
+
+# PostgreSQL Database (SQLAlchemy AsyncPG)
+DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ai_work_layer"
+
+# Supabase Auth & JWT Verification
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
+SUPABASE_ANON_KEY="your-supabase-anon-key"
+
+# OpenAI Provider
+OPENAI_API_KEY="sk-..."
+OPENAI_DEFAULT_MODEL="gpt-4o-mini"
+```
 
 ---
 
-### 2. Backend Setup & Database Migrations
+## 🚀 Local Development Setup
+
+### 1. Backend Setup & Database Migrations
 
 ```bash
 # 1. Install dependencies
@@ -149,52 +193,30 @@ pip install -r backend/requirements.txt
 # 2. Configure environment
 cp backend/.env.example backend/.env
 
-# Configure your DATABASE_URL in backend/.env:
-# DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/ai_work_layer
-
-# Optional: Add your OpenAI API Key:
-# OPENAI_API_KEY=sk-...
-
-# 3. Create the PostgreSQL database (if not already created)
-# createdb ai_work_layer
-
-# 4. Run Alembic database migrations
+# 3. Apply Alembic database migrations
 python -m alembic -c backend/alembic.ini upgrade head
 
-# 5. Run backend tests (33 unit tests with async database isolation)
+# 4. Run full test suite (44 passing unit and integration tests)
 python -m pytest backend/tests -v
 
-# 6. Start FastAPI backend server
+# 5. Start FastAPI backend server
 python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend will be running at `http://localhost:8000`.
-- **API Docs (Swagger UI)**: `http://localhost:8000/docs`
+Backend endpoints:
+- **Swagger Docs**: `http://localhost:8000/docs`
 - **Health Check**: `http://localhost:8000/api/health`
-- **Model Directory**: `http://localhost:8000/api/models`
-- **Workspaces API**: `http://localhost:8000/api/workspaces`
+- **Auth Profile**: `http://localhost:8000/api/auth/me`
 
 ---
 
-### 3. Database Migration Commands
-
-| Action | Command |
-| :--- | :--- |
-| **Apply All Migrations** | `python -m alembic -c backend/alembic.ini upgrade head` |
-| **Rollback 1 Migration** | `python -m alembic -c backend/alembic.ini downgrade -1` |
-| **Rollback to Base** | `python -m alembic -c backend/alembic.ini downgrade base` |
-| **View Migration History** | `python -m alembic -c backend/alembic.ini history` |
-| **Inspect Pending SQL** | `python -m alembic -c backend/alembic.ini upgrade head --sql` |
-
----
-
-### 4. Frontend Setup & Startup
+### 2. Frontend Setup & Startup
 
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. Run lint & build validation
+# 2. Run lint and build validation
 npm run lint
 npm run build
 
@@ -202,43 +224,49 @@ npm run build
 npm run dev
 ```
 
-Frontend will be running at `http://localhost:3000`.
+Frontend routes:
 - **Landing Page**: `http://localhost:3000/`
-- **Workspace Dashboard**: `http://localhost:3000/app`
-- **Projects Management**: `http://localhost:3000/app/projects`
-- **Tasks & Runs Management**: `http://localhost:3000/app/tasks`
-- **LLM Abstraction Playground**: `http://localhost:3000/app/playground`
+- **Sign In**: `http://localhost:3000/login`
+- **Sign Up**: `http://localhost:3000/signup`
+- **Protected Dashboard**: `http://localhost:3000/app`
+- **Protected Projects**: `http://localhost:3000/app/projects`
+- **Protected Tasks**: `http://localhost:3000/app/tasks`
+- **Protected Playground**: `http://localhost:3000/app/playground`
+- **Account & Settings**: `http://localhost:3000/app/settings`
 
 ---
 
-## 📡 Core API Reference
+## 📡 API Reference
 
-### Workspaces
-- `POST   /api/workspaces` — Create workspace
-- `GET    /api/workspaces` — List workspaces
-- `GET    /api/workspaces/{workspace_id}` — Get workspace by ID
-- `PATCH  /api/workspaces/{workspace_id}` — Update workspace
-- `DELETE /api/workspaces/{workspace_id}` — Cascade delete workspace
+### Authentication & Profiles
+- `GET    /api/auth/me` — Retrieve authenticated user profile and default workspace context
 
-### Projects
-- `POST   /api/workspaces/{workspace_id}/projects` — Create project in workspace
-- `GET    /api/workspaces/{workspace_id}/projects` — List projects in workspace
-- `GET    /api/projects` — List all projects
-- `GET    /api/projects/{project_id}` — Get project by ID
-- `PATCH  /api/projects/{project_id}` — Update project
-- `DELETE /api/projects/{project_id}` — Cascade delete project
+### Workspaces (Multi-Tenant Scoped)
+- `POST   /api/workspaces` — Create workspace owned by authenticated user
+- `GET    /api/workspaces` — List workspaces owned by authenticated user
+- `GET    /api/workspaces/{workspace_id}` — Get workspace by ID (404 if unowned)
+- `PATCH  /api/workspaces/{workspace_id}` — Update owned workspace
+- `DELETE /api/workspaces/{workspace_id}` — Cascade delete owned workspace
 
-### Tasks & Runs
-- `POST   /api/projects/{project_id}/tasks` — Create task in project
-- `GET    /api/projects/{project_id}/tasks` — List tasks in project
-- `GET    /api/tasks` — List all tasks (with status filtering)
-- `GET    /api/tasks/{task_id}` — Get task by ID
-- `PATCH  /api/tasks/{task_id}` — Update task status/title/description
-- `DELETE /api/tasks/{task_id}` — Cascade delete task
-- `GET    /api/tasks/{task_id}/runs` — List execution runs for task
-- `POST   /api/tasks/{task_id}/runs` — Record an execution run
+### Projects (Multi-Tenant Scoped)
+- `POST   /api/workspaces/{workspace_id}/projects` — Create project in owned workspace
+- `GET    /api/workspaces/{workspace_id}/projects` — List projects in owned workspace
+- `GET    /api/projects` — List all projects in user's workspaces
+- `GET    /api/projects/{project_id}` — Get project by ID (404 if unowned)
+- `PATCH  /api/projects/{project_id}` — Update owned project
+- `DELETE /api/projects/{project_id}` — Cascade delete owned project
 
-### LLM Orchestration
+### Tasks & Runs (Multi-Tenant Scoped)
+- `POST   /api/projects/{project_id}/tasks` — Create task in owned project
+- `GET    /api/projects/{project_id}/tasks` — List tasks in owned project
+- `GET    /api/tasks` — List tasks across user's projects
+- `GET    /api/tasks/{task_id}` — Get task by ID (404 if unowned)
+- `PATCH  /api/tasks/{task_id}` — Update owned task
+- `DELETE /api/tasks/{task_id}` — Cascade delete owned task
+- `GET    /api/tasks/{task_id}/runs` — List runs for owned task
+- `POST   /api/tasks/{task_id}/runs` — Record execution run for owned task
+
+### LLM Orchestration (Authenticated)
 - `GET    /api/models` — List registered models across providers
 - `POST   /api/llm/generate` — Synchronous completion
 - `POST   /api/llm/generate/stream` — SSE token stream

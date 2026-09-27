@@ -23,6 +23,19 @@ class NotFoundError(AppError):
     status_code = status.HTTP_404_NOT_FOUND
 
 
+class AuthenticationError(AppError):
+    """Raised when authentication fails (missing, invalid, or expired token)."""
+    code = "AUTHENTICATION_REQUIRED"
+    status_code = status.HTTP_401_UNAUTHORIZED
+
+
+class AuthorizationError(AppError):
+    """Raised when user lacks permission to access or perform an action on a resource."""
+    code = "FORBIDDEN"
+    status_code = status.HTTP_403_FORBIDDEN
+
+
+
 class ConflictError(AppError):
     """Raised when a uniqueness or integrity conflict occurs (e.g. duplicate slug)."""
     code = "CONFLICT"

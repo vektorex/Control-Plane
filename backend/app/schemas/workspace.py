@@ -56,11 +56,13 @@ class WorkspaceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    owner_user_id: Optional[UUID] = None
     name: str
     slug: str
     created_at: datetime
     updated_at: datetime
     project_count: Optional[int] = 0
+
 
 
 class WorkspaceListResponse(BaseModel):

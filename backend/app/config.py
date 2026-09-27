@@ -59,8 +59,13 @@ class Settings(BaseSettings):
             return url.replace("postgres://", "postgresql+asyncpg://", 1)
         return url
 
-    # Security
+    # Security & Authentication (Supabase Auth)
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_JWT_SECRET: Optional[str] = None
+    SUPABASE_ANON_KEY: Optional[str] = None
+    SUPABASE_AUDIENCE: str = "authenticated"
     ORCHESTRATION_API_SECRET: Optional[str] = None
 
 
 settings = Settings()
+

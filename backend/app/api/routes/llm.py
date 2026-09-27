@@ -2,7 +2,9 @@ import json
 from typing import AsyncIterator
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
+from backend.app.core.auth import get_current_user
 from backend.app.core.logging import logger
+from backend.app.db.models.user import User
 from backend.app.schemas.llm import (
     LLMGenerateRequest,
     LLMGenerateResponse,
@@ -16,6 +18,7 @@ router = APIRouter(prefix="/llm", tags=["LLM Orchestration"])
 @router.post("/generate", response_model=LLMGenerateResponse)
 async def generate_completion(
     request: LLMGenerateRequest,
+    user: User = Depends(get_current_user),
     factory: LLMProviderFactory = Depends(get_llm_factory),
 ) -> LLMGenerateResponse:
     """
@@ -25,7 +28,7 @@ async def generate_completion(
     """
     logger.info(
         f"[LLMRoute] Received generation request for model '{request.model}' "
-        f"with {len(request.messages)} message(s)."
+        f"from user {user.id} with {len(request.messages)} message(s)."
     )
     provider = factory.get_provider_for_model(request.model)
     return await provider.generate(request)
@@ -34,8 +37,10 @@ async def generate_completion(
 @router.post("/generate/stream")
 async def generate_completion_stream(
     request: LLMGenerateRequest,
+    user: User = Depends(get_current_user),
     factory: LLMProviderFactory = Depends(get_llm_factory),
 ):
+
     """
     Execute streaming LLM generation via Server-Sent Events (SSE).
     Yields JSON event payloads followed by a terminal [DONE] event.

@@ -1,5 +1,6 @@
 import "@/styles/globals.css";
 import { siteConfig } from "@/config/site";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 export const metadata = {
   title: {
@@ -23,8 +24,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className="dark scroll-smooth">
       <body className="bg-[#07090e] text-slate-100 min-h-screen antialiased flex flex-col">
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
 }
+

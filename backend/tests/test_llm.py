@@ -1,10 +1,12 @@
 import json
 from backend.app.main import app
+from backend.app.core.auth import create_access_token
 from backend.app.services.llm.factory import get_llm_factory, LLMProviderFactory
-from backend.tests.conftest import MockTestProvider
+from backend.tests.conftest import MockTestProvider, override_get_db
+from backend.app.db.database import get_db
 
 
-def test_generate_success(client):
+def test_generate_success(auth_client):
     payload = {
         "model": "mock-model-v1",
         "messages": [
@@ -12,7 +14,7 @@ def test_generate_success(client):
         ],
         "temperature": 0.5,
     }
-    response = client.post("/api/llm/generate", json=payload)
+    response = auth_client.post("/api/llm/generate", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["content"] == "Mock response for: Hello, work layer!"
@@ -23,46 +25,46 @@ def test_generate_success(client):
     assert data["usage"]["total_tokens"] == 40
 
 
-def test_generate_validation_error_empty_messages(client):
+def test_generate_validation_error_empty_messages(auth_client):
     payload = {
         "model": "mock-model-v1",
         "messages": [],
     }
-    response = client.post("/api/llm/generate", json=payload)
+    response = auth_client.post("/api/llm/generate", json=payload)
     assert response.status_code == 422
     data = response.json()
     assert data["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_generate_validation_error_invalid_temperature(client):
+def test_generate_validation_error_invalid_temperature(auth_client):
     payload = {
         "model": "mock-model-v1",
         "messages": [{"role": "user", "content": "test"}],
         "temperature": 5.0,  # Max is 2.0
     }
-    response = client.post("/api/llm/generate", json=payload)
+    response = auth_client.post("/api/llm/generate", json=payload)
     assert response.status_code == 422
     data = response.json()
     assert data["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_generate_model_not_found(client):
+def test_generate_model_not_found(auth_client):
     payload = {
         "model": "completely-unknown-model-xyz",
         "messages": [{"role": "user", "content": "test"}],
     }
-    response = client.post("/api/llm/generate", json=payload)
+    response = auth_client.post("/api/llm/generate", json=payload)
     assert response.status_code == 404
     data = response.json()
     assert data["error"]["code"] == "MODEL_NOT_FOUND"
 
 
-def test_generate_stream_success(client):
+def test_generate_stream_success(auth_client):
     payload = {
         "model": "mock-model-v1",
         "messages": [{"role": "user", "content": "Stream me"}],
     }
-    response = client.post("/api/llm/generate/stream", json=payload)
+    response = auth_client.post("/api/llm/generate/stream", json=payload)
     assert response.status_code == 200
     assert "text/event-stream" in response.headers["content-type"]
 
@@ -78,37 +80,34 @@ def test_generate_stream_success(client):
     assert first_chunk_json["model"] == "mock-model-v1"
 
 
-def test_generate_provider_auth_failure():
+def test_generate_provider_auth_failure(client, user1_auth):
     factory = LLMProviderFactory()
     failing_provider = MockTestProvider(configured=True, should_fail=True, fail_type="auth")
     factory.register_provider(failing_provider)
 
     app.dependency_overrides[get_llm_factory] = lambda: factory
-    from fastapi.testclient import TestClient
-    with TestClient(app) as test_client:
-        response = test_client.post("/api/llm/generate", json={
-            "model": "mock-model-v1",
-            "messages": [{"role": "user", "content": "test"}]
-        })
-        assert response.status_code == 401
-        data = response.json()
-        assert data["error"]["code"] == "PROVIDER_AUTHENTICATION_ERROR"
-    app.dependency_overrides.clear()
+    response = client.post(
+        "/api/llm/generate",
+        json={"model": "mock-model-v1", "messages": [{"role": "user", "content": "test"}]},
+        headers=user1_auth["headers"],
+    )
+    assert response.status_code == 401
+    data = response.json()
+    assert data["error"]["code"] == "PROVIDER_AUTHENTICATION_ERROR"
 
 
-def test_generate_provider_rate_limit():
+def test_generate_provider_rate_limit(client, user1_auth):
     factory = LLMProviderFactory()
     failing_provider = MockTestProvider(configured=True, should_fail=True, fail_type="rate_limit")
     factory.register_provider(failing_provider)
 
     app.dependency_overrides[get_llm_factory] = lambda: factory
-    from fastapi.testclient import TestClient
-    with TestClient(app) as test_client:
-        response = test_client.post("/api/llm/generate", json={
-            "model": "mock-model-v1",
-            "messages": [{"role": "user", "content": "test"}]
-        })
-        assert response.status_code == 429
-        data = response.json()
-        assert data["error"]["code"] == "PROVIDER_RATE_LIMIT_ERROR"
-    app.dependency_overrides.clear()
+    response = client.post(
+        "/api/llm/generate",
+        json={"model": "mock-model-v1", "messages": [{"role": "user", "content": "test"}]},
+        headers=user1_auth["headers"],
+    )
+    assert response.status_code == 429
+    data = response.json()
+    assert data["error"]["code"] == "PROVIDER_RATE_LIMIT_ERROR"
+

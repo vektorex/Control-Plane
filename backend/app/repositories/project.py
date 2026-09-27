@@ -12,18 +12,25 @@ from backend.app.schemas.workspace import slugify
 
 
 class ProjectRepository:
-    """Repository handling all CRUD queries and persistence logic for Projects."""
+    """Repository handling multi-tenant CRUD queries and persistence logic for Projects."""
 
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_id(self, project_id: UUID) -> Optional[Project]:
-        stmt = select(Project).where(Project.id == project_id)
+    async def get_by_id_and_owner(self, project_id: UUID, owner_user_id: UUID) -> Optional[Project]:
+        stmt = (
+            select(Project)
+            .join(Workspace, Project.workspace_id == Workspace.id)
+            .where(
+                Project.id == project_id,
+                Workspace.owner_user_id == owner_user_id,
+            )
+        )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_id_or_raise(self, project_id: UUID) -> Project:
-        project = await self.get_by_id(project_id)
+    async def get_by_id_and_owner_or_raise(self, project_id: UUID, owner_user_id: UUID) -> Project:
+        project = await self.get_by_id_and_owner(project_id, owner_user_id)
         if not project:
             raise NotFoundError(f"Project with id '{project_id}' not found.")
         return project
@@ -37,10 +44,13 @@ class ProjectRepository:
         return result.scalar_one_or_none()
 
     async def list_by_workspace(
-        self, workspace_id: UUID, skip: int = 0, limit: int = 100
+        self, workspace_id: UUID, owner_user_id: UUID, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Project], int]:
-        # Verify workspace exists
-        ws_stmt = select(Workspace.id).where(Workspace.id == workspace_id)
+        # Verify workspace exists and belongs to owner
+        ws_stmt = select(Workspace.id).where(
+            Workspace.id == workspace_id,
+            Workspace.owner_user_id == owner_user_id,
+        )
         ws_res = await self.session.execute(ws_stmt)
         if not ws_res.scalar_one_or_none():
             raise NotFoundError(f"Workspace with id '{workspace_id}' not found.")
@@ -62,13 +72,22 @@ class ProjectRepository:
         projects = list(res.scalars().all())
         return projects, total
 
-    async def list_all(self, skip: int = 0, limit: int = 100) -> Tuple[List[Project], int]:
-        count_stmt = select(func.count(Project.id))
+    async def list_by_owner(
+        self, owner_user_id: UUID, skip: int = 0, limit: int = 100
+    ) -> Tuple[List[Project], int]:
+        # Count all projects in workspaces owned by user
+        count_stmt = (
+            select(func.count(Project.id))
+            .join(Workspace, Project.workspace_id == Workspace.id)
+            .where(Workspace.owner_user_id == owner_user_id)
+        )
         count_res = await self.session.execute(count_stmt)
         total = count_res.scalar_one() or 0
 
         stmt = (
             select(Project)
+            .join(Workspace, Project.workspace_id == Workspace.id)
+            .where(Workspace.owner_user_id == owner_user_id)
             .order_by(Project.created_at.desc())
             .offset(skip)
             .limit(limit)
@@ -76,9 +95,12 @@ class ProjectRepository:
         res = await self.session.execute(stmt)
         return list(res.scalars().all()), total
 
-    async def create(self, workspace_id: UUID, data: ProjectCreate) -> Project:
-        # Check workspace exists
-        ws_stmt = select(Workspace.id).where(Workspace.id == workspace_id)
+    async def create(self, workspace_id: UUID, owner_user_id: UUID, data: ProjectCreate) -> Project:
+        # Check workspace exists and is owned by user
+        ws_stmt = select(Workspace.id).where(
+            Workspace.id == workspace_id,
+            Workspace.owner_user_id == owner_user_id,
+        )
         ws_res = await self.session.execute(ws_stmt)
         if not ws_res.scalar_one_or_none():
             raise NotFoundError(f"Workspace with id '{workspace_id}' not found.")
@@ -110,8 +132,8 @@ class ProjectRepository:
             await self.session.rollback()
             raise DatabaseError("Failed to create project in database.", details=str(e))
 
-    async def update(self, project_id: UUID, data: ProjectUpdate) -> Project:
-        project = await self.get_by_id_or_raise(project_id)
+    async def update(self, project_id: UUID, owner_user_id: UUID, data: ProjectUpdate) -> Project:
+        project = await self.get_by_id_and_owner_or_raise(project_id, owner_user_id)
 
         if data.name is not None:
             project.name = data.name.strip()
@@ -138,8 +160,8 @@ class ProjectRepository:
             await self.session.rollback()
             raise DatabaseError("Failed to update project.", details=str(e))
 
-    async def delete(self, project_id: UUID) -> bool:
-        project = await self.get_by_id_or_raise(project_id)
+    async def delete(self, project_id: UUID, owner_user_id: UUID) -> bool:
+        project = await self.get_by_id_and_owner_or_raise(project_id, owner_user_id)
         await self.session.delete(project)
         try:
             await self.session.flush()

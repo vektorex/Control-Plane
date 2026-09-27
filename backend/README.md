@@ -1,31 +1,40 @@
 # AI Work Layer — Backend Service
 
-A high-performance Python FastAPI service providing a provider-agnostic LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, and Alembic database migrations.
+A high-performance Python FastAPI service providing a provider-agnostic LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, multi-tenant isolation, Supabase Auth JWT verification, and Alembic database migrations.
 
 ---
 
-## 🏛️ Architecture Overview
+## 🏛️ Architecture & Enforcement Pipeline
+
+Every backend operation follows this mandatory architectural flow:
+```
+Request ──► Authentication ──► Authorization / Ownership ──► Validation ──► Service ──► Repository ──► Database
+```
 
 ```
 Next.js Frontend (Port 3000)
        │
-       ▼ (HTTP / SSE)
-FastAPI Backend Routes (/api/workspaces, /api/projects, /api/tasks, /api/llm, /api/models, /api/health)
+       ▼ (HTTP Bearer JWT / SSE Stream)
+FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /api/llm, /api/models, /api/health)
+       │
+       ├── Core Security & Auth Layer
+       │     ├── get_current_user (JWT verification via Supabase secret or JWKS)
+       │     ├── verify_workspace_access / verify_project_access / verify_task_access
+       │     └── AuthService (Idempotent user & default workspace bootstrap)
        │
        ├── LLM Abstraction Layer (Dynamic Provider & Model Resolution)
        │     └── BaseLLMProvider -> OpenAIProvider, Anthropic, Gemini, Local
        │
-       └── Repository Layer (Decoupled Persistence & Query Handlers)
-             ├── WorkspaceRepository
-             ├── ProjectRepository
-             ├── TaskRepository
-             └── RunRepository
+       └── Multi-Tenant Repository Layer (Decoupled Persistence Scoped to Owner)
+             ├── UserRepository
+             ├── WorkspaceRepository (scoped by owner_user_id)
+             ├── ProjectRepository (scoped by workspace owner)
+             ├── TaskRepository (scoped by project/workspace owner)
+             └── RunRepository (scoped by task/workspace owner)
                    │
                    ▼
              PostgreSQL Database (AsyncPG + SQLAlchemy 2.x ORM)
 ```
-
-> **Note on Authentication:** Authentication and multi-user tenant isolation will be implemented in a subsequent step. Currently, the system operates in a development-only workspace context to establish the core data model.
 
 ---
 
@@ -45,10 +54,15 @@ Copy `.env.example` to `.env`:
 ```bash
 cp backend/.env.example backend/.env
 ```
-Set your database and provider API keys:
+Set your database, Supabase Auth secret, and provider API keys:
 ```env
 # PostgreSQL connection (AsyncPG driver)
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/ai_work_layer
+
+# Supabase Auth
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+SUPABASE_ANON_KEY=your-supabase-anon-key
 
 # OpenAI configuration
 OPENAI_API_KEY=sk-...
@@ -73,7 +87,7 @@ API Documentation will be available at:
 
 ## 🧪 Running Tests
 
-The test suite validates request schemas, health checks, provider factory resolution, model completion, streaming, workspace/project/task CRUD, and error handling with isolated async SQLite database sessions:
+The test suite validates authentication, cross-tenant isolation, request schemas, health checks, provider factory resolution, model completion, streaming, and error handling with isolated async SQLite database sessions:
 ```bash
 python -m pytest backend/tests -v
 ```
@@ -94,43 +108,34 @@ python -m pytest backend/tests -v
 
 ## 📡 API Reference
 
-### 1. Health Status
-`GET /api/health`
-```json
-{
-  "status": "healthy",
-  "version": "0.1.0",
-  "timestamp": "2026-09-27T12:00:00Z",
-  "environment": "development",
-  "providers_configured": ["openai"]
-}
-```
+### 1. Authentication & Profiles
+- `GET /api/auth/me` — Retrieve authenticated user profile and default workspace context
 
-### 2. Workspaces
-- `POST   /api/workspaces` — Create workspace
-- `GET    /api/workspaces` — List workspaces
-- `GET    /api/workspaces/{workspace_id}` — Get workspace by ID
-- `PATCH  /api/workspaces/{workspace_id}` — Update workspace
-- `DELETE /api/workspaces/{workspace_id}` — Cascade delete workspace
-- `POST   /api/workspaces/{workspace_id}/projects` — Create project under workspace
-- `GET    /api/workspaces/{workspace_id}/projects` — List projects in workspace
+### 2. Workspaces (Multi-Tenant Scoped)
+- `POST   /api/workspaces` — Create workspace owned by authenticated user
+- `GET    /api/workspaces` — List workspaces owned by authenticated user
+- `GET    /api/workspaces/{workspace_id}` — Get workspace by ID (404 if unowned)
+- `PATCH  /api/workspaces/{workspace_id}` — Update owned workspace
+- `DELETE /api/workspaces/{workspace_id}` — Cascade delete owned workspace
+- `POST   /api/workspaces/{workspace_id}/projects` — Create project under owned workspace
+- `GET    /api/workspaces/{workspace_id}/projects` — List projects in owned workspace
 
-### 3. Projects
-- `GET    /api/projects` — List all projects across platform
-- `GET    /api/projects/{project_id}` — Get project by ID
-- `PATCH  /api/projects/{project_id}` — Update project
-- `DELETE /api/projects/{project_id}` — Cascade delete project
-- `POST   /api/projects/{project_id}/tasks` — Create task under project
-- `GET    /api/projects/{project_id}/tasks` — List tasks under project
+### 3. Projects (Multi-Tenant Scoped)
+- `GET    /api/projects` — List all projects belonging to user's workspaces
+- `GET    /api/projects/{project_id}` — Get project by ID (404 if unowned)
+- `PATCH  /api/projects/{project_id}` — Update owned project
+- `DELETE /api/projects/{project_id}` — Cascade delete owned project
+- `POST   /api/projects/{project_id}/tasks` — Create task under owned project
+- `GET    /api/projects/{project_id}/tasks` — List tasks under owned project
 
-### 4. Tasks & Runs
-- `GET    /api/tasks` — List all tasks (supports `?status=draft|active|completed|archived`)
-- `GET    /api/tasks/{task_id}` — Get task by ID
-- `PATCH  /api/tasks/{task_id}` — Update task
-- `DELETE /api/tasks/{task_id}` — Cascade delete task
-- `GET    /api/tasks/{task_id}/runs` — List runs associated with task
-- `POST   /api/tasks/{task_id}/runs` — Record run telemetry
+### 4. Tasks & Runs (Multi-Tenant Scoped)
+- `GET    /api/tasks` — List tasks for authenticated user
+- `GET    /api/tasks/{task_id}` — Get task by ID (404 if unowned)
+- `PATCH  /api/tasks/{task_id}` — Update owned task
+- `DELETE /api/tasks/{task_id}` — Cascade delete owned task
+- `GET    /api/tasks/{task_id}/runs` — List runs for owned task
+- `POST   /api/tasks/{task_id}/runs` — Record run telemetry for owned task
 
-### 5. LLM Generation
+### 5. LLM Generation (Authenticated)
 - `POST /api/llm/generate` — Non-streaming completion
 - `POST /api/llm/generate/stream` — Real-time Server-Sent Events (SSE) token stream

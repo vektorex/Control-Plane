@@ -40,7 +40,15 @@ class LLMProviderFactory:
     def get_provider_for_model(self, model_id: str) -> BaseLLMProvider:
         """
         Find the registered provider adapter that supports the given model identifier.
+        Supports both bare model IDs ('gpt-4o') and namespaced identifiers ('openai/gpt-4o').
         """
+        # Check namespaced prefix (e.g. "openai/gpt-4o")
+        if "/" in model_id:
+            prefix, bare_model = model_id.split("/", 1)
+            if prefix in self._providers:
+                return self._providers[prefix]
+            model_id = bare_model
+
         # 1. Exact match among registered models
         for provider in self._providers.values():
             for m in provider.get_models():

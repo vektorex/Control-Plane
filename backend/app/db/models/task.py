@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class Task(Base):
     """
-    Task entity representing an orchestrated unit of work with status and history.
+    Task entity representing an executable unit of work with instructions, context, status, and run history.
     """
     __tablename__ = "tasks"
 
@@ -33,6 +33,8 @@ class Task(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    context_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,

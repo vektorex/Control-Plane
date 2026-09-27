@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,6 +15,9 @@ class RunBase(BaseModel):
     total_tokens: Optional[int] = Field(default=None, ge=0)
     latency_ms: Optional[int] = Field(default=None, ge=0)
     error_message: Optional[str] = Field(default=None)
+    input_snapshot: Optional[Dict[str, Any]] = Field(default=None, description="Snapshot of prompt & parameters sent to model")
+    output_content: Optional[str] = Field(default=None, description="Full text output returned by LLM")
+    started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
 
@@ -35,7 +38,10 @@ class RunResponse(BaseModel):
     total_tokens: Optional[int] = None
     latency_ms: Optional[int] = None
     error_message: Optional[str] = None
+    input_snapshot: Optional[Dict[str, Any]] = None
+    output_content: Optional[str] = None
     created_at: datetime
+    started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
 

@@ -1,5 +1,6 @@
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
+from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -96,6 +97,9 @@ class RunRepository:
             total_tokens=data.total_tokens,
             latency_ms=data.latency_ms,
             error_message=data.error_message,
+            input_snapshot=data.input_snapshot,
+            output_content=data.output_content,
+            started_at=data.started_at,
             completed_at=data.completed_at,
         )
         self.session.add(run)

@@ -123,6 +123,8 @@ class TaskRepository:
             project_id=project_id,
             title=data.title.strip(),
             description=data.description.strip() if data.description else None,
+            instructions=data.instructions.strip() if data.instructions else None,
+            context_text=data.context_text.strip() if data.context_text else None,
             status=data.status.value if hasattr(data.status, "value") else str(data.status),
         )
         self.session.add(task)
@@ -143,8 +145,15 @@ class TaskRepository:
         if data.description is not None:
             task.description = data.description.strip() if data.description else None
 
+        if data.instructions is not None:
+            task.instructions = data.instructions.strip() if data.instructions else None
+
+        if data.context_text is not None:
+            task.context_text = data.context_text.strip() if data.context_text else None
+
         if data.status is not None:
             task.status = data.status.value if hasattr(data.status, "value") else str(data.status)
+
 
         try:
             await self.session.flush()

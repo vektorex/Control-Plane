@@ -77,7 +77,16 @@ export function TaskList({ tasks = [], onSelectTask, onOpenCreateTask }) {
                 {formatDate(task.created_at || task.createdAt || new Date())}
               </TableCell>
               <TableCell className="text-right">
-                <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+                <div className="flex items-center justify-end gap-1">
+                  <a
+                    href={`/app/tasks/${task.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+                    title="Open Task Workspace"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </a>
+                </div>
               </TableCell>
             </TableRow>
           ))}

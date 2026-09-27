@@ -237,7 +237,7 @@ export function TaskDetailDrawer({ task, onClose, onTaskUpdated, onTaskDeleted }
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between">
+        <div className="p-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between gap-2">
           <Button
             variant="destructive"
             size="sm"
@@ -245,11 +245,24 @@ export function TaskDetailDrawer({ task, onClose, onTaskUpdated, onTaskDeleted }
             onClick={handleDelete}
             disabled={isDeleting}
           >
-            {isDeleting ? "Deleting..." : "Delete Task"}
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Close Drawer
-          </Button>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Play}
+              onClick={() => {
+                window.location.href = `/app/tasks/${task.id}`;
+              }}
+            >
+              Open Workspace
+            </Button>
+            <Button variant="secondary" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -11,6 +11,8 @@ import { projectService } from "@/services/projects";
 export function CreateTaskModal({ isOpen, onClose, projects = [], onTaskCreated }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [contextText, setContextText] = useState("");
   const [projectId, setProjectId] = useState(projects[0]?.id || "");
   const [status, setStatus] = useState("draft");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,11 +42,15 @@ export function CreateTaskModal({ isOpen, onClose, projects = [], onTaskCreated 
       const payload = {
         title: title.trim(),
         description: description.trim() || undefined,
+        instructions: instructions.trim() || undefined,
+        context_text: contextText.trim() || undefined,
         status: status,
       };
       const created = await projectService.createProjectTask(targetProjId, payload);
       setTitle("");
       setDescription("");
+      setInstructions("");
+      setContextText("");
       setStatus("draft");
       onTaskCreated?.(created);
       onClose();
@@ -60,7 +66,7 @@ export function CreateTaskModal({ isOpen, onClose, projects = [], onTaskCreated 
       isOpen={isOpen}
       onClose={onClose}
       title="Create Work Task"
-      description="Define a new task unit within a project scope to organize goals and execution runs."
+      description="Define a new AI work task unit with executable instructions and context."
       footer={
         <>
           <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
@@ -88,7 +94,7 @@ export function CreateTaskModal({ isOpen, onClose, projects = [], onTaskCreated 
 
         <Input
           label="Task Title / Goal"
-          placeholder="e.g. Implement PostgreSQL persistence layer"
+          placeholder="e.g. Analyze authentication implementation"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -96,11 +102,19 @@ export function CreateTaskModal({ isOpen, onClose, projects = [], onTaskCreated 
         />
 
         <Textarea
-          label="Task Description & Scope"
-          placeholder="Describe task goals, constraints, and instructions..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          label="AI Instructions"
+          placeholder="Detailed instructions for the AI model to execute..."
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
           rows={3}
+        />
+
+        <Textarea
+          label="Context / Supplementary Data (Optional)"
+          placeholder="Paste relevant code, background text, or data..."
+          value={contextText}
+          onChange={(e) => setContextText(e.target.value)}
+          rows={2}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

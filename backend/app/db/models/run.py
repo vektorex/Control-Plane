@@ -90,6 +90,12 @@ class Run(Base):
     iteration_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=1)
     completion_evaluation: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
+    # Step 12: Model Router & Intelligence Metadata
+    estimated_cost: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    model_selection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model_routing_policy: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    fallback_attempts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+
 
     created_at: Mapped[datetime] = mapped_column(
 

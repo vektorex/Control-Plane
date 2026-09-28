@@ -1,16 +1,17 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from backend.app.core.errors import ModelNotFoundError, ProviderNotConfiguredError
 from backend.app.core.logging import logger
 from backend.app.schemas.models import ModelInfo, ModelListResponse, ProviderInfo
 from backend.app.services.llm.base import BaseLLMProvider
 from backend.app.services.llm.providers.openai import OpenAIProvider
+from backend.app.services.llm.providers.mock import MockLLMProvider
 
 
 class LLMProviderFactory:
     """
     Registry and factory for LLM Providers.
-    Decouples API routes from specific vendor implementations and provides
-    dynamic resolution of models to their appropriate provider adapters.
+    Decouples API routes and orchestration from specific vendor implementations
+    and provides dynamic resolution of models and ModelSelections to provider adapters.
     """
 
     def __init__(self):
@@ -37,11 +38,15 @@ class LLMProviderFactory:
             raise ProviderNotConfiguredError(f"Provider '{provider_id}' is not registered in this system.")
         return self._providers[provider_id]
 
-    def get_provider_for_model(self, model_id: str) -> BaseLLMProvider:
+    def get_provider_for_model(self, model_id: str, provider_id: Optional[str] = None) -> BaseLLMProvider:
         """
         Find the registered provider adapter that supports the given model identifier.
+        If provider_id is explicitly provided, fetches that provider directly.
         Supports both bare model IDs ('gpt-4o') and namespaced identifiers ('openai/gpt-4o').
         """
+        if provider_id and provider_id in self._providers:
+            return self._providers[provider_id]
+
         # Check namespaced prefix (e.g. "openai/gpt-4o")
         if "/" in model_id:
             prefix, bare_model = model_id.split("/", 1)
@@ -64,6 +69,15 @@ class LLMProviderFactory:
         raise ModelNotFoundError(
             f"Model '{model_id}' is not supported by any registered LLM provider."
         )
+
+    def resolve_from_selection(self, selection: Any) -> BaseLLMProvider:
+        """
+        Resolves the appropriate BaseLLMProvider from a normalized ModelSelection object.
+        Accepts ModelSelection instance or dict with provider/model_id.
+        """
+        provider_id = getattr(selection, "provider", None) or (selection.get("provider") if isinstance(selection, dict) else None)
+        model_id = getattr(selection, "model_id", None) or getattr(selection, "model", None) or (selection.get("model_id") or selection.get("model") if isinstance(selection, dict) else "")
+        return self.get_provider_for_model(model_id=model_id, provider_id=provider_id)
 
     def has_provider_for_model(self, model_id: str) -> bool:
         """Check if any registered provider supports the given model identifier."""

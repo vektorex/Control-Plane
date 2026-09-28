@@ -54,6 +54,12 @@ class RunBase(BaseModel):
     iteration_count: Optional[int] = Field(default=1, ge=1, description="Number of agentic execution loop iterations performed")
     completion_evaluation: Optional[Dict[str, Any]] = Field(default=None, description="Structured completion evaluator decision")
 
+    # Step 12: Model Router & Intelligence Metadata
+    estimated_cost: Optional[float] = Field(default=None, description="Estimated execution cost in USD if pricing available")
+    model_selection_reason: Optional[str] = Field(default=None, description="Reason model was selected by router or approved")
+    model_routing_policy: Optional[str] = Field(default=None, description="Routing policy applied (e.g. balanced, manual)")
+    fallback_attempts: Optional[int] = Field(default=0, ge=0, description="Number of model fallback attempts during execution")
+
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -109,6 +115,10 @@ class RunResponse(BaseModel):
     repair_count: Optional[int] = 0
     iteration_count: Optional[int] = 1
     completion_evaluation: Optional[Dict[str, Any]] = None
+    estimated_cost: Optional[float] = None
+    model_selection_reason: Optional[str] = None
+    model_routing_policy: Optional[str] = None
+    fallback_attempts: Optional[int] = 0
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

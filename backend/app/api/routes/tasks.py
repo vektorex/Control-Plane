@@ -10,6 +10,11 @@ from backend.app.db.models.user import User
 from backend.app.repositories.task import TaskRepository
 from backend.app.repositories.run import RunRepository
 from backend.app.repositories.context import ContextRepository
+from backend.app.schemas.models import (
+    ModelRequirementsSchema,
+    ModelSelectionSchema,
+    TaskModelPreviewResponse,
+)
 from backend.app.schemas.task import (
     TaskCreate,
     TaskUpdate,
@@ -20,9 +25,9 @@ from backend.app.schemas.task import (
     RetrievalPreviewResponse,
 )
 from backend.app.schemas.run import (
-    RunCreate,
     RunResponse,
     RunListResponse,
+    RunCreate,
 )
 from backend.app.schemas.context import (
     TaskContextCreate,
@@ -30,6 +35,10 @@ from backend.app.schemas.context import (
     TaskContextListResponse,
     ContextItemDTO,
     ContextInspectResponse,
+)
+from backend.app.services.models.router import (
+    ModelRequirementAnalyzer,
+    default_model_router,
 )
 from backend.app.services.context.engine import get_context_engine, ContextEngine
 from backend.app.services.context.token_estimator import estimate_tokens
@@ -128,6 +137,69 @@ async def plan_task(
     req = request or TaskPlanRequest()
     service = TaskExecutionService(session, factory)
     return await service.plan_task(task_id, user, req)
+
+
+@router.post("/{task_id}/model-preview", response_model=TaskModelPreviewResponse)
+async def preview_task_model(
+    task_id: UUID,
+    request: Optional[TaskRunRequest] = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    factory: LLMProviderFactory = Depends(get_llm_factory),
+) -> TaskModelPreviewResponse:
+    """
+    Analyze task requirements, run ModelRouter, and preview the selected model without executing the task.
+    """
+    repo = TaskRepository(session)
+    task = await repo.get_by_id_and_owner_or_raise(task_id, user.id)
+
+    req = request or TaskRunRequest()
+    context_tokens = estimate_tokens(task.context_text or "")
+
+    # Analyze requirements deterministically
+    requirements = ModelRequirementAnalyzer.analyze(
+        task=task,
+        context_token_estimate=context_tokens,
+        enable_tools=bool(req.enable_web_search or (req.tools_enabled and len(req.tools_enabled) > 0) or req.tool_mode == "enabled"),
+        streaming=True,
+        latency_preference=req.latency_preference or "balanced",
+        cost_preference=req.cost_preference or "balanced",
+        manual_model_pref=req.model if (req.model_mode == "manual" or (getattr(task, "model_mode", None) == "manual" and req.model)) else None,
+    )
+
+    model_mode = req.model_mode or getattr(task, "model_mode", "auto") or "auto"
+
+    if model_mode == "manual" and req.model:
+        selection = default_model_router.validate_manual_selection(
+            model_id=req.model,
+            requirements=requirements,
+        )
+    else:
+        selection = default_model_router.route(requirements, policy_name=req.cost_preference or "balanced")
+
+    return TaskModelPreviewResponse(
+        task_id=str(task.id),
+        model_mode=model_mode,
+        requirements=ModelRequirementsSchema(**requirements.model_dump()),
+        selection=ModelSelectionSchema(
+            provider=selection.provider,
+            model_id=selection.model_id,
+            display_name=selection.display_name,
+            reason=selection.reason,
+            policy=selection.policy,
+            satisfied_requirements=selection.satisfied_requirements,
+            fallback_candidates=[
+                {
+                    "provider": fb.provider,
+                    "model_id": fb.model_id,
+                    "display_name": fb.display_name,
+                    "reason": fb.reason,
+                }
+                for fb in selection.fallback_candidates
+            ],
+            metadata=selection.metadata,
+        ),
+    )
 
 
 @router.post("/{task_id}/run", response_model=RunResponse, status_code=status.HTTP_201_CREATED)

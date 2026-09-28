@@ -6,6 +6,7 @@ from typing import AsyncIterator, Dict, List, Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.config import settings
 from backend.app.core.errors import AppError, InvalidStateError
 from backend.app.core.logging import logger
 from backend.app.db.models.enums import RunStatus, TaskStatus
@@ -20,15 +21,43 @@ from backend.app.schemas.task import TaskRunRequest
 from backend.app.services.context.engine import ContextEngine, get_context_engine
 from backend.app.services.context.models import ContextBudget
 from backend.app.services.llm.factory import LLMProviderFactory, get_llm_factory
+from backend.app.services.models.registry import default_model_registry
+from backend.app.services.models.router import ModelRequirementAnalyzer, default_model_router
 from backend.app.services.orchestration.orchestrator import Orchestrator, get_orchestrator
 from backend.app.services.orchestration.plan import ExecutionPlan, StepType
+
+
+def calculate_estimated_cost(
+    model_id: Optional[str],
+    provider_id: Optional[str],
+    input_tokens: Optional[int],
+    output_tokens: Optional[int],
+) -> Optional[float]:
+    """
+    Calculates estimated run cost based on configured ModelRegistry cost metadata.
+    Returns None if pricing configuration is unavailable without guessing.
+    """
+    if not model_id or (input_tokens is None and output_tokens is None):
+        return None
+    model_def = default_model_registry.get_model(model_id, provider=provider_id)
+    if not model_def or not model_def.cost_metadata:
+        return None
+    in_rate = model_def.cost_metadata.input_cost_per_1k_tokens
+    out_rate = model_def.cost_metadata.output_cost_per_1k_tokens
+    if in_rate is None and out_rate is None:
+        return None
+
+    in_tok = input_tokens or 0
+    out_tok = output_tokens or 0
+    total = ((in_tok / 1000.0) * (in_rate or 0.0)) + ((out_tok / 1000.0) * (out_rate or 0.0))
+    return round(total, 6)
 
 
 class TaskExecutionService:
     """
     Service responsible for turning a Task entity into an orchestrated AI workflow
     via the Orchestration Engine, coordinating planning, retrieval, tools, context,
-    and persisting execution runs with complete observability.
+    intelligent model routing, and persisting execution runs with complete observability.
     """
 
     def __init__(
@@ -91,10 +120,7 @@ class TaskExecutionService:
             session=self.session,
         )
 
-        model_name = request.model or "gpt-4o-mini"
-        provider = self.factory.get_provider_for_model(model_name)
-
-        # 2. Extract planning metadata for initial run snapshot
+        # 2. Extract planning metadata
         retrieval_meta = plan.metadata.get("retrieval_decision", {})
         retrieval_required = retrieval_meta.get("retrieval_required", False)
         raw_strat = retrieval_meta.get("strategy")
@@ -111,25 +137,68 @@ class TaskExecutionService:
         tool_steps = [s for s in plan.steps if s.type == StepType.TOOL]
         tools_planned = [s.tool for s in tool_steps if s.tool]
 
+        # 3. Model Requirement Extraction and Model Routing (Step 12)
+        model_mode = request.model_mode or getattr(task, "model_mode", None) or settings.DEFAULT_MODEL_MODE or "auto"
+        latency_pref = request.latency_preference or getattr(task, "latency_preference", "balanced")
+        cost_pref = request.cost_preference or getattr(task, "cost_preference", "balanced")
+
+        model_reqs = ModelRequirementAnalyzer.analyze(
+            task=task,
+            context_token_estimate=request.max_context_tokens or 8000,
+            enable_tools=bool(tools_planned or request.tool_mode == "enabled" or request.enable_web_search),
+            streaming=False,
+            execution_plan=plan,
+            latency_preference=latency_pref,
+            cost_preference=cost_pref,
+            manual_model_pref=request.model or getattr(task, "preferred_model", None),
+        )
+
+        if model_mode == "manual" and (request.model or getattr(task, "preferred_model", None)):
+            target_manual = request.model or getattr(task, "preferred_model", settings.GENERATION_DEFAULT_MODEL)
+            model_selection = default_model_router.validate_manual_selection(
+                model_id=target_manual,
+                provider=request.provider,
+                requirements=model_reqs,
+            )
+        else:
+            model_selection = default_model_router.route(
+                requirements=model_reqs,
+                policy_name=latency_pref,
+            )
+
+        # Inject routed model and fallback candidates into generate steps
+        for step in plan.steps:
+            if step.type == StepType.GENERATE:
+                step.model = model_selection.model_id
+                if step.metadata is None:
+                    step.metadata = {}
+                step.metadata["model_selection"] = model_selection.model_dump(mode="json")
+
         plan_json = plan.model_dump(mode="json")
         planner_mode = plan.metadata.get("planner_mode") or request.planner_mode or "hybrid"
         planner_model = plan.metadata.get("planner_model")
         repair_count = plan.metadata.get("repair_count", 0)
 
-        # 3. Create initial Run in 'running' status
+        # 4. Create initial Run in 'running' status
         start_time = time.perf_counter()
         run = Run(
             task_id=task.id,
             status=RunStatus.RUNNING.value,
-            model_provider=provider.provider_id,
-            model_name=model_name,
-            final_model=model_name,
+            model_provider=model_selection.provider,
+            model_name=model_selection.model_id,
+            final_model=model_selection.model_id,
+            model_selection_reason=model_selection.reason,
+            model_routing_policy=model_selection.policy,
+            fallback_attempts=0,
             planner_mode=planner_mode,
             planner_model=planner_model,
             repair_count=repair_count,
             iteration_count=1,
             input_snapshot={
-                "model": model_name,
+                "model": model_selection.model_id,
+                "provider": model_selection.provider,
+                "model_mode": model_mode,
+                "model_selection": model_selection.model_dump(mode="json"),
                 "temperature": request.temperature,
                 "max_context_tokens": request.max_context_tokens or 8000,
                 "execution_plan": plan_json,
@@ -152,7 +221,7 @@ class TaskExecutionService:
         await self.session.flush()
         await self.session.refresh(run)
 
-        # 4. Execute Orchestration Plan with bounded agentic loop
+        # 5. Execute Orchestration Plan with bounded agentic loop
         try:
             state = await self.orchestrator.execute_task(
                 task=task,
@@ -161,7 +230,7 @@ class TaskExecutionService:
                 session=self.session,
             )
 
-            # 5. Harvest execution state telemetry
+            # 6. Harvest execution state telemetry
             tools_used = []
             tool_call_count = len(state.tool_results)
             tool_latency_total = 0
@@ -222,6 +291,23 @@ class TaskExecutionService:
             run.tool_errors = tool_errors if tool_errors else None
             run.tool_executions = tool_executions if tool_executions else None
 
+            # Final Model, Fallback & Cost telemetry (Step 12)
+            final_mod = state.metadata.get("final_model") or model_selection.model_id
+            final_prov = state.metadata.get("model_provider") or model_selection.provider
+            fallback_attempts = state.metadata.get("fallback_attempts", 0)
+
+            run.final_model = final_mod
+            run.model_provider = final_prov
+            run.fallback_attempts = fallback_attempts
+            run.model_selection_reason = model_selection.reason
+            run.model_routing_policy = model_selection.policy
+            run.estimated_cost = calculate_estimated_cost(
+                model_id=final_mod,
+                provider_id=final_prov,
+                input_tokens=run.input_tokens,
+                output_tokens=run.output_tokens,
+            )
+
             # Step 11 updates
             run.planner_mode = state.planning_mode or planner_mode
             run.planner_model = state.planner_model or planner_model
@@ -278,9 +364,6 @@ class TaskExecutionService:
             yield f"data: {json.dumps({'type': 'error', 'error': 'Task has no instructions, description, or title.'})}\n\n"
             return
 
-        model_name = request.model or "gpt-4o-mini"
-        provider = self.factory.get_provider_for_model(model_name)
-
         # 1. Generate & Validate Plan
         try:
             plan = await self.orchestrator.plan_task(
@@ -299,6 +382,47 @@ class TaskExecutionService:
         retrieval_strategy = raw_strat.value if hasattr(raw_strat, "value") else (str(raw_strat) if raw_strat else None)
         raw_scope = retrieval_meta.get("scope")
         retrieval_scope = raw_scope.value if hasattr(raw_scope, "value") else (str(raw_scope) if raw_scope else None)
+
+        tool_steps = [s for s in plan.steps if s.type == StepType.TOOL]
+        tools_planned = [s.tool for s in tool_steps if s.tool]
+
+        # 2. Model Routing (Step 12)
+        model_mode = request.model_mode or getattr(task, "model_mode", None) or settings.DEFAULT_MODEL_MODE or "auto"
+        latency_pref = request.latency_preference or getattr(task, "latency_preference", "balanced")
+        cost_pref = request.cost_preference or getattr(task, "cost_preference", "balanced")
+
+        model_reqs = ModelRequirementAnalyzer.analyze(
+            task=task,
+            context_token_estimate=request.max_context_tokens or 8000,
+            enable_tools=bool(tools_planned or request.tool_mode == "enabled" or request.enable_web_search),
+            streaming=True,
+            execution_plan=plan,
+            latency_preference=latency_pref,
+            cost_preference=cost_pref,
+            manual_model_pref=request.model or getattr(task, "preferred_model", None),
+        )
+
+        if model_mode == "manual" and (request.model or getattr(task, "preferred_model", None)):
+            target_manual = request.model or getattr(task, "preferred_model", settings.GENERATION_DEFAULT_MODEL)
+            model_selection = default_model_router.validate_manual_selection(
+                model_id=target_manual,
+                provider=request.provider,
+                requirements=model_reqs,
+            )
+        else:
+            model_selection = default_model_router.route(
+                requirements=model_reqs,
+                policy_name=latency_pref,
+            )
+
+        # Inject routed model into generate step
+        for step in plan.steps:
+            if step.type == StepType.GENERATE:
+                step.model = model_selection.model_id
+                if step.metadata is None:
+                    step.metadata = {}
+                step.metadata["model_selection"] = model_selection.model_dump(mode="json")
+
         plan_json = plan.model_dump(mode="json")
         planner_mode = plan.metadata.get("planner_mode") or request.planner_mode or "hybrid"
         planner_model = plan.metadata.get("planner_model")
@@ -320,14 +444,17 @@ class TaskExecutionService:
             budget=ContextBudget(max_context_tokens=request.max_context_tokens or 8000),
         )
 
-        # 2. Create Run entity in DB
+        # 3. Create Run entity in DB
         start_time = time.perf_counter()
         run = Run(
             task_id=task.id,
             status=RunStatus.RUNNING.value,
-            model_provider=provider.provider_id,
-            model_name=model_name,
-            final_model=model_name,
+            model_provider=model_selection.provider,
+            model_name=model_selection.model_id,
+            final_model=model_selection.model_id,
+            model_selection_reason=model_selection.reason,
+            model_routing_policy=model_selection.policy,
+            fallback_attempts=0,
             planner_mode=planner_mode,
             planner_model=planner_model,
             repair_count=repair_count,
@@ -341,15 +468,16 @@ class TaskExecutionService:
             retrieval_top_k=retrieval_meta.get("top_k"),
             retrieval_reason=retrieval_meta.get("reason"),
             retrieval_confidence=retrieval_meta.get("confidence"),
-            tools_used=[s.tool for s in plan.steps if s.type == StepType.TOOL and s.tool],
+            tools_used=tools_planned if tools_planned else None,
             started_at=datetime.now(timezone.utc),
         )
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
 
-        # Emit run_start
+        # Emit run_start and model_selected events
         yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'execution_plan': plan_json, 'orchestration_plan': plan_json, 'tools_used': run.tools_used, 'retrieval_enabled': retrieval_required, 'context_item_count': init_pkg.total_items, 'estimated_context_tokens': init_pkg.estimated_tokens, 'context_truncated': init_pkg.truncated, 'context_sources': list(init_pkg.sources)})}\n\n"
+        yield f"data: {json.dumps({'type': 'model_selected', 'model': model_selection.model_id, 'provider': model_selection.provider, 'display_name': model_selection.display_name, 'reason': model_selection.reason, 'policy': model_selection.policy, 'satisfied_requirements': model_selection.satisfied_requirements})}\n\n"
 
         accumulated_output = ""
         step_records_final = []
@@ -395,6 +523,23 @@ class TaskExecutionService:
             run.output_tokens = tok_meta.get("output_tokens")
             run.total_tokens = tok_meta.get("total_tokens")
 
+            # Final model and fallback metadata
+            final_mod = final_orch_state.get("metadata", {}).get("final_model") if final_orch_state else model_selection.model_id
+            final_prov = final_orch_state.get("metadata", {}).get("model_provider") if final_orch_state else model_selection.provider
+            fallback_attempts = final_orch_state.get("metadata", {}).get("fallback_attempts", 0) if final_orch_state else 0
+
+            run.final_model = final_mod or model_selection.model_id
+            run.model_provider = final_prov or model_selection.provider
+            run.fallback_attempts = fallback_attempts
+            run.model_selection_reason = model_selection.reason
+            run.model_routing_policy = model_selection.policy
+            run.estimated_cost = calculate_estimated_cost(
+                model_id=run.final_model,
+                provider_id=run.model_provider,
+                input_tokens=run.input_tokens,
+                output_tokens=run.output_tokens,
+            )
+
             if final_orch_state:
                 run.planner_mode = final_orch_state.get("planning_mode", planner_mode)
                 run.planner_model = final_orch_state.get("planner_model", planner_model)
@@ -414,18 +559,6 @@ class TaskExecutionService:
                 run.tools_used = t_used
                 run.tool_call_count = len(final_orch_state["tool_results"])
                 run.tool_latency_ms = t_lat
-
-            ctx_meta = final_orch_state.get("metadata", {}).get("context_package", {}) if final_orch_state else {}
-            tok_meta = final_orch_state.get("token_usage", {}) if final_orch_state else {}
-            run.estimated_context_tokens = ctx_meta.get("estimated_tokens", init_pkg.estimated_tokens)
-            run.context_truncated = ctx_meta.get("truncated", init_pkg.truncated)
-            run.context_item_count = len(final_orch_state.get("context_items", [])) if final_orch_state else init_pkg.total_items
-            run.context_sources = list(set(it.get("source_type", "task") for it in final_orch_state.get("context_items", []))) if final_orch_state else list(init_pkg.sources)
-            run.retrieved_chunk_count = len(final_orch_state.get("retrieval_results", [])) if final_orch_state else 0
-            run.retrieval_latency_ms = sum(r.get("duration_ms", 0) for r in step_records_final if r.get("step_type") == "retrieve") if run.retrieved_chunk_count else None
-            run.input_tokens = tok_meta.get("input_tokens")
-            run.output_tokens = tok_meta.get("output_tokens")
-            run.total_tokens = tok_meta.get("total_tokens")
 
             run.completed_at = datetime.now(timezone.utc)
             await self.session.flush()

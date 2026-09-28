@@ -382,15 +382,61 @@ class OrchestrationExecutor:
         target_model = step.model or settings.OPENAI_DEFAULT_MODEL
         target_temp = step.temperature if step.temperature is not None else 0.2
 
-        provider = self.llm_factory.get_provider_for_model(target_model)
+        # Extract fallback candidates from step/state metadata if available
+        model_sel = (step.metadata or {}).get("model_selection") or state.metadata.get("model_selection", {})
+        candidates = [(None, target_model)]
+        if model_sel and isinstance(model_sel, dict):
+            fallbacks = model_sel.get("fallback_candidates", [])
+            for fb in fallbacks[:settings.MAX_MODEL_FALLBACK_ATTEMPTS]:
+                fb_prov = fb.get("provider") if isinstance(fb, dict) else getattr(fb, "provider", None)
+                fb_mod = fb.get("model_id") if isinstance(fb, dict) else getattr(fb, "model_id", None)
+                if fb_mod:
+                    candidates.append((fb_prov, fb_mod))
 
-        llm_request = LLMGenerateRequest(
-            model=target_model,
-            messages=messages,
-            temperature=target_temp,
-        )
+        last_error = None
+        gen_resp = None
+        active_model = target_model
+        active_provider_id = "unknown"
+        fallback_count = 0
 
-        gen_resp = await provider.generate(llm_request)
+        for idx, (cand_prov, cand_model) in enumerate(candidates):
+            try:
+                if cand_prov:
+                    try:
+                        provider = self.llm_factory.get_provider_for_model(cand_model, provider_id=cand_prov)
+                    except TypeError:
+                        provider = self.llm_factory.get_provider_for_model(cand_model)
+                else:
+                    provider = self.llm_factory.get_provider_for_model(cand_model)
+
+                active_provider_id = getattr(provider, "provider_id", "unknown")
+                active_model = cand_model
+
+                llm_request = LLMGenerateRequest(
+                    model=cand_model,
+                    messages=messages,
+                    temperature=target_temp,
+                )
+
+                gen_resp = await provider.generate(llm_request)
+                if idx > 0:
+                    fallback_count = idx
+                    logger.info(
+                        f"[OrchestrationExecutor] Successfully recovered using fallback candidate "
+                        f"'{cand_model}' ({provider.provider_id}) on attempt {idx}."
+                    )
+                break
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    f"[OrchestrationExecutor] Primary/fallback model '{cand_model}' failed: {exc}. "
+                    f"Attempts remaining: {len(candidates) - idx - 1}"
+                )
+                if idx == len(candidates) - 1:
+                    raise last_error
+
+        if not gen_resp:
+            raise last_error or RuntimeError("LLM generation produced no response.")
 
         state.generated_output = gen_resp.content
         state.token_usage = {
@@ -398,9 +444,14 @@ class OrchestrationExecutor:
             "output_tokens": getattr(gen_resp.usage, "output_tokens", None) or getattr(gen_resp.usage, "completion_tokens", 0) if gen_resp.usage else 0,
             "total_tokens": getattr(gen_resp.usage, "total_tokens", 0) if gen_resp.usage else 0,
         }
+        state.metadata["final_model"] = active_model
+        state.metadata["model_provider"] = active_provider_id
+        state.metadata["fallback_attempts"] = fallback_count
 
         return {
-            "model": target_model,
+            "model": active_model,
+            "provider": active_provider_id,
+            "fallback_attempts": fallback_count,
             "tokens": state.token_usage,
             "output_length": len(gen_resp.content),
         }

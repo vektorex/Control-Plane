@@ -380,23 +380,79 @@ npm run dev
 
 ---
 
-## ✅ Step 11 Verification Checklist
+## 🧠 Step 12: Model Intelligence & Model Router Layer
 
-- [x] Pluggable `LLMPlanningProvider` generating structured `ExecutionPlan` with strict Pydantic validation.
-- [x] Dedicated planning prompt with trusted vs untrusted data boundaries.
-- [x] Filtered `AvailableCapabilities` preventing LLM from inventing tools, strategies, or providers.
-- [x] 6-Layer `PlanValidator` enforcing schema, capabilities, permissions, security policies, limits, and task config.
-- [x] Controlled plan repair mechanism (max 1 repair attempt) with safe fallback.
-- [x] `HybridPlanner` combining deterministic baseline, LLM proposal, and automated safe fallback.
-- [x] Separate `PLANNER_MODEL_PROVIDER` and `PLANNER_MODEL` configuration.
-- [x] `CompletionEvaluator` providing structured completion decisions with missing information diagnostics.
-- [x] `AntiLoopDetector` preventing duplicate actions across iterations.
-- [x] Bounded agentic loop with `MAX_AGENT_ITERATIONS=3`.
-- [x] Alembic migration `009_llm_planner_and_agent_loop` updating `Run` model and `RunStatus` enum (`PLANNING`, `EXECUTING`, `EVALUATING`, `PARTIAL`).
-- [x] `POST /api/tasks/{task_id}/plan` supporting `planner_mode` (`hybrid`, `deterministic`, `llm`).
-- [x] `POST /api/tasks/{task_id}/run` and `/run/stream` supporting real-time planning, evaluation, replanning, and streaming SSE events.
-- [x] Frontend Task Workspace (`/app/tasks/[taskId]`) with Planning Mode selector, Live Planning indicator, Evidence Evaluation card, and Run History observability.
-- [x] 172/172 passing backend tests covering planning, repair, hybrid fallback, bounded loop, security, and streaming.
+Step 12 introduces a centralized, deterministic **Model Intelligence and Model Router Layer** that selects the most appropriate Large Language Model for both planning and generation stages based on normalized task requirements and configured policies.
+
+```
+Task
+ ↓
+Execution Plan
+ ↓
+Model Requirement Analyzer
+ ↓
+Model Requirements
+ ↓
+Model Router (Deterministic Scoring & Capability Matching)
+ ↓
+Model Selection (Primary Candidate + Compatible Fallbacks)
+ ↓
+LLM Abstraction Layer
+ ↓
+Provider Adapter (with Multi-Provider Fallback & Failover)
+```
+
+### Key Components
+
+1. **Normalized Model Capabilities (`ModelCapability`)**:
+   - Normalized flags: `text_generation`, `reasoning`, `structured_output`, `tool_calling`, `vision`, `long_context`, `streaming`, `embeddings`.
+   - Applications depend on capabilities rather than provider-specific model IDs.
+
+2. **Central Model Registry (`ModelRegistry`)**:
+   - Manages rich metadata per model: `provider`, `model_id`, `display_name`, `capabilities`, `context_window`, `supports_streaming`, `supports_tools`, `supports_structured_output`, `supports_vision`, `enabled`, `cost_metadata` (`cost_class`, `input_cost_per_million`, `output_cost_per_million`), and `latency_class`.
+   - Never exposes API keys, credentials, or sensitive infrastructure to the frontend.
+
+3. **Deterministic Model Requirements Extraction (`ModelRequirementAnalyzer`)**:
+   - Fast, local, rule-based extraction analyzing task configuration, context budget, execution plan steps, and enabled tools.
+   - Requires zero external LLM calls or network latency for requirement analysis.
+
+4. **Deterministic Model Router (`ModelRouter`)**:
+   - Capability filtering ensures incompatible models are immediately disqualified.
+   - Weighted scoring computes optimal candidate based on capability match, context window capacity, streaming support, tool support, and configured latency/cost preferences (`low`, `balanced`, `quality`).
+   - Generates factual, audit-ready justifications without marketing superlatives.
+
+5. **Multi-Provider Fallback & Failover**:
+   - Resilient execution path: `Primary Candidate → Compatible Fallback Candidate → Final Failure`.
+   - Fallback candidates are strictly pre-filtered to satisfy all task requirements and allowed server policies.
+   - Configurable maximum fallback attempts (`MAX_FALLBACK_ATTEMPTS=2`).
+
+6. **Separate Planner vs. Generation Model Modes**:
+   - Dedicated configuration for planning (`PLANNER_MODEL_MODE`, `PLANNER_MODEL`, `PLANNER_MODEL_PROVIDER`) and generation (`GENERATION_MODEL_MODE`).
+
+7. **Task Model Preference Modes**:
+   - `model_mode = "auto"`: ModelRouter dynamically selects the optimal model.
+   - `model_mode = "manual"`: User selects from server-approved enabled models; server validates compatibility against required capabilities.
+
+8. **Accurate Usage Tracking & Cost Estimation**:
+   - Tracks exact `input_tokens`, `output_tokens`, `total_tokens`, `latency_ms`, and `estimated_cost` calculated from verified pricing metadata (or `null` if unconfigured; never invents pricing).
+
+---
+
+## ✅ Step 12 Verification Checklist
+
+- [x] Central `ModelRegistry` with normalized capabilities, context window, cost metadata, and latency classes.
+- [x] Multi-vendor model catalog supporting OpenAI, Anthropic, Google Gemini, and Mock providers.
+- [x] Deterministic `ModelRequirementAnalyzer` extracting requirements from task parameters, context size, and tool steps.
+- [x] Deterministic `ModelRouter` scoring and filtering compatible models with factual justification.
+- [x] Multi-provider resilient fallback & failover (`primary -> fallback -> final failure`) up to configured max attempts.
+- [x] Task model mode support (`auto` vs `manual` model override with capability validation).
+- [x] Separate planner and generation model routing configuration.
+- [x] Orchestrator integration passing normalized `ModelSelection` to LLM abstraction.
+- [x] API endpoints: `GET /api/models`, `POST /api/models/route`, and `POST /api/tasks/{task_id}/model-preview`.
+- [x] Next.js task UI (`/app/tasks/[taskId]`) with Automatic vs Manual model selection, requirement pill checklist, routing reason preview, and cost/telemetry display.
+- [x] Live SSE failover notification banner for stream execution.
+- [x] Usage tracking with token metrics and `estimated_cost` (or `None` when unconfigured).
+- [x] 199/199 passing backend tests (100% pass rate).
 - [x] Next.js production build passing with pure JavaScript.
 
 

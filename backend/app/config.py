@@ -102,6 +102,15 @@ class Settings(BaseSettings):
     MAX_AGENT_ITERATIONS: int = 3
     EVALUATOR_MODEL: str = "gpt-4o-mini"
 
+    # Step 12: Model Intelligence & Model Router Settings
+    DEFAULT_MODEL_MODE: str = "auto"  # auto | manual
+    GENERATION_MODEL_PROVIDER: str = "openai"
+    GENERATION_DEFAULT_MODEL: str = "gpt-4o-mini"
+    PLANNER_MODEL_MODE: str = "auto"
+    GENERATION_MODEL_MODE: str = "auto"
+    MAX_MODEL_FALLBACK_ATTEMPTS: int = 2
+    ALLOWED_MODEL_PROVIDERS: List[str] = ["openai", "mock", "anthropic", "gemini"]
+
 
 
 settings = Settings()

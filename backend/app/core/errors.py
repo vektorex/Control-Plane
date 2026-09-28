@@ -54,6 +54,12 @@ class BadRequestError(AppError):
     status_code = status.HTTP_400_BAD_REQUEST
 
 
+class ValidationError(AppError):
+    """Raised when domain or policy validation fails for an entity, plan, or model selection."""
+    code = "VALIDATION_ERROR"
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
 class UnsupportedMediaTypeError(AppError):
     """Raised when client uploads an unsupported file format or MIME type."""
     code = "UNSUPPORTED_MEDIA_TYPE"

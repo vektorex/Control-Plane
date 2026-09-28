@@ -42,6 +42,10 @@ class Task(Base):
         default=TaskStatus.DRAFT.value,
         index=True,
     )
+    # Step 12: Model Router & Preference settings
+    model_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="auto")
+    preferred_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

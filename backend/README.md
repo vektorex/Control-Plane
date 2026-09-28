@@ -186,27 +186,32 @@ pytest backend/tests -v
 
 ## 📡 API Reference
 
-### 1. Orchestration & LLM-Assisted Planning (Step 10 & 11)
-- `POST /api/tasks/{task_id}/plan` — Propose and validate structured `ExecutionPlan` using selected `planner_mode` (`hybrid`, `deterministic`, `llm`).
-- `POST /api/tasks/{task_id}/run` — Execute task via Bounded Agentic Loop, evaluating evidence completeness and replanning when needed.
-- `POST /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming for `planning_start`, `plan_generated`, `step_start`, `step_completed`, `step_failed`, `evaluating`, `evaluation_completed`, `replan_generated`, `content_delta`, and `run_completed` events.
-- `GET  /api/tasks/{task_id}/runs` — List historical runs with planning mode, repair count, iteration count, and completion evaluation.
+### 1. Model Catalog & Model Router (Step 12)
+- `GET  /api/models` — List registered LLM models with safe capability and cost metadata (no credentials).
+- `POST /api/models/route` — Test and preview deterministic model selection based on normalized `ModelRequirements`.
+- `POST /api/tasks/{task_id}/model-preview` — Analyze task requirements and preview proposed model without execution.
 
-### 2. Tools & Web Search (Step 9)
+### 2. Orchestration & LLM-Assisted Planning (Step 10 & 11)
+- `POST /api/tasks/{task_id}/plan` — Propose and validate structured `ExecutionPlan` using selected `planner_mode` (`hybrid`, `deterministic`, `llm`).
+- `POST /api/tasks/{task_id}/run` — Execute task via Bounded Agentic Loop with dynamic model routing, fallback execution, and telemetry.
+- `POST /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming for `model_selected`, `model_fallback`, `planning_start`, `plan_generated`, `step_start`, `step_completed`, `step_failed`, `evaluating`, `evaluation_completed`, `replan_generated`, `content_delta`, and `run_completed` events.
+- `GET  /api/tasks/{task_id}/runs` — List historical runs with routed model, provider, failover attempts, and estimated cost.
+
+### 3. Tools & Web Search (Step 9)
 - `GET  /api/tools` — List registered tools available to the authenticated user
 - `POST /api/tools/{tool_name}/execute` — Direct testing/execution endpoint returning normalized `ToolResult`
 
-### 3. Retrieval Router & Preview (Step 8)
+### 4. Retrieval Router & Preview (Step 8)
 - `POST /api/tasks/{task_id}/retrieval/preview` — Debug preview of structured `RetrievalDecision`
 
-### 4. Documents & Ingestion (Step 7)
+### 5. Documents & Ingestion (Step 7)
 - `POST   /api/workspaces/{workspace_id}/documents` — Multipart document upload with background ingestion
 - `GET    /api/workspaces/{workspace_id}/documents` — List documents in workspace
 - `GET    /api/documents/{document_id}` — Get document metadata & status
 - `GET    /api/documents/{document_id}/chunks` — Inspect indexed vector chunks
 - `DELETE /api/documents/{document_id}` — Delete document and chunks
 
-### 5. Authentication, Tasks & Workspaces
+### 6. Authentication, Tasks & Workspaces
 - `GET    /api/auth/me` — Retrieve authenticated user profile
 - `GET    /api/workspaces` — List workspaces owned by authenticated user
 - `GET    /api/projects` — List projects in user's workspaces

@@ -142,6 +142,10 @@ export const taskService = {
             const parsed = JSON.parse(dataStr);
             if (parsed.type === "run_start") {
               onRunStart?.(parsed);
+            } else if (parsed.type === "model_selected") {
+              onModelSelected?.(parsed);
+            } else if (parsed.type === "model_fallback") {
+              onModelFallback?.(parsed);
             } else if (parsed.type === "planning_start") {
               onPlanningStart?.(parsed);
             } else if (parsed.type === "plan_generated") {
@@ -193,10 +197,19 @@ export const taskService = {
   },
 
   /**
+   * Preview model routing and requirement extraction for a task (Step 12 Model Intelligence)
+   */
+  async previewTaskModel(taskId, payload = {}) {
+    return apiClient(`/tasks/${taskId}/model-preview`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
    * Preview intelligent retrieval routing decision for a task (Step 8 dev debug)
    */
   async previewTaskRetrieval(taskId, payload = {}) {
-
     return apiClient(`/tasks/${taskId}/retrieval/preview`, {
       method: "POST",
       body: payload,

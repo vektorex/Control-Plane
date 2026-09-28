@@ -61,6 +61,10 @@ import {
   Loader2,
   XCircle,
   Workflow,
+  Coins,
+  Shield,
+  Activity,
+  CheckSquare,
 } from "lucide-react";
 
 export default function TaskWorkspacePage({ params: paramsProp }) {
@@ -130,6 +134,15 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [previewError, setPreviewError] = useState(null);
 
 
+  // Step 12: Model Intelligence & Model Router settings
+  const [modelMode, setModelMode] = useState("auto"); // "auto" | "manual"
+  const [latencyPreference, setLatencyPreference] = useState("balanced"); // "low" | "balanced" | "high_quality"
+  const [costPreference, setCostPreference] = useState("balanced"); // "low" | "balanced" | "quality"
+  const [modelPreview, setModelPreview] = useState(null);
+  const [isPreviewingModel, setIsPreviewingModel] = useState(false);
+  const [modelPreviewError, setModelPreviewError] = useState(null);
+  const [fallbackEvent, setFallbackEvent] = useState(null);
+
   // Execution & Run state
   const [activeRun, setActiveRun] = useState(null);
   const [runs, setRuns] = useState([]);
@@ -174,6 +187,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       setInstructions(taskData.instructions || taskData.description || "");
       setContextText(taskData.context_text || "");
       setTaskStatus(taskData.status || "draft");
+      if (taskData.model_mode) {
+        setModelMode(taskData.model_mode);
+      }
+      if (taskData.preferred_model) {
+        setSelectedModel(taskData.preferred_model);
+      }
 
       // Fetch contexts and runs in parallel
       await Promise.all([fetchTaskContexts(), fetchTaskRuns()]);
@@ -322,6 +341,40 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
   };
 
+  // Step 12: Preview Model Selection & Requirements
+  const handlePreviewModel = async () => {
+    if (!taskId) return;
+    try {
+      setIsPreviewingModel(true);
+      setModelPreviewError(null);
+      // Auto-save updated instructions first
+      try {
+        await taskService.updateTask(taskId, {
+          title: title.trim(),
+          instructions: instructions.trim(),
+          context_text: contextText.trim() || null,
+        });
+      } catch {}
+
+      const payload = {
+        model_mode: modelMode,
+        model: modelMode === "manual" ? selectedModel : undefined,
+        latency_preference: latencyPreference,
+        cost_preference: costPreference,
+        enable_web_search: enableWebSearch,
+        tools_enabled: enableWebSearch ? ["web_search"] : [],
+      };
+
+      const res = await taskService.previewTaskModel(taskId, payload);
+      setModelPreview(res);
+    } catch (err) {
+      console.error("[TaskWorkspace] Error previewing model selection:", err);
+      setModelPreviewError(err.message || "Failed to preview model selection.");
+    } finally {
+      setIsPreviewingModel(false);
+    }
+  };
+
   const loadAvailableTools = async () => {
     try {
       const res = await toolService.listTools();
@@ -350,6 +403,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         instructions: instructions.trim(),
         context_text: contextText.trim() || null,
         status: taskStatus,
+        model_mode: modelMode,
+        preferred_model: modelMode === "manual" ? selectedModel : null,
       });
 
       setTask(updated);
@@ -445,7 +500,11 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   // Run Task Execution (Step 10 Orchestrator Pipeline)
   const handleExecuteTask = async (e) => {
     e?.preventDefault();
-    if (!taskId || !selectedModel) return;
+    if (!taskId) return;
+    if (modelMode === "manual" && !selectedModel) {
+      setExecutionError("Please select a target LLM model when in manual mode.");
+      return;
+    }
 
     if (!instructions.trim() && !task?.instructions && !task?.description) {
       setExecutionError("Task instructions cannot be empty. Please enter instructions before executing.");
@@ -458,12 +517,15 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         title: title.trim(),
         instructions: instructions.trim(),
         context_text: contextText.trim() || null,
+        model_mode: modelMode,
+        preferred_model: modelMode === "manual" ? selectedModel : null,
       });
     } catch (err) {
       console.warn("Auto-save prior to run failed:", err);
     }
 
     setExecutionError(null);
+    setFallbackEvent(null);
     setOutputStream("");
     setIsRunning(true);
     setPlanningState("analyzing");
@@ -496,7 +558,11 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }, 50);
 
     const runPayload = {
-      model: selectedModel,
+      model: modelMode === "manual" ? selectedModel : undefined,
+      model_mode: modelMode,
+      preferred_model: modelMode === "manual" ? selectedModel : undefined,
+      latency_preference: latencyPreference,
+      cost_preference: costPreference,
       planner_mode: plannerMode,
       temperature: Number(temperature),
       max_context_tokens: Number(contextBudget),
@@ -525,7 +591,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             id: event.run_id,
             task_id: taskId,
             status: "running",
-            model_name: selectedModel,
+            model_name: event.model || selectedModel,
+            model_provider: event.provider,
+            model_selection_reason: event.model_selection_reason,
+            model_routing_policy: event.model_routing_policy,
+            estimated_cost: event.estimated_cost,
+            fallback_attempts: event.fallback_attempts,
             planner_mode: plannerMode,
             context_item_count: event.context_item_count,
             estimated_context_tokens: event.estimated_context_tokens,
@@ -543,6 +614,14 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             tool_latency_ms: event.tool_latency_ms,
             created_at: new Date().toISOString(),
           });
+        },
+        onModelSelected: (event) => {
+          if (event.selection) {
+            setModelPreview(event);
+          }
+        },
+        onModelFallback: (event) => {
+          setFallbackEvent(event);
         },
         onPlanningStart: (event) => {
           setPlanningState("analyzing");
@@ -936,27 +1015,208 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
               {/* Model & Budget Controls */}
               <div className="pt-2 border-t border-slate-800 space-y-3.5">
-                {/* Model Selector */}
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1.5">
-                    Target LLM Model
-                  </label>
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono cursor-pointer"
-                  >
-                    {models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.provider})
-                      </option>
-                    ))}
-                    {models.length === 0 && (
-                      <option value="" disabled>
-                        Loading registered models...
-                      </option>
+                {/* Step 12: Model Intelligence & Model Router Panel */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/25 space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="w-4 h-4 text-indigo-400" />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-100 block">
+                          Model Intelligence & Router
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Capability-based dynamic model selection & failover
+                        </span>
+                      </div>
+                    </div>
+                    {modelMode === "auto" && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={handlePreviewModel}
+                        disabled={isPreviewingModel}
+                        className="text-[11px] text-indigo-300 hover:text-indigo-100"
+                      >
+                        {isPreviewingModel ? "Routing..." : "Preview Model"}
+                      </Button>
                     )}
-                  </select>
+                  </div>
+
+                  {/* Mode Selector: Automatic vs Choose Manually */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-medium text-slate-300 block">
+                      Model Selection Mode:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: "auto", label: "Automatic", desc: "Router selects best fit" },
+                        { id: "manual", label: "Manual", desc: "Choose specific model" },
+                      ].map((mode) => (
+                        <label
+                          key={mode.id}
+                          className={`flex flex-col p-2 rounded-lg border cursor-pointer transition-all ${
+                            modelMode === mode.id
+                              ? "bg-indigo-950/70 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/30"
+                              : "bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="radio"
+                              name="model_mode_selector"
+                              value={mode.id}
+                              checked={modelMode === mode.id}
+                              onChange={() => setModelMode(mode.id)}
+                              className="accent-indigo-500"
+                            />
+                            <span className="text-xs font-semibold">{mode.label}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 pl-4 mt-0.5">{mode.desc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Automatic Mode View */}
+                  {modelMode === "auto" ? (
+                    <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+                      {/* Requirements Checklist Pills */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">
+                          Inferred Capability Requirements
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-indigo-950/80 border border-indigo-500/30 text-indigo-300">
+                            <Check className="w-3 h-3 text-emerald-400" /> Reasoning
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                            enableStreaming
+                              ? "bg-indigo-950/80 border-indigo-500/30 text-indigo-300"
+                              : "bg-slate-900 border-slate-800 text-slate-500 line-through"
+                          }`}>
+                            <Check className="w-3 h-3 text-emerald-400" /> Streaming
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                            enableWebSearch
+                              ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-300"
+                              : "bg-slate-900 border-slate-800 text-slate-500"
+                          }`}>
+                            {enableWebSearch ? <Check className="w-3 h-3 text-emerald-400" /> : <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />}
+                            Tools {enableWebSearch ? "(Active)" : "(Optional)"}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                            contextBudget >= 8000
+                              ? "bg-purple-950/80 border-purple-500/40 text-purple-300"
+                              : "bg-slate-900 border-slate-800 text-slate-500"
+                          }`}>
+                            {contextBudget >= 8000 ? <Check className="w-3 h-3 text-purple-400" /> : <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />}
+                            Long Context ({contextBudget >= 8000 ? "Required" : "Standard"})
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Policy Preferences Row */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1">Latency Preference</label>
+                          <select
+                            value={latencyPreference}
+                            onChange={(e) => setLatencyPreference(e.target.value)}
+                            className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                          >
+                            <option value="balanced">Balanced Latency</option>
+                            <option value="low">Low Latency (Fast)</option>
+                            <option value="high_quality">High Quality</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1">Cost Preference</label>
+                          <select
+                            value={costPreference}
+                            onChange={(e) => setCostPreference(e.target.value)}
+                            className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                          >
+                            <option value="balanced">Balanced Cost</option>
+                            <option value="low">Low Cost (Economical)</option>
+                            <option value="quality">Quality Focus</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Live Model Preview Result */}
+                      {modelPreview?.selection && (
+                        <div className="p-2.5 rounded-lg bg-slate-900/95 border border-indigo-500/30 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-slate-400 font-mono">Proposed Model:</span>
+                            <Badge variant="info" className="text-[10px] font-mono">
+                              {modelPreview.selection.provider} / {modelPreview.selection.model}
+                            </Badge>
+                          </div>
+                          {modelPreview.selection.reason && (
+                            <p className="text-[11px] text-slate-300/90 leading-relaxed font-mono bg-slate-950/70 p-2 rounded border border-slate-800">
+                              <span className="text-indigo-400 font-semibold">Selection Policy: </span>
+                              {modelPreview.selection.reason}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {modelPreviewError && (
+                        <div className="p-2 rounded bg-rose-950/60 border border-rose-800 text-rose-300 text-[10px]">
+                          {modelPreviewError}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Manual Mode View: List Only Enabled Server-Approved Models */
+                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-300 block mb-1">
+                          Select Allowed Model
+                        </label>
+                        <select
+                          value={selectedModel}
+                          onChange={(e) => setSelectedModel(e.target.value)}
+                          className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono cursor-pointer"
+                        >
+                          {models.filter((m) => m.enabled !== false && m.is_enabled !== false).map((m) => (
+                            <option key={m.id || m.model_id} value={m.id || m.model_id}>
+                              {m.display_name || m.name || m.model_id} ({m.provider})
+                            </option>
+                          ))}
+                          {models.length === 0 && (
+                            <option value="" disabled>
+                              Loading registered models...
+                            </option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Selected Model Capabilities Badges */}
+                      {(() => {
+                        const cur = models.find((m) => (m.id || m.model_id) === selectedModel);
+                        if (!cur) return null;
+                        return (
+                          <div className="p-2 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                              <span className="text-slate-400">Context: <strong className="text-indigo-300">{cur.context_window?.toLocaleString() || "128k"}</strong></span>
+                              <span>•</span>
+                              <span className="text-slate-400">Latency: <strong className="text-emerald-300">{cur.latency_class || "balanced"}</strong></span>
+                              <span>•</span>
+                              <span className="text-slate-400">Cost: <strong className="text-amber-300">{cur.cost_class || "balanced"}</strong></span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {cur.capabilities?.map((cap) => (
+                                <span key={cap} className="px-1.5 py-0.2 rounded bg-slate-950 border border-slate-800 text-slate-300 text-[9px] font-mono">
+                                  {cap}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
 
                 {/* Temperature & Budget row */}
@@ -1616,6 +1876,28 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
             {/* Live Response Content Viewport */}
             <CardContent className="flex-1 p-4 bg-slate-950/90 font-mono text-xs overflow-y-auto flex flex-col justify-between">
+              {/* Step 12: Live Provider Failover Banner */}
+              {(fallbackEvent || (activeRun?.fallback_attempts && activeRun.fallback_attempts.length > 0)) && (
+                <div className="mb-3.5 p-3.5 rounded-xl bg-amber-950/70 border border-amber-500/50 text-amber-200 text-xs font-mono space-y-1 shadow-md shadow-amber-950/40">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-semibold text-amber-300">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Provider Failover Activated</span>
+                    </div>
+                    <Badge variant="warning" className="text-[10px]">
+                      Fallback Attempt {fallbackEvent?.attempt || activeRun?.fallback_attempts?.length || 1}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-amber-200/90 leading-relaxed pt-0.5">
+                    Primary candidate failed
+                    {fallbackEvent?.error_message ? ` (${fallbackEvent.error_message})` : ""}.
+                    Successfully routed failover to{" "}
+                    <strong className="text-white font-semibold">{fallbackEvent?.fallback_model || activeRun?.final_model || activeRun?.model_name}</strong>
+                    {" "}({fallbackEvent?.provider || activeRun?.model_provider || "fallback provider"}).
+                  </p>
+                </div>
+              )}
+
               {/* Step 11: Live Planning Banner */}
               {isRunning && planningState === "analyzing" && (
                 <div className="mb-3.5 p-3.5 rounded-xl bg-indigo-950/80 border border-indigo-500/40 flex items-center justify-between shadow-lg shadow-indigo-950/50 animate-pulse">
@@ -1953,7 +2235,32 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   <div className="flex flex-wrap items-center gap-3 font-mono">
                     {activeRun.model_name && (
                       <span className="text-slate-300">
-                        Model: <strong className="text-cyan-400">{activeRun.model_name}</strong>
+                        Model: <strong className="text-cyan-400">{activeRun.final_model || activeRun.model_name}</strong>
+                        {activeRun.model_provider && (
+                          <span className="text-slate-400 ml-1">({activeRun.model_provider})</span>
+                        )}
+                      </span>
+                    )}
+                    {activeRun.model_routing_policy && (
+                      <span className="text-slate-300">
+                        • Policy: <strong className="text-indigo-300">{activeRun.model_routing_policy}</strong>
+                      </span>
+                    )}
+                    {activeRun.estimated_cost !== null && activeRun.estimated_cost !== undefined ? (
+                      <span className="text-emerald-300 flex items-center gap-1">
+                        <Coins className="w-3 h-3 text-emerald-400" />
+                        Cost: <strong>${Number(activeRun.estimated_cost).toFixed(6)}</strong>
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 flex items-center gap-1">
+                        <Coins className="w-3 h-3 text-slate-500" />
+                        Cost: unconfigured
+                      </span>
+                    )}
+                    {activeRun.fallback_attempts && activeRun.fallback_attempts.length > 0 && (
+                      <span className="text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-400" />
+                        Failover: {activeRun.fallback_attempts.length} attempts
                       </span>
                     )}
                     {activeRun.step_count !== null && activeRun.step_count !== undefined && (
@@ -1981,7 +2288,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                       </span>
                     )}
                     {activeRun.latency_ms !== null && activeRun.latency_ms !== undefined && (
-                      <span>• Total Latency: <strong className="text-emerald-400">{activeRun.latency_ms}ms</strong></span>
+                      <span>• Latency: <strong className="text-emerald-400">{activeRun.latency_ms}ms</strong></span>
                     )}
                     {activeRun.total_tokens !== null && activeRun.total_tokens !== undefined && (
                       <span>• Tokens: <strong className="text-indigo-300">{activeRun.total_tokens}</strong> (in: {activeRun.input_tokens || 0}, out: {activeRun.output_tokens || 0})</span>
@@ -2154,9 +2461,20 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                       )}
                       {run.model_name && (
                         <span className="text-xs text-slate-300 font-mono hidden md:inline">
-                          {run.model_name}
+                          {run.final_model || run.model_name}
+                          {run.model_provider ? ` (${run.model_provider})` : ""}
                         </span>
                       )}
+                      {run.fallback_attempts && run.fallback_attempts.length > 0 && (
+                        <Badge variant="warning" className="text-[10px] font-mono">
+                          failover
+                        </Badge>
+                      )}
+                      {run.estimated_cost !== null && run.estimated_cost !== undefined ? (
+                        <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-800/40 font-mono">
+                          ${Number(run.estimated_cost).toFixed(6)}
+                        </Badge>
+                      ) : null}
                       {run.retrieval_required || run.retrieval_enabled ? (
                         <div className="hidden sm:flex items-center gap-1.5">
                           {getStrategyBadge(run.retrieval_strategy)}

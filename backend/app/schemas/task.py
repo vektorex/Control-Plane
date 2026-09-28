@@ -12,6 +12,9 @@ class TaskBase(BaseModel):
     instructions: Optional[str] = Field(default=None, description="Specific prompt/instructions for the LLM")
     context_text: Optional[str] = Field(default=None, description="Optional background context or document snippets")
     status: TaskStatus = Field(default=TaskStatus.DRAFT, description="Task lifecycle status")
+    # Step 12: Model Preferences
+    model_mode: Optional[str] = Field(default="auto", description="Model selection mode: 'auto' | 'manual'")
+    preferred_model: Optional[str] = Field(default=None, description="Preferred model identifier")
 
 
 class TaskCreate(TaskBase):
@@ -24,6 +27,8 @@ class TaskUpdate(BaseModel):
     instructions: Optional[str] = Field(default=None)
     context_text: Optional[str] = Field(default=None)
     status: Optional[TaskStatus] = Field(default=None)
+    model_mode: Optional[str] = Field(default=None)
+    preferred_model: Optional[str] = Field(default=None)
 
 
 class TaskRunRequest(BaseModel):
@@ -50,6 +55,10 @@ class TaskRunRequest(BaseModel):
     planner_mode: Optional[str] = Field(default="hybrid", description="Planning mode: deterministic, llm, hybrid, auto")
     max_agent_iterations: Optional[int] = Field(default=3, ge=1, le=5, description="Max iterations for bounded agentic loop")
 
+    # Step 12: Model Router Configuration
+    model_mode: Optional[str] = Field(default="auto", description="Model selection mode: auto | manual")
+    latency_preference: Optional[str] = Field(default="balanced", description="Latency preference: low | balanced | high_quality")
+    cost_preference: Optional[str] = Field(default="balanced", description="Cost preference: low | balanced | quality")
 
 
 class TaskResponse(BaseModel):
@@ -62,6 +71,8 @@ class TaskResponse(BaseModel):
     instructions: Optional[str] = None
     context_text: Optional[str] = None
     status: TaskStatus
+    model_mode: Optional[str] = "auto"
+    preferred_model: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     run_count: Optional[int] = 0

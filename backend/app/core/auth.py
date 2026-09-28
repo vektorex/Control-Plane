@@ -106,3 +106,18 @@ async def get_current_user(
         email=email,
     )
     return user
+
+
+async def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    session: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """
+    FastAPI dependency that returns User if Bearer token is provided and valid, otherwise None.
+    """
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        return await get_current_user(credentials=credentials, session=session)
+    except Exception:
+        return None

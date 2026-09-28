@@ -477,32 +477,88 @@ class Orchestrator:
 
             target_model = final_gen_step.model or settings.OPENAI_DEFAULT_MODEL
             target_temp = final_gen_step.temperature if final_gen_step.temperature is not None else 0.2
-            provider = self.llm_factory.get_provider_for_model(target_model)
 
-            llm_request = LLMGenerateRequest(
-                model=target_model,
-                messages=messages,
-                temperature=target_temp,
-            )
+            model_sel = (final_gen_step.metadata or {}).get("model_selection") or state.metadata.get("model_selection", {})
+            candidates = [(None, target_model)]
+            if model_sel and isinstance(model_sel, dict):
+                fallbacks = model_sel.get("fallback_candidates", [])
+                for fb in fallbacks[:settings.MAX_MODEL_FALLBACK_ATTEMPTS]:
+                    fb_prov = fb.get("provider") if isinstance(fb, dict) else getattr(fb, "provider", None)
+                    fb_mod = fb.get("model_id") if isinstance(fb, dict) else getattr(fb, "model_id", None)
+                    if fb_mod:
+                        candidates.append((fb_prov, fb_mod))
 
-            full_content = ""
-            async for chunk in provider.generate_stream(llm_request):
-                delta_text = getattr(chunk, "delta", None) or getattr(chunk, "content", "")
-                full_content += delta_text
-                if chunk.usage:
-                    state.token_usage = {
-                        "input_tokens": getattr(chunk.usage, "input_tokens", None) or getattr(chunk.usage, "prompt_tokens", 0) or 0,
-                        "output_tokens": getattr(chunk.usage, "output_tokens", None) or getattr(chunk.usage, "completion_tokens", 0) or 0,
-                        "total_tokens": getattr(chunk.usage, "total_tokens", 0) or 0,
-                    }
-                yield {
-                    "type": "content_delta",
-                    "delta": delta_text,
-                    "content": full_content,
-                }
+            stream_success = False
+            last_err = None
+            active_model = target_model
+            active_provider_id = "unknown"
+            fallback_count = 0
 
-            state.generated_output = full_content
-            gen_record.mark_completed({"output_length": len(full_content)})
+            for idx, (cand_prov, cand_model) in enumerate(candidates):
+                try:
+                    if cand_prov:
+                        try:
+                            provider = self.llm_factory.get_provider_for_model(cand_model, provider_id=cand_prov)
+                        except TypeError:
+                            provider = self.llm_factory.get_provider_for_model(cand_model)
+                    else:
+                        provider = self.llm_factory.get_provider_for_model(cand_model)
+
+                    active_provider_id = getattr(provider, "provider_id", "unknown")
+                    active_model = cand_model
+
+                    if idx > 0:
+                        fallback_count = idx
+                        yield {
+                            "type": "model_fallback",
+                            "from_model": target_model,
+                            "to_model": cand_model,
+                            "provider": active_provider_id,
+                            "attempt": idx,
+                        }
+
+                    llm_request = LLMGenerateRequest(
+                        model=cand_model,
+                        messages=messages,
+                        temperature=target_temp,
+                    )
+
+                    full_content = ""
+                    async for chunk in provider.generate_stream(llm_request):
+                        delta_text = getattr(chunk, "delta", None) or getattr(chunk, "content", "")
+                        full_content += delta_text
+                        if chunk.usage:
+                            state.token_usage = {
+                                "input_tokens": getattr(chunk.usage, "input_tokens", None) or getattr(chunk.usage, "prompt_tokens", 0) or 0,
+                                "output_tokens": getattr(chunk.usage, "output_tokens", None) or getattr(chunk.usage, "completion_tokens", 0) or 0,
+                                "total_tokens": getattr(chunk.usage, "total_tokens", 0) or 0,
+                            }
+                        yield {
+                            "type": "content_delta",
+                            "delta": delta_text,
+                            "content": full_content,
+                        }
+
+                    state.generated_output = full_content
+                    state.metadata["final_model"] = active_model
+                    state.metadata["model_provider"] = active_provider_id
+                    state.metadata["fallback_attempts"] = fallback_count
+                    stream_success = True
+                    break
+
+                except Exception as cand_exc:
+                    last_err = cand_exc
+                    logger.warning(
+                        f"[Orchestrator SSE] Streaming attempt failed on model '{cand_model}': {cand_exc}. "
+                        f"Remaining candidates: {len(candidates) - idx - 1}"
+                    )
+                    if idx == len(candidates) - 1:
+                        raise last_err
+
+            if not stream_success:
+                raise last_err or RuntimeError("Streaming LLM generation failed across all candidates.")
+
+            gen_record.mark_completed({"output_length": len(state.generated_output), "model": active_model, "provider": active_provider_id})
             state.complete()
 
             yield {
@@ -512,9 +568,12 @@ class Orchestrator:
 
             yield {
                 "type": "generation_completed",
-                "content": full_content,
+                "content": state.generated_output,
                 "total_steps": len(state.step_records),
                 "iterations": state.iteration,
+                "final_model": active_model,
+                "model_provider": active_provider_id,
+                "fallback_attempts": fallback_count,
             }
 
             yield {

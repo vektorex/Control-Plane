@@ -11,6 +11,7 @@ from backend.app.db.models.guid import GUID
 if TYPE_CHECKING:
     from backend.app.db.models.project import Project
     from backend.app.db.models.run import Run
+    from backend.app.db.models.context import TaskContext
 
 
 class Task(Base):
@@ -64,6 +65,13 @@ class Task(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="desc(Run.created_at)",
+    )
+    contexts: Mapped[List["TaskContext"]] = relationship(
+        "TaskContext",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="desc(TaskContext.priority), desc(TaskContext.created_at)",
     )
 
     def __repr__(self) -> str:

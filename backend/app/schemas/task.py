@@ -29,6 +29,7 @@ class TaskUpdate(BaseModel):
 class TaskRunRequest(BaseModel):
     model: Optional[str] = Field(default="gpt-4o-mini", description="Target model identifier (e.g. gpt-4o-mini)")
     temperature: Optional[float] = Field(default=0.2, ge=0.0, le=2.0, description="Sampling temperature")
+    max_context_tokens: Optional[int] = Field(default=8000, ge=1, le=128000, description="Max token budget for context assembly")
 
 
 class TaskResponse(BaseModel):
@@ -44,6 +45,7 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     run_count: Optional[int] = 0
+    context_count: Optional[int] = 0
 
 
 class TaskListResponse(BaseModel):

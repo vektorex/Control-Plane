@@ -17,42 +17,27 @@ from backend.app.repositories.run import RunRepository
 from backend.app.schemas.llm import ChatMessage, LLMGenerateRequest
 from backend.app.schemas.run import RunResponse
 from backend.app.schemas.task import TaskRunRequest
+from backend.app.services.context.engine import ContextEngine, get_context_engine
 from backend.app.services.llm.factory import LLMProviderFactory
 
 
 class TaskExecutionService:
     """
-    Service responsible for turning a Task entity into an AI request,
-    orchestrating provider invocation, and persisting execution runs with full telemetry.
+    Service responsible for turning a Task entity into an AI request via the Context Engine,
+    orchestrating provider invocation, and persisting execution runs with full context telemetry.
     """
 
-    def __init__(self, session: AsyncSession, factory: LLMProviderFactory):
+    def __init__(
+        self,
+        session: AsyncSession,
+        factory: LLMProviderFactory,
+        context_engine: Optional[ContextEngine] = None,
+    ):
         self.session = session
         self.factory = factory
+        self.context_engine = context_engine or get_context_engine()
         self.task_repo = TaskRepository(session)
         self.run_repo = RunRepository(session)
-
-    def _build_llm_messages(self, task: Task) -> list[ChatMessage]:
-        """Constructs system and user messages from Task attributes."""
-        prompt = (task.instructions or "").strip()
-        if not prompt:
-            prompt = (task.description or "").strip()
-        if not prompt:
-            prompt = (task.title or "").strip()
-
-        if not prompt:
-            raise InvalidStateError("Task has no instructions, description, or title to execute.")
-
-        if task.context_text and task.context_text.strip():
-            prompt = f"{prompt}\n\n--- Context ---\n{task.context_text.strip()}"
-
-        return [
-            ChatMessage(
-                role="system",
-                content="You are an AI assistant helping the user complete a task accurately.",
-            ),
-            ChatMessage(role="user", content=prompt),
-        ]
 
     async def execute_task(
         self,
@@ -62,17 +47,40 @@ class TaskExecutionService:
     ) -> Run:
         """
         Executes a task synchronously against the LLM abstraction and records the run outcome.
+        Context is gathered, normalized, and budget-enforced by the ContextEngine.
         """
         task = await self.task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
-        messages = self._build_llm_messages(task)
+
+        prompt_check = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
+        if not prompt_check:
+            raise InvalidStateError("Task has no instructions, description, or title to execute.")
+
+        # 1. Gather & package context via ContextEngine
+        max_context_tokens = request.max_context_tokens or 8000
+        context_package = await self.context_engine.build_context(
+            task=task,
+            session=self.session,
+            max_context_tokens=max_context_tokens,
+        )
+
+        # 2. Build structured messages from context package
+        messages = self.context_engine.builder.format_as_messages(context_package, task)
 
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
 
-        # 1. Create Run in 'queued' status
+        # 3. Create Run in 'queued' status with full context telemetry
         input_snapshot = {
             "model": model_name,
             "temperature": request.temperature,
+            "max_context_tokens": max_context_tokens,
+            "context_summary": {
+                "item_count": context_package.total_items,
+                "estimated_tokens": context_package.estimated_tokens,
+                "sources": context_package.sources,
+                "truncated": context_package.truncated,
+                "dropped_items": context_package.dropped_items_count,
+            },
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
 
@@ -82,12 +90,16 @@ class TaskExecutionService:
             model_provider=provider.provider_id,
             model_name=model_name,
             input_snapshot=input_snapshot,
+            context_item_count=context_package.total_items,
+            estimated_context_tokens=context_package.estimated_tokens,
+            context_truncated=context_package.truncated,
+            context_sources=context_package.sources,
         )
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
 
-        # 2. Transition Run to 'running'
+        # 4. Transition Run to 'running'
         start_time = time.perf_counter()
         run.status = RunStatus.RUNNING.value
         run.started_at = datetime.now(timezone.utc)
@@ -100,11 +112,15 @@ class TaskExecutionService:
         )
 
         try:
-            logger.info(f"[TaskExecution] Invoking model '{model_name}' for task '{task.id}' (run '{run.id}')")
+            logger.info(
+                f"[TaskExecution] Invoking model '{model_name}' for task '{task.id}' "
+                f"(run '{run.id}', context_items={context_package.total_items}, "
+                f"context_tokens={context_package.estimated_tokens})"
+            )
             response = await provider.generate(llm_request)
             latency_ms = int((time.perf_counter() - start_time) * 1000)
 
-            # 3. Persist completed Run
+            # 5. Persist completed Run
             run.status = RunStatus.COMPLETED.value
             run.output_content = response.content
             run.latency_ms = latency_ms
@@ -144,9 +160,24 @@ class TaskExecutionService:
     ) -> AsyncIterator[str]:
         """
         Executes a task with Server-Sent Events (SSE) streaming while persisting the Run.
+        Context is gathered, normalized, and budget-enforced by the ContextEngine.
         """
         task = await self.task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
-        messages = self._build_llm_messages(task)
+
+        prompt_check = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
+        if not prompt_check:
+            raise InvalidStateError("Task has no instructions, description, or title to execute.")
+
+        # 1. Gather & package context via ContextEngine
+        max_context_tokens = request.max_context_tokens or 8000
+        context_package = await self.context_engine.build_context(
+            task=task,
+            session=self.session,
+            max_context_tokens=max_context_tokens,
+        )
+
+        # 2. Build structured messages from context package
+        messages = self.context_engine.builder.format_as_messages(context_package, task)
 
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
@@ -154,24 +185,36 @@ class TaskExecutionService:
         input_snapshot = {
             "model": model_name,
             "temperature": request.temperature,
+            "max_context_tokens": max_context_tokens,
+            "context_summary": {
+                "item_count": context_package.total_items,
+                "estimated_tokens": context_package.estimated_tokens,
+                "sources": context_package.sources,
+                "truncated": context_package.truncated,
+                "dropped_items": context_package.dropped_items_count,
+            },
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
 
-        # 1. Initialize Run in 'running' status
+        # 3. Initialize Run in 'running' status with context telemetry
         run = Run(
             task_id=task.id,
             status=RunStatus.RUNNING.value,
             model_provider=provider.provider_id,
             model_name=model_name,
             input_snapshot=input_snapshot,
+            context_item_count=context_package.total_items,
+            estimated_context_tokens=context_package.estimated_tokens,
+            context_truncated=context_package.truncated,
+            context_sources=context_package.sources,
             started_at=datetime.now(timezone.utc),
         )
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
 
-        # Notify frontend of run ID immediately
-        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status})}\n\n"
+        # Notify frontend of run ID and context telemetry immediately
+        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated})}\n\n"
 
         llm_request = LLMGenerateRequest(
             model=model_name,

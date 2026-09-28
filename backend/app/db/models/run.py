@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional, TYPE_CHECKING
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, func
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.base import Base
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class Run(Base):
     """
-    Run entity capturing execution telemetry, snapshots, token metrics, and output of a Task execution attempt.
+    Run entity capturing execution telemetry, snapshots, token metrics, context metadata, and output of a Task execution attempt.
     """
     __tablename__ = "runs"
 
@@ -45,6 +45,12 @@ class Run(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     input_snapshot: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     output_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Step 6: Context Engine Execution Metadata
+    context_item_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    estimated_context_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    context_truncated: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    context_sources: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

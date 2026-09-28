@@ -146,4 +146,49 @@ export const taskService = {
       onError?.(err);
     }
   },
+
+  /**
+   * List context items associated with a task
+   */
+  async listTaskContexts(taskId, params = {}) {
+    return apiClient(`/tasks/${taskId}/context`, { params });
+  },
+
+  /**
+   * Create a manual context item for a task
+   */
+  async createTaskContext(taskId, payload) {
+    return apiClient(`/tasks/${taskId}/context`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
+   * Inspect assembled context package from ContextEngine (debug/dev view)
+   */
+  async inspectTaskContext(taskId, maxContextTokens = 8000) {
+    return apiClient(`/tasks/${taskId}/context/inspect`, {
+      params: { max_context_tokens: maxContextTokens },
+    });
+  },
+
+  /**
+   * Update an individual context item
+   */
+  async updateContext(contextId, payload) {
+    return apiClient(`/context/${contextId}`, {
+      method: "PATCH",
+      body: payload,
+    });
+  },
+
+  /**
+   * Delete a context item
+   */
+  async deleteContext(contextId) {
+    return apiClient(`/context/${contextId}`, {
+      method: "DELETE",
+    });
+  },
 };

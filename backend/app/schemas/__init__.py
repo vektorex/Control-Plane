@@ -42,6 +42,15 @@ from backend.app.schemas.run import (
     RunResponse,
     RunListResponse,
 )
+from backend.app.schemas.context import (
+    TaskContextBase,
+    TaskContextCreate,
+    TaskContextUpdate,
+    TaskContextResponse,
+    TaskContextListResponse,
+    ContextItemDTO,
+    ContextInspectResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -73,4 +82,11 @@ __all__ = [
     "RunCreate",
     "RunResponse",
     "RunListResponse",
+    "TaskContextBase",
+    "TaskContextCreate",
+    "TaskContextUpdate",
+    "TaskContextResponse",
+    "TaskContextListResponse",
+    "ContextItemDTO",
+    "ContextInspectResponse",
 ]

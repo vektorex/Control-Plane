@@ -6,6 +6,7 @@ from backend.app.db.models.workspace import Workspace
 from backend.app.db.models.project import Project
 from backend.app.db.models.task import Task
 from backend.app.db.models.run import Run
+from backend.app.db.models.context import TaskContext
 
 __all__ = [
     "Base",
@@ -17,4 +18,6 @@ __all__ = [
     "Project",
     "Task",
     "Run",
+    "TaskContext",
 ]
+

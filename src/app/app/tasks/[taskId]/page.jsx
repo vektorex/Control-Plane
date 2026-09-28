@@ -13,16 +13,14 @@ import {
 } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
 import { taskService } from "@/services/tasks";
 import { orchestratorService } from "@/services/orchestrator";
-import { runService } from "@/services/runs";
 import { formatDate } from "@/lib/utils";
 import {
   Play,
   Square,
   Sparkles,
-  Cpu,
   Zap,
   Copy,
   Check,
@@ -31,13 +29,21 @@ import {
   Clock,
   ArrowLeft,
   Save,
-  CheckCircle2,
   FileText,
-  Layers,
   History,
   Terminal,
-  Activity,
   Calendar,
+  Plus,
+  Trash2,
+  Edit3,
+  Layers,
+  Sliders,
+  Database,
+  Eye,
+  CheckCircle2,
+  AlertTriangle,
+  Code,
+  Compass,
 } from "lucide-react";
 
 export default function TaskWorkspacePage({ params: paramsProp }) {
@@ -53,6 +59,23 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [taskStatus, setTaskStatus] = useState("draft");
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Manual Context state (Step 6)
+  const [contexts, setContexts] = useState([]);
+  const [isLoadingContexts, setIsLoadingContexts] = useState(false);
+  const [isContextModalOpen, setIsContextModalOpen] = useState(false);
+  const [editingContext, setEditingContext] = useState(null);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalContent, setModalContent] = useState("");
+  const [modalPriority, setModalPriority] = useState(50);
+  const [isSavingContext, setIsSavingContext] = useState(false);
+  const [contextError, setContextError] = useState(null);
+
+  // Context Inspector / Debug view state (Step 6)
+  const [showInspector, setShowInspector] = useState(false);
+  const [inspectData, setInspectData] = useState(null);
+  const [isLoadingInspect, setIsLoadingInspect] = useState(false);
+  const [contextBudget, setContextBudget] = useState(8000);
 
   // Models & execution settings
   const [models, setModels] = useState([]);
@@ -91,8 +114,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
   };
 
-  // Load task and runs
-  const loadTaskAndRuns = async () => {
+  // Load task and context
+  const loadTaskAndContexts = async () => {
     if (!taskId) return;
     try {
       setIsLoadingTask(true);
@@ -105,13 +128,26 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       setContextText(taskData.context_text || "");
       setTaskStatus(taskData.status || "draft");
 
-      // Fetch runs
-      await fetchTaskRuns();
+      // Fetch contexts and runs in parallel
+      await Promise.all([fetchTaskContexts(), fetchTaskRuns()]);
     } catch (err) {
       console.error("[TaskWorkspace] Error loading task:", err);
       setExecutionError(err.message || "Failed to load task details");
     } finally {
       setIsLoadingTask(false);
+    }
+  };
+
+  const fetchTaskContexts = async () => {
+    if (!taskId) return;
+    try {
+      setIsLoadingContexts(true);
+      const data = await taskService.listTaskContexts(taskId);
+      setContexts(data?.contexts || []);
+    } catch (err) {
+      console.error("[TaskWorkspace] Error loading contexts:", err);
+    } finally {
+      setIsLoadingContexts(false);
     }
   };
 
@@ -133,12 +169,27 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
   };
 
+  // Inspect context assembly from ContextEngine
+  const handleInspectContext = async () => {
+    if (!taskId) return;
+    try {
+      setIsLoadingInspect(true);
+      setShowInspector(true);
+      const data = await taskService.inspectTaskContext(taskId, contextBudget);
+      setInspectData(data);
+    } catch (err) {
+      console.error("[TaskWorkspace] Error inspecting context:", err);
+    } finally {
+      setIsLoadingInspect(false);
+    }
+  };
+
   useEffect(() => {
     loadModels();
-    loadTaskAndRuns();
+    loadTaskAndContexts();
   }, [taskId]);
 
-  // Save task modifications (title, instructions, context)
+  // Save task modifications (title, instructions, context_text)
   const handleSaveTask = async () => {
     if (!taskId) return;
     try {
@@ -160,6 +211,73 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       setExecutionError(`Failed to save task: ${err.message}`);
     } finally {
       setIsSavingTask(false);
+    }
+  };
+
+  // Manual Context Modal Handlers
+  const handleOpenAddContextModal = () => {
+    setEditingContext(null);
+    setModalTitle("");
+    setModalContent("");
+    setModalPriority(50);
+    setContextError(null);
+    setIsContextModalOpen(true);
+  };
+
+  const handleOpenEditContextModal = (ctx) => {
+    setEditingContext(ctx);
+    setModalTitle(ctx.title || "");
+    setModalContent(ctx.content || "");
+    setModalPriority(ctx.priority || 50);
+    setContextError(null);
+    setIsContextModalOpen(true);
+  };
+
+  const handleSaveContextItem = async (e) => {
+    e?.preventDefault();
+    if (!taskId || !modalTitle.trim() || !modalContent.trim()) return;
+
+    try {
+      setIsSavingContext(true);
+      setContextError(null);
+
+      if (editingContext) {
+        await taskService.updateContext(editingContext.id, {
+          title: modalTitle.trim(),
+          content: modalContent.trim(),
+          priority: Number(modalPriority),
+        });
+      } else {
+        await taskService.createTaskContext(taskId, {
+          title: modalTitle.trim(),
+          content: modalContent.trim(),
+          priority: Number(modalPriority),
+          source_type: "manual",
+        });
+      }
+
+      setIsContextModalOpen(false);
+      await fetchTaskContexts();
+      if (showInspector) {
+        await handleInspectContext();
+      }
+    } catch (err) {
+      setContextError(err.message || "Failed to save context item");
+    } finally {
+      setIsSavingContext(false);
+    }
+  };
+
+  const handleDeleteContextItem = async (contextId) => {
+    if (!confirm("Are you sure you want to delete this context item?")) return;
+    try {
+      await taskService.deleteContext(contextId);
+      await fetchTaskContexts();
+      if (showInspector) {
+        await handleInspectContext();
+      }
+    } catch (err) {
+      alert(`Failed to delete context item: ${err.message}`);
     }
   };
 
@@ -186,7 +304,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       return;
     }
 
-    // Auto-save any updated instructions first
+    // Auto-save any updated instructions/context_text first
     try {
       await taskService.updateTask(taskId, {
         title: title.trim(),
@@ -211,6 +329,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     const runPayload = {
       model: selectedModel,
       temperature: Number(temperature),
+      max_context_tokens: Number(contextBudget),
     };
 
     if (enableStreaming) {
@@ -226,6 +345,9 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             task_id: taskId,
             status: "running",
             model_name: selectedModel,
+            context_item_count: event.context_item_count,
+            estimated_context_tokens: event.estimated_context_tokens,
+            context_truncated: event.context_truncated,
             created_at: new Date().toISOString(),
           });
         },
@@ -299,6 +421,19 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
   };
 
+  const getPriorityBadge = (priority) => {
+    if (priority >= 90) return <Badge variant="destructive">Critical ({priority})</Badge>;
+    if (priority >= 70) return <Badge variant="warning">High ({priority})</Badge>;
+    if (priority >= 40) return <Badge variant="info">Medium ({priority})</Badge>;
+    return <Badge variant="default">Low ({priority})</Badge>;
+  };
+
+  // Rough estimation helper for UI
+  const estimateTokensLocal = (text) => {
+    if (!text) return 0;
+    return Math.max(Math.ceil(text.trim().length / 4), 1);
+  };
+
   if (isLoadingTask) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[450px] space-y-3">
@@ -350,7 +485,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             variant="ghost"
             size="sm"
             icon={RefreshCw}
-            onClick={loadTaskAndRuns}
+            onClick={loadTaskAndContexts}
             disabled={isRunning}
           >
             Refresh
@@ -371,7 +506,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
       {/* Main Execution Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Task Definition & Execution Parameters */}
+        {/* Left Column: Task Definition, Context Items & Execution Parameters */}
         <div className="lg:col-span-5 space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -380,7 +515,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                 <span>Task Specification</span>
               </CardTitle>
               <CardDescription className="text-xs">
-                Define the explicit instructions and contextual information passed to the AI model.
+                Define the primary prompt and instructions sent to the AI Context Engine.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -393,29 +528,29 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                 <textarea
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
-                  placeholder="Explain exactly what the AI model must accomplish (e.g., 'Analyze the API architecture and write unit test fixtures')..."
-                  rows={6}
+                  placeholder="Explain exactly what the AI model must accomplish (e.g., 'Analyze authentication flow and identify security weaknesses')..."
+                  rows={5}
                   className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
                   required
                 />
               </div>
 
-              {/* Context Text */}
+              {/* Task Background Context (Task Context Provider) */}
               <div>
                 <label className="text-xs font-semibold text-slate-300 block mb-1.5 flex items-center justify-between">
-                  <span>Context / Input Data (Optional)</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Supplementary text</span>
+                  <span>Task Context (Baseline)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">TaskContextProvider</span>
                 </label>
                 <textarea
                   value={contextText}
                   onChange={(e) => setContextText(e.target.value)}
-                  placeholder="Paste relevant snippets, source documents, JSON payloads, or domain constraints..."
-                  rows={4}
+                  placeholder="Inherent background context (e.g. 'FastAPI backend using JWT authentication')..."
+                  rows={3}
                   className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
                 />
               </div>
 
-              {/* Model & Parameters Controls */}
+              {/* Model & Budget Controls */}
               <div className="pt-2 border-t border-slate-800 space-y-3.5">
                 {/* Model Selector */}
                 <div>
@@ -462,6 +597,28 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   </div>
                 </div>
 
+                {/* Context Budget Selector */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-medium text-slate-300 flex items-center gap-1">
+                      <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Context Budget</span>
+                    </span>
+                    <span className="font-mono text-indigo-400 font-semibold">{contextBudget} tokens</span>
+                  </div>
+                  <select
+                    value={contextBudget}
+                    onChange={(e) => setContextBudget(Number(e.target.value))}
+                    className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono cursor-pointer"
+                  >
+                    <option value={2000}>2,000 tokens (Compact)</option>
+                    <option value={4000}>4,000 tokens (Balanced)</option>
+                    <option value={8000}>8,000 tokens (Standard)</option>
+                    <option value={16000}>16,000 tokens (Extended)</option>
+                    <option value={32000}>32,000 tokens (Deep Context)</option>
+                  </select>
+                </div>
+
                 {/* SSE Streaming Toggle */}
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
                   <div className="text-xs">
@@ -478,7 +635,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
               </div>
 
               {/* Execution Action Button */}
-              <div className="pt-2">
+              <div className="pt-2 flex gap-2">
                 {isRunning ? (
                   <Button
                     variant="destructive"
@@ -498,17 +655,136 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                     disabled={(!instructions.trim() && !task?.instructions) || !selectedModel}
                     className="w-full shadow-md shadow-indigo-900/30"
                   >
-                    Run Task
+                    Run Task with Context Engine
                   </Button>
                 )}
               </div>
             </CardContent>
           </Card>
+
+          {/* Context Engine Ingestion Section (Step 6) */}
+          <Card>
+            <CardHeader className="py-3 px-4 border-b border-slate-800 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-400" />
+                <div>
+                  <CardTitle className="text-sm">Context Management</CardTitle>
+                  <CardDescription className="text-[11px]">
+                    {contexts.length} explicit item{contexts.length !== 1 ? "s" : ""} configured
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="xs"
+                  icon={Eye}
+                  onClick={handleInspectContext}
+                  disabled={isLoadingInspect}
+                >
+                  {isLoadingInspect ? "Inspecting..." : "Inspect Context"}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="xs"
+                  icon={Plus}
+                  onClick={handleOpenAddContextModal}
+                >
+                  Add Context
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoadingContexts ? (
+                <div className="p-6 text-center text-xs text-slate-400">Loading context items...</div>
+              ) : (
+                <div className="divide-y divide-slate-850">
+                  {/* Task Baseline Context Preview */}
+                  {contextText && (
+                    <div className="p-3 bg-slate-900/40 flex items-start justify-between gap-3">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-200">Task Context</span>
+                          <Badge variant="outline">task</Badge>
+                          <Badge variant="warning">Priority 80</Badge>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            ~{estimateTokensLocal(contextText)} tok
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 line-clamp-2 font-mono">
+                          {contextText}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual Context Items */}
+                  {contexts.length === 0 && !contextText ? (
+                    <div className="p-6 text-center space-y-2">
+                      <Database className="w-6 h-6 text-slate-600 mx-auto" />
+                      <p className="text-xs text-slate-400">
+                        No context items yet. Add manual context documents, API specs, or constraints to empower LLM execution.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        icon={Plus}
+                        onClick={handleOpenAddContextModal}
+                        className="mt-2"
+                      >
+                        Add First Context Item
+                      </Button>
+                    </div>
+                  ) : (
+                    contexts.map((ctx) => (
+                      <div
+                        key={ctx.id}
+                        className="p-3.5 hover:bg-slate-850/40 transition-colors flex items-start justify-between gap-3"
+                      >
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-200 truncate">
+                              {ctx.title}
+                            </span>
+                            <Badge variant="outline">{ctx.source_type || "manual"}</Badge>
+                            {getPriorityBadge(ctx.priority)}
+                            <span className="text-[10px] font-mono text-indigo-400">
+                              ~{ctx.estimated_tokens || estimateTokensLocal(ctx.content)} tok
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 line-clamp-2 font-mono leading-relaxed">
+                            {ctx.content}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleOpenEditContextModal(ctx)}
+                            className="p-1 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded transition-colors"
+                            title="Edit context item"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteContextItem(ctx.id)}
+                            className="p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors"
+                            title="Delete context item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Right Column: AI Output & Live Telemetry */}
+        {/* Right Column: AI Output & Live Telemetry + Context Inspector View */}
         <div className="lg:col-span-7 space-y-4">
-          <Card className="flex flex-col h-full min-h-[560px]">
+          {/* AI Execution Output */}
+          <Card className="flex flex-col min-h-[500px]">
             <CardHeader className="py-3 px-4 border-b border-slate-800 flex flex-row items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Terminal className="w-4 h-4 text-cyan-400" />
@@ -558,12 +834,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
               ) : isRunning ? (
                 <div className="flex flex-col items-center justify-center flex-1 py-16 text-slate-400 space-y-3">
                   <Sparkles className="w-7 h-7 text-indigo-400 animate-spin" />
-                  <span className="text-xs">Orchestrating task with {selectedModel}...</span>
+                  <span className="text-xs">Orchestrating context & invoking {selectedModel}...</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center flex-1 py-16 text-slate-500 space-y-2">
                   <Terminal className="w-8 h-8 text-slate-700" />
-                  <span className="text-xs">Click &apos;Run Task&apos; to execute this task with AI</span>
+                  <span className="text-xs">Click &apos;Run Task with Context Engine&apos; to execute this task</span>
                 </div>
               )}
 
@@ -580,6 +856,14 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         Model: <strong className="text-cyan-400">{activeRun.model_name}</strong>
                       </span>
                     )}
+                    {activeRun.context_item_count !== null && activeRun.context_item_count !== undefined && (
+                      <span>
+                        • Context: <strong className="text-indigo-400">{activeRun.context_item_count} items</strong> ({activeRun.estimated_context_tokens || 0} tok)
+                        {activeRun.context_truncated && (
+                          <span className="text-amber-400 ml-1">(Truncated)</span>
+                        )}
+                      </span>
+                    )}
                     {activeRun.latency_ms !== null && activeRun.latency_ms !== undefined && (
                       <span>• Latency: <strong className="text-emerald-400">{activeRun.latency_ms}ms</strong></span>
                     )}
@@ -591,6 +875,112 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
               )}
             </CardContent>
           </Card>
+
+          {/* Context Inspector / Debug View (Section 12) */}
+          {showInspector && (
+            <Card className="border-indigo-900/60 bg-slate-900/90">
+              <CardHeader className="py-3 px-4 border-b border-slate-800 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Compass className="w-4 h-4 text-indigo-400" />
+                  <CardTitle className="text-sm">Context Engine Inspector (Debug View)</CardTitle>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="xs" onClick={handleInspectContext} disabled={isLoadingInspect}>
+                    Refresh Inspection
+                  </Button>
+                  <Button variant="ghost" size="xs" onClick={() => setShowInspector(false)}>
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {isLoadingInspect ? (
+                  <div className="py-8 text-center text-xs text-slate-400">Assembling context inspection package...</div>
+                ) : inspectData ? (
+                  <div className="space-y-4">
+                    {/* Summary Metrics Bar */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Total Items</span>
+                        <span className="text-base font-bold text-white font-mono">{inspectData.total_items}</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Estimated Tokens</span>
+                        <span className="text-base font-bold text-indigo-400 font-mono">
+                          {inspectData.estimated_tokens} / {inspectData.max_context_tokens}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Truncation Status</span>
+                        <span className="text-xs font-semibold font-mono block mt-1">
+                          {inspectData.truncated ? (
+                            <span className="text-amber-400 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> Truncated ({inspectData.dropped_items_count} dropped)
+                            </span>
+                          ) : (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Full Context Preserved
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Sources Ingested</span>
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {inspectData.sources.map((s) => (
+                            <Badge key={s} variant="outline" className="text-[9px] py-0">
+                              {s}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Assembled Items List */}
+                    <div className="space-y-2">
+                      <span className="text-xs font-semibold text-slate-300 block">
+                        Included Context Items ({inspectData.items.length})
+                      </span>
+                      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        {inspectData.items.map((item, idx) => (
+                          <div
+                            key={item.id || idx}
+                            className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-indigo-400 font-semibold">#{idx + 1}</span>
+                                <Badge variant="outline" className="text-[10px]">{item.source_type}</Badge>
+                                <span className="font-semibold text-slate-200">{item.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {getPriorityBadge(item.priority)}
+                                <span className="text-slate-400">{item.token_estimate} tok</span>
+                              </div>
+                            </div>
+                            <p className="text-slate-400 text-[11px] line-clamp-2">{item.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Formatted Prompt Payload Preview */}
+                    {inspectData.formatted_prompt_preview && (
+                      <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                        <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                          <Code className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Assembled LLM Messages Snapshot</span>
+                        </span>
+                        <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[180px]">
+                          {inspectData.formatted_prompt_preview}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -610,7 +1000,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             <div className="p-6 text-center text-xs text-slate-400">Loading historical runs...</div>
           ) : runs.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400">
-              No previous execution runs recorded for this task. Click &apos;Run Task&apos; above to create the first run.
+              No previous execution runs recorded for this task. Click &apos;Run Task with Context Engine&apos; above to create the first run.
             </div>
           ) : (
             <div className="divide-y divide-slate-850">
@@ -639,6 +1029,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400">
+                      {run.context_item_count !== null && run.context_item_count !== undefined && (
+                        <span className="text-indigo-300 flex items-center gap-1">
+                          <Layers className="w-3 h-3 text-indigo-400" />
+                          {run.context_item_count} ctx ({run.estimated_context_tokens || 0} tok)
+                        </span>
+                      )}
                       {run.total_tokens !== null && run.total_tokens !== undefined && (
                         <span className="flex items-center gap-1 text-slate-300">
                           <Zap className="w-3 h-3 text-amber-400" />
@@ -663,6 +1059,94 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Add / Edit Context Modal */}
+      <Modal
+        isOpen={isContextModalOpen}
+        onClose={() => setIsContextModalOpen(false)}
+        title={editingContext ? "Edit Context Item" : "Add Task Context"}
+        description="Provide background documentation, technical constraints, or data notes for the Context Engine."
+      >
+        <form onSubmit={handleSaveContextItem} className="space-y-4">
+          {contextError && (
+            <div className="p-3 rounded-lg bg-rose-950 border border-rose-800 text-rose-300 text-xs">
+              {contextError}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium text-slate-300 block mb-1">
+              Context Title / Label *
+            </label>
+            <input
+              type="text"
+              value={modalTitle}
+              onChange={(e) => setModalTitle(e.target.value)}
+              placeholder="e.g. FastAPI JWT Authentication Notes"
+              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+              required
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <label className="font-medium text-slate-300">Context Content *</label>
+              <span className="font-mono text-[11px] text-indigo-400">
+                ~{estimateTokensLocal(modalContent)} estimated tokens
+              </span>
+            </div>
+            <textarea
+              value={modalContent}
+              onChange={(e) => setModalContent(e.target.value)}
+              placeholder="Paste relevant domain documentation, rules, schema definitions, or reference material..."
+              rows={6}
+              className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
+              required
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <label className="font-medium text-slate-300">Priority Weight (0 - 100)</label>
+              <span className="font-mono text-indigo-400 font-semibold">{modalPriority}</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={modalPriority}
+              onChange={(e) => setModalPriority(parseInt(e.target.value, 10))}
+              className="w-full accent-indigo-500 cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400">
+              <span>Low (10)</span>
+              <span>Medium (50)</span>
+              <span>High (80)</span>
+              <span>Critical (100)</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setIsContextModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              disabled={isSavingContext || !modalTitle.trim() || !modalContent.trim()}
+            >
+              {isSavingContext ? "Saving..." : editingContext ? "Update Context" : "Add Context"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

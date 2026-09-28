@@ -2,185 +2,168 @@
 
 > **"One workspace for getting real work done with LLMs."**
 
-A universal, production-oriented LLM work orchestration platform that accepts complex user tasks and coordinates optimal LLMs, context sources, retrieval strategies, persistent project data, multi-tenant workspace isolation, and specialized execution tools.
+A universal, production-oriented LLM work orchestration platform that accepts complex user tasks and coordinates optimal LLMs, context sources, hybrid retrieval strategies (Vector + Keyword Search + Reranking), persistent project data, multi-tenant workspace isolation, and specialized execution tools.
 
 ---
 
 ## 🏛️ System Architecture
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    Next.js Frontend                        │
-│   • Modern App Router (JavaScript + Tailwind CSS)          │
-│   • Supabase Auth Provider & Session Lifecycle             │
-│   • Protected App Shell (/app, /tasks, /projects, /settings)│
-│   • Task Context Management & Context Inspector Debug View │
-│   • Developer Playground (/app/playground)                 │
-└─────────────────────────────┬──────────────────────────────┘
-                              │ HTTP (Bearer JWT) / SSE Stream
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                   Python FastAPI Backend                   │
-│   • JWT Signature & Expiry Verification (Independent Auth) │
-│   • Multi-Tenant Resource Ownership Authorization Layer    │
-│   • Context Management (/api/tasks/{id}/context, /api/context)│
-│   • Health & Model Metadata (/api/health, /api/models)     │
-│   • Synchronous & SSE Streaming Task Execution             │
-│   • Request Validation & Structured Error Handling         │
-└─────────────────────────────┬──────────────────────────────┘
-                              │
-               ┌──────────────┴──────────────┐
-               ▼                             ▼
-┌─────────────────────────────┐┌─────────────────────────────┐
-│       Context Engine        ││      Repository Layer       │
-│  • Provider Registry        ││  • UserRepository           │
-│  • TaskContextProvider      ││  • WorkspaceRepository      │
-│  • ManualContextProvider    ││  • ProjectRepository        │
-│  • Future Vector/RAG/Web    ││  • TaskRepository           │
-│  • Token Budget & Dedup     ││  • RunRepository            │
-│  • ContextPackage Builder   ││  • ContextRepository        │
-└──────────────┬──────────────┘└─────────────┬───────────────┘
-               │                             │
-               ▼                             ▼
-┌─────────────────────────────┐┌─────────────────────────────┐
-│    LLM Abstraction Layer    ││    PostgreSQL Database      │
-│  • Provider Factory         ││ (SQLAlchemy 2.x + Alembic)  │
-│  • AsyncOpenAI SDK Adapter  ││ Multi-Tenant User Isolation │
-│  • Model Resolution         ││ TaskContext & Run Metadata  │
-└──────────────┬──────────────┘└─────────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│       LLM Providers         │
-│   (OpenAI, Anthropic, etc.) │
-└─────────────────────────────┘
-```
-
----
-
-## 🧠 Context Engine Architecture (Step 6)
-
-The **Context Engine** establishes the foundational abstraction for collecting, normalizing, prioritizing, deduplicating, and assembling context supplied to LLMs during task execution.
-
-### Architectural Flow:
-```
-Task Execution
-     │
-     ▼
+User
+ │
+ ▼
+Task
+ │
+ ▼
 ContextEngine
-     │
-     ├── Provider Registry
-     │         ├── TaskContextProvider (Task title, instructions, context_text)
-     │         ├── ManualContextProvider (User-attached TaskContext records)
-     │         └── Future Extensibility:
-     │               ├── VectorRetrievalProvider (Embeddings / Vector DB)
-     │               ├── WebSearchProvider (Live web retrieval)
-     │               ├── GitHubProvider (Code repository snippets)
-     │               └── DatabaseProvider (Structured SQL / Schema context)
-     ▼
-Raw Context Items
-     │
-     ▼
-ContextBuilder
-     ├── 1. Deduplication (SHA-256 fingerprinting with priority preservation)
-     ├── 2. Priority Sorting (System 100 > Task 80-90 > Manual 50-85 > Recency)
-     ├── 3. Deterministic Token Estimation
-     └── 4. Budget Enforcement & Truncation Safety (max_context_tokens)
-     │
-     ▼
-ContextPackage
-  {
-    "items": [...],
-    "total_items": 4,
-    "estimated_tokens": 1250,
-    "truncated": false,
-    "sources": ["task", "manual"]
-  }
-     │
-     ▼
-TaskExecutionService (Formats messages & dispatches to LLM Abstraction)
+ ├── TaskContextProvider     (Task title, instructions, baseline context)
+ ├── ManualContextProvider   (User-attached task notes, guidelines, constraints)
+ └── RAGContextProvider      (User-owned domain knowledge retrieval)
+          │
+          ▼
+     HybridRetriever
+       ├── Vector Search     (pgvector cosine semantic similarity)
+       └── Keyword Search    (Lexical term coverage + BM25-style scoring)
+          │
+          ▼
+     Result Fusion           (Reciprocal Rank Fusion - RRF)
+          │
+          ▼
+     Reranking               (Deterministic Local scoring & alignment)
+          │
+          ▼
+     Context Items           (Prioritized & token-budget enforced)
+          │
+          ▼
+     LLM Abstraction         (OpenAI, Anthropic, Mock providers)
 ```
-
-### ContextProvider Interface:
-All context providers implement a uniform, provider-independent abstraction:
-```python
-class ContextProvider(ABC):
-    @property
-    def provider_id(self) -> str: ...
-    @property
-    def source_type(self) -> str: ...
-    async def can_handle(self, task: Task, **kwargs) -> bool: ...
-    async def collect(self, task: Task, session: AsyncSession, **kwargs) -> List[Any]: ...
-    def normalize(self, raw_items: List[Any], **kwargs) -> List[ContextItem]: ...
-    async def provide(self, task: Task, session: AsyncSession, **kwargs) -> List[ContextItem]: ...
-```
-
-### Extensibility Guarantee:
-Adding future retrieval systems (e.g. `VectorProvider`, `WebProvider`, `GitHubProvider`, `FileProvider`) requires **zero modifications** to `TaskExecutionService`. New providers simply register with `ContextProviderRegistry` or `ContextEngine.register_provider(provider)`.
-
-### Token Estimation Strategy:
-To maintain deterministic speed and zero paid API dependencies, the engine implements a local character/word token estimator:
-- Text averaging ~4 characters per token and ~1.33 tokens per word with 4-token structural wrapper overhead per item.
-- Strict budget enforcement drops or truncates lower-priority items when total tokens exceed `max_context_tokens` (default 8,000, configurable per execution request).
 
 ---
 
-## 🔐 Authentication & Multi-Tenant Authorization Model
+## 📚 Document Ingestion & Hybrid RAG Pipeline (Step 7)
 
-### Architectural Flow
-Every backend operation strictly enforces the following pipeline:
+Step 7 implements document ingestion and an end-to-end production-oriented **Hybrid RAG Pipeline** that plugs directly into the existing `ContextEngine` via `RAGContextProvider`.
+
+### Ingestion Pipeline Architecture:
 ```
-Request ──► Authentication ──► Authorization / Ownership ──► Validation ──► Service ──► Repository ──► Database
+Upload Document (PDF, Markdown, TXT, DOCX)
+     │
+     ▼
+Create Document Record (status = "pending")
+     │
+     ▼
+File Storage Abstraction (.storage/documents, R2/S3 ready)
+     │
+     ▼
+Asynchronous Background Worker (Non-blocking)
+     │
+     ▼
+Format-Specific Extractor (PDFExtractor, MarkdownExtractor, TextExtractor, DOCXExtractor)
+     │
+     ▼
+Structure-Aware Chunking (Paragraph/Sentence split, Token Overlap, Page retention)
+     │
+     ▼
+Batch Vector Embeddings (OpenAI text-embedding-3-small, 1536d / Mock 128d)
+     │
+     ▼
+Persist DocumentChunks (pgvector / JSON vector type + Metadata)
+     │
+     ▼
+Update Document Status (status = "ready", chunk_count = N)
 ```
 
-1. **Authentication**:
-   - The frontend authenticates via **Supabase Auth** (`email/password`).
-   - Requests to `/api/*` automatically attach `Authorization: Bearer <access_token>`.
-   - The FastAPI backend independently verifies token signature, claims (`sub`, `email`, `aud`), and expiration using `SUPABASE_JWT_SECRET` (or dev secret fallback). No client-provided user IDs or workspace IDs are trusted.
-2. **Multi-Tenant Ownership & Resource Isolation**:
-   - Hierarchical data model:
-     $$\text{Authenticated User} \longrightarrow \text{Workspace} \longrightarrow \text{Project} \longrightarrow \text{Task} \longrightarrow \text{TaskContext / Run}$$
-   - When User A requests a resource belonging to User B, the backend returns `404 Not Found` (never leaking whether another tenant's resource exists).
+### 1. Supported Document Formats & Extraction
+- **PDF (`.pdf`)**: Extracted using `pypdf` with discrete per-page text tracking.
+- **Markdown (`.md`, `.markdown`)**: Extracted with structural headings count and section demarcation.
+- **Plain Text (`.txt`)**: Extracted with UTF-8 / latin-1 fallback encoding normalization.
+- **Word Documents (`.docx`)**: Extracted using `python-docx` parsing body paragraphs and tables.
+- **Security Validation**: File size limits (max 25MB), MIME type verification, dangerous executable rejection (`.exe`, `.sh`, `.bat`).
+
+### 2. Storage Abstraction Layer
+- Located at `backend/app/services/storage/`
+- Implements `FileStorage` interface: `upload`, `download`, `delete`, `exists`.
+- Local filesystem storage (`LocalFileStorage`) stores files securely outside the source tree at `DOCUMENT_STORAGE_PATH=.storage/documents` with path traversal defense.
+- Ready for future zero-code swap to Cloudflare R2 or AWS S3. Storage filesystem paths are never exposed to the client.
+
+### 3. Structure-Aware Chunking
+- Located at `backend/app/services/chunking/`
+- Splits continuous text along structural boundaries (paragraphs `\n\n`, sentences, linebreaks) rather than arbitrary character cuts.
+- Retains `page_number`, `chunk_index`, document metadata, and token count estimates.
+- Configurable `chunk_size` (default 500 tokens) and `chunk_overlap` (default 50 tokens).
+
+### 4. Embedding Provider Abstraction
+- Located at `backend/app/services/embeddings/`
+- Implements `BaseEmbeddingProvider`: `embed_text()` and `embed_batch()`.
+- Providers:
+  - `OpenAIEmbeddingProvider`: Batched API requests with exponential backoff and rate-limit retries.
+  - `MockEmbeddingProvider`: Deterministic unit-normalized float vectors for zero-cost testing.
+- Configurable via `EMBEDDING_MODEL` and `EMBEDDING_DIMENSION`.
+
+### 5. PostgreSQL + pgvector Schema
+- `VectorType` in `backend/app/db/models/vector_type.py` dynamically uses native `pgvector.sqlalchemy.Vector` on PostgreSQL and JSON float arrays on SQLite.
+- Fully managed via Alembic migration `005_documents_chunks_and_retrieval_telemetry.py`.
+
+### 6. Hybrid Retrieval, Fusion & Reranking
+- **Vector Search (`VectorRetriever`)**: Computes cosine similarity between query embeddings and workspace-scoped document chunks.
+- **Keyword Search (`KeywordRetriever`)**: Computes term coverage, normalized term frequency (sublinear logarithmic scaling), exact phrase bonus, and filename bonus.
+- **Reciprocal Rank Fusion (`HybridRetriever`)**:
+  $$RRF(d) = \frac{w_{\text{vec}}}{k + \text{rank}_{\text{vec}}(d)} + \frac{w_{\text{kw}}}{k + \text{rank}_{\text{kw}}(d)}$$
+  (Default weights: 0.6 vector, 0.4 keyword, $k=60$).
+- **Deterministic Local Reranker (`LocalReranker`)**: Evaluates fusion rank, query term density in leading chunk text, and filename alignment to produce final ranked candidate order.
+
+### 7. RAGContextProvider & Run Telemetry
+- Implements the `ContextProvider` interface from Step 6.
+- Injects retrieved sources as normalized `ContextItem`s with `source_type="document"` into the `ContextEngine`.
+- Captures full telemetry in the `Run` entity:
+  - `retrieval_enabled`: Boolean flag
+  - `retrieved_chunk_count`: Total chunks retrieved
+  - `retrieval_latency_ms`: Time taken for search + fusion + reranking
+  - `retrieval_sources`: List of document names, pages, and relevance scores for UI transparency.
+
+---
+
+## 🔐 Multi-Tenant Security & Isolation
+
+Every document, chunk, context item, and task execution strictly enforces multi-tenant ownership:
+$$\text{User} \longrightarrow \text{Workspace} \longrightarrow \text{Project} \longrightarrow \text{Document} \longrightarrow \text{DocumentChunk}$$
+
+- **Cross-Tenant Isolation**: User A can NEVER search, retrieve, view, or delete document chunks belonging to User B.
+- **Tenant Scope Enforcement**: All SQL queries filter on `workspace_id` at the database layer.
+- **Storage Safety**: Storage keys include non-guessable prefixes and filenames are sanitized.
 
 ---
 
 ## 📡 API Reference
 
-### Authentication & Profiles
-- `GET    /api/auth/me` — Retrieve authenticated user profile and default workspace context
+### Document Management & Uploads (Step 7)
+- `POST   /api/workspaces/{workspace_id}/documents` — Multipart upload for PDF, TXT, Markdown, DOCX with non-blocking background ingestion
+- `GET    /api/workspaces/{workspace_id}/documents` — List workspace documents with project and status filters
+- `GET    /api/documents/{document_id}` — Get document status, metadata, and chunk count
+- `GET    /api/documents/{document_id}/chunks` — Inspect indexed vector chunks for a document
+- `DELETE /api/documents/{document_id}` — Delete document, vector chunks, and stored file
+- `POST   /api/documents/{document_id}/reprocess` — Trigger manual re-ingestion
 
-### Workspaces (Multi-Tenant Scoped)
+### Workspaces & Projects
 - `POST   /api/workspaces` — Create workspace owned by authenticated user
 - `GET    /api/workspaces` — List workspaces owned by authenticated user
-- `GET    /api/workspaces/{workspace_id}` — Get workspace by ID (404 if unowned)
-- `PATCH  /api/workspaces/{workspace_id}` — Update owned workspace
-- `DELETE /api/workspaces/{workspace_id}` — Cascade delete owned workspace
+- `GET    /api/workspaces/{workspace_id}` — Get workspace details
+- `PATCH  /api/workspaces/{workspace_id}` — Update workspace
+- `DELETE /api/workspaces/{workspace_id}` — Delete workspace
+- `POST   /api/workspaces/{workspace_id}/projects` — Create project
+- `GET    /api/workspaces/{workspace_id}/projects` — List projects
 
-### Projects (Multi-Tenant Scoped)
-- `POST   /api/workspaces/{workspace_id}/projects` — Create project in owned workspace
-- `GET    /api/workspaces/{workspace_id}/projects` — List projects in owned workspace
-- `GET    /api/projects` — List all projects in user's workspaces
-- `GET    /api/projects/{project_id}` — Get project by ID (404 if unowned)
-- `PATCH  /api/projects/{project_id}` — Update owned project
-- `DELETE /api/projects/{project_id}` — Cascade delete owned project
-
-### Tasks & Context (Multi-Tenant Scoped)
-- `POST   /api/projects/{project_id}/tasks` — Create task in owned project
-- `GET    /api/projects/{project_id}/tasks` — List tasks in owned project
-- `GET    /api/tasks` — List tasks across user's projects
-- `GET    /api/tasks/{task_id}` — Get task by ID (404 if unowned)
-- `PATCH  /api/tasks/{task_id}` — Update owned task
-- `DELETE /api/tasks/{task_id}` — Cascade delete owned task
-- `POST   /api/tasks/{task_id}/context` — Create manual context item for task
-- `GET    /api/tasks/{task_id}/context` — List context items for task
+### Tasks, Context & Hybrid AI Execution
+- `POST   /api/projects/{project_id}/tasks` — Create task
+- `GET    /api/projects/{project_id}/tasks` — List tasks
+- `GET    /api/tasks/{task_id}` — Get task
+- `PATCH  /api/tasks/{task_id}` — Update task
+- `DELETE /api/tasks/{task_id}` — Delete task
+- `POST   /api/tasks/{task_id}/context` — Create manual context item
+- `GET    /api/tasks/{task_id}/context` — List context items
 - `GET    /api/tasks/{task_id}/context/inspect` — Debug view of assembled ContextPackage & prompt
-- `PATCH  /api/context/{context_id}` — Update individual context item
-- `DELETE /api/context/{context_id}` — Delete individual context item
-
-### Task AI Execution & Runs (Multi-Tenant Scoped)
-- `POST   /api/tasks/{task_id}/run` — Execute task synchronously via Context Engine & LLM
-- `POST   /api/tasks/{task_id}/run/stream` — Execute task with Server-Sent Events (SSE) streaming
-- `GET    /api/tasks/{task_id}/runs` — List historical execution runs for task
+- `POST   /api/tasks/{task_id}/run` — Execute task with ContextEngine + Hybrid RAG + Telemetry
+- `POST   /api/tasks/{task_id}/run/stream` — Execute task with SSE streaming + Hybrid RAG
 
 ---
 
@@ -195,25 +178,47 @@ pip install -r backend/requirements.txt
 # 2. Configure environment
 cp backend/.env.example backend/.env
 
-# 3. Apply Alembic database migrations
+# 3. Apply Alembic database migrations (up to revision 005)
 python -m alembic -c backend/alembic.ini upgrade head
 
-# 4. Run full test suite (68 passing unit and integration tests)
+# 4. Run full test suite (87 passing unit, integration, and security tests)
 python -m pytest backend/tests -v
 
 # 5. Start FastAPI backend server
 python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 2. Frontend Setup & Startup
+### 2. Frontend Setup & Build
 
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. Run lint and build validation
+# 2. Run production build validation (Pure JavaScript Next.js App Router)
 npm run build
 
 # 3. Start development server
 npm run dev
 ```
+
+---
+
+## ✅ Step 7 Verification Checklist
+
+- [x] Database schema & Alembic migration `005` (Documents, DocumentChunks, VectorType, Run retrieval fields).
+- [x] Storage abstraction (`FileStorage`, `LocalFileStorage`, `get_file_storage`).
+- [x] Format extractors (PDF via `pypdf`, Markdown, Plain Text, DOCX via `python-docx`).
+- [x] Structure-aware text chunker with token overlap and page preservation.
+- [x] Embedding provider interface (`BaseEmbeddingProvider`, `OpenAIEmbeddingProvider`, `MockEmbeddingProvider`).
+- [x] Vector retriever with cosine similarity & multi-tenant isolation.
+- [x] Keyword retriever with sublinear TF scoring and full-text coverage.
+- [x] Hybrid retriever with Reciprocal Rank Fusion (RRF).
+- [x] Deterministic local reranker (`LocalReranker`).
+- [x] `RAGContextProvider` integrated into `ContextEngine`.
+- [x] Multipart Document upload API with background worker processing.
+- [x] Document Management UI (`/app/documents`) with upload, status tracking, and chunk inspection.
+- [x] Task Workspace UI (`/app/tasks/[taskId]`) with Knowledge/Retrieval toggle, scope selector, and Retrieved Sources inspection panel.
+- [x] Run telemetry capturing `retrieval_enabled`, `retrieved_chunk_count`, `retrieval_latency_ms`, `retrieval_sources`.
+- [x] Strict multi-tenant security preventing cross-user document access or retrieval.
+- [x] 87/87 backend unit & integration tests passing.
+- [x] Next.js frontend production build passing with 0 errors.

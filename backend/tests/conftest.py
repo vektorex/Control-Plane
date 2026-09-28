@@ -158,6 +158,20 @@ async def override_get_db():
 
 
 @pytest.fixture
+async def db_session() -> AsyncIterator[AsyncSession]:
+    """Yields an isolated async session for database model testing."""
+    async with test_async_session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+@pytest.fixture
 def mock_factory():
     factory = LLMProviderFactory()
     mock_provider = MockTestProvider(configured=True)
@@ -194,7 +208,13 @@ def user2_auth():
 
 
 @pytest.fixture
-def client(mock_factory):
+def client(mock_factory, monkeypatch):
+    import backend.app.db.database as db_mod
+    import backend.app.api.routes.documents as doc_mod
+
+    monkeypatch.setattr(db_mod, "AsyncSessionLocal", test_async_session_factory)
+    monkeypatch.setattr(doc_mod, "AsyncSessionLocal", test_async_session_factory)
+
     app.dependency_overrides[get_llm_factory] = lambda: mock_factory
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:

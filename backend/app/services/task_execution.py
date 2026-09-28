@@ -57,11 +57,40 @@ class TaskExecutionService:
 
         # 1. Gather & package context via ContextEngine
         max_context_tokens = request.max_context_tokens or 8000
+        retrieval_telemetry = {}
+
+        def _on_retrieval_telemetry(result):
+            retrieval_telemetry["result"] = result
+
         context_package = await self.context_engine.build_context(
             task=task,
             session=self.session,
             max_context_tokens=max_context_tokens,
+            retrieval_enabled=request.retrieval_enabled,
+            retrieval_top_k=request.retrieval_top_k,
+            retrieval_project_scope=request.retrieval_project_scope,
+            retrieval_telemetry_callback=_on_retrieval_telemetry,
         )
+
+        ret_res = retrieval_telemetry.get("result")
+        ret_sources = None
+        ret_chunk_count = 0
+        ret_latency = 0
+        if ret_res:
+            ret_chunk_count = len(ret_res.candidates)
+            ret_latency = ret_res.retrieval_latency_ms
+            ret_sources = [
+                {
+                    "document_id": str(c.document_id),
+                    "chunk_id": str(c.chunk_id),
+                    "filename": c.filename,
+                    "page_number": c.page_number,
+                    "score": round(c.rerank_score or c.fusion_score, 4),
+                    "vector_score": round(c.vector_score, 4) if c.vector_score is not None else None,
+                    "keyword_score": round(c.keyword_score, 4) if c.keyword_score is not None else None,
+                }
+                for c in ret_res.candidates
+            ]
 
         # 2. Build structured messages from context package
         messages = self.context_engine.builder.format_as_messages(context_package, task)
@@ -69,11 +98,12 @@ class TaskExecutionService:
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
 
-        # 3. Create Run in 'queued' status with full context telemetry
+        # 3. Create Run in 'queued' status with full context and retrieval telemetry
         input_snapshot = {
             "model": model_name,
             "temperature": request.temperature,
             "max_context_tokens": max_context_tokens,
+            "retrieval_enabled": bool(request.retrieval_enabled),
             "context_summary": {
                 "item_count": context_package.total_items,
                 "estimated_tokens": context_package.estimated_tokens,
@@ -94,6 +124,10 @@ class TaskExecutionService:
             estimated_context_tokens=context_package.estimated_tokens,
             context_truncated=context_package.truncated,
             context_sources=context_package.sources,
+            retrieval_enabled=bool(request.retrieval_enabled),
+            retrieved_chunk_count=ret_chunk_count if request.retrieval_enabled else None,
+            retrieval_latency_ms=ret_latency if request.retrieval_enabled else None,
+            retrieval_sources=ret_sources if request.retrieval_enabled else None,
         )
         self.session.add(run)
         await self.session.flush()
@@ -170,11 +204,40 @@ class TaskExecutionService:
 
         # 1. Gather & package context via ContextEngine
         max_context_tokens = request.max_context_tokens or 8000
+        retrieval_telemetry = {}
+
+        def _on_retrieval_telemetry(result):
+            retrieval_telemetry["result"] = result
+
         context_package = await self.context_engine.build_context(
             task=task,
             session=self.session,
             max_context_tokens=max_context_tokens,
+            retrieval_enabled=request.retrieval_enabled,
+            retrieval_top_k=request.retrieval_top_k,
+            retrieval_project_scope=request.retrieval_project_scope,
+            retrieval_telemetry_callback=_on_retrieval_telemetry,
         )
+
+        ret_res = retrieval_telemetry.get("result")
+        ret_sources = None
+        ret_chunk_count = 0
+        ret_latency = 0
+        if ret_res:
+            ret_chunk_count = len(ret_res.candidates)
+            ret_latency = ret_res.retrieval_latency_ms
+            ret_sources = [
+                {
+                    "document_id": str(c.document_id),
+                    "chunk_id": str(c.chunk_id),
+                    "filename": c.filename,
+                    "page_number": c.page_number,
+                    "score": round(c.rerank_score or c.fusion_score, 4),
+                    "vector_score": round(c.vector_score, 4) if c.vector_score is not None else None,
+                    "keyword_score": round(c.keyword_score, 4) if c.keyword_score is not None else None,
+                }
+                for c in ret_res.candidates
+            ]
 
         # 2. Build structured messages from context package
         messages = self.context_engine.builder.format_as_messages(context_package, task)
@@ -186,6 +249,7 @@ class TaskExecutionService:
             "model": model_name,
             "temperature": request.temperature,
             "max_context_tokens": max_context_tokens,
+            "retrieval_enabled": bool(request.retrieval_enabled),
             "context_summary": {
                 "item_count": context_package.total_items,
                 "estimated_tokens": context_package.estimated_tokens,
@@ -196,7 +260,7 @@ class TaskExecutionService:
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
 
-        # 3. Initialize Run in 'running' status with context telemetry
+        # 3. Initialize Run in 'running' status with context and retrieval telemetry
         run = Run(
             task_id=task.id,
             status=RunStatus.RUNNING.value,
@@ -207,6 +271,10 @@ class TaskExecutionService:
             estimated_context_tokens=context_package.estimated_tokens,
             context_truncated=context_package.truncated,
             context_sources=context_package.sources,
+            retrieval_enabled=bool(request.retrieval_enabled),
+            retrieved_chunk_count=ret_chunk_count if request.retrieval_enabled else None,
+            retrieval_latency_ms=ret_latency if request.retrieval_enabled else None,
+            retrieval_sources=ret_sources if request.retrieval_enabled else None,
             started_at=datetime.now(timezone.utc),
         )
         self.session.add(run)
@@ -214,7 +282,7 @@ class TaskExecutionService:
         await self.session.refresh(run)
 
         # Notify frontend of run ID and context telemetry immediately
-        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated})}\n\n"
+        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated, 'retrieval_enabled': bool(request.retrieval_enabled), 'retrieved_chunk_count': ret_chunk_count})}\n\n"
 
         llm_request = LLMGenerateRequest(
             model=model_name,

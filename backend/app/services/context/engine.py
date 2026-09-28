@@ -7,6 +7,7 @@ from backend.app.services.context.base import ContextProvider
 from backend.app.services.context.builders.context_builder import ContextBuilder
 from backend.app.services.context.models import ContextBudget, ContextItem, ContextPackage
 from backend.app.services.context.providers.manual_context import ManualContextProvider
+from backend.app.services.context.providers.rag_context import RAGContextProvider
 from backend.app.services.context.providers.task_context import TaskContextProvider
 from backend.app.services.context.registry import ContextProviderRegistry
 
@@ -33,6 +34,8 @@ class ContextEngine:
             self.registry.register(TaskContextProvider())
         if not self.registry.get_provider("manual_context"):
             self.registry.register(ManualContextProvider())
+        if not self.registry.get_provider("rag_context"):
+            self.registry.register(RAGContextProvider())
 
     def register_provider(self, provider: ContextProvider) -> None:
         """Dynamically registers an additional context provider (e.g. VectorProvider, WebProvider)."""

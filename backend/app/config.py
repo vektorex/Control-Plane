@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     SUPABASE_AUDIENCE: str = "authenticated"
     ORCHESTRATION_API_SECRET: Optional[str] = None
 
+    # Step 7: Document Storage & RAG Settings
+    DOCUMENT_STORAGE_PATH: str = ".storage/documents"
+    MAX_DOCUMENT_SIZE_MB: int = 25
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIMENSION: int = 1536
+    RAG_DEFAULT_TOP_K: int = 8
+    RAG_DEFAULT_MAX_CONTEXT_TOKENS: int = 6000
+
 
 settings = Settings()
 

@@ -14,7 +14,6 @@ from backend.app.schemas.user import (
     UserProfileResponse,
 )
 from backend.app.schemas.workspace import (
-
     WorkspaceBase,
     WorkspaceCreate,
     WorkspaceUpdate,
@@ -50,6 +49,12 @@ from backend.app.schemas.context import (
     TaskContextListResponse,
     ContextItemDTO,
     ContextInspectResponse,
+)
+from backend.app.schemas.document import (
+    DocumentResponse,
+    DocumentListResponse,
+    DocumentChunkResponse,
+    DocumentChunkListResponse,
 )
 
 __all__ = [
@@ -89,4 +94,8 @@ __all__ = [
     "TaskContextListResponse",
     "ContextItemDTO",
     "ContextInspectResponse",
+    "DocumentResponse",
+    "DocumentListResponse",
+    "DocumentChunkResponse",
+    "DocumentChunkListResponse",
 ]

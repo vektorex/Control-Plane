@@ -35,6 +35,9 @@ async_session_factory = async_sessionmaker(
     autoflush=False,
 )
 
+# Alias for background tasks and worker workers
+AsyncSessionLocal = async_session_factory
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """

@@ -83,6 +83,11 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [temperature, setTemperature] = useState(0.2);
   const [enableStreaming, setEnableStreaming] = useState(true);
 
+  // Hybrid RAG Retrieval settings (Step 7)
+  const [retrievalEnabled, setRetrievalEnabled] = useState(true);
+  const [retrievalTopK, setRetrievalTopK] = useState(8);
+  const [retrievalProjectScope, setRetrievalProjectScope] = useState(true);
+
   // Execution & Run state
   const [activeRun, setActiveRun] = useState(null);
   const [runs, setRuns] = useState([]);
@@ -330,6 +335,9 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       model: selectedModel,
       temperature: Number(temperature),
       max_context_tokens: Number(contextBudget),
+      retrieval_enabled: Boolean(retrievalEnabled),
+      retrieval_top_k: Number(retrievalTopK),
+      retrieval_project_scope: Boolean(retrievalProjectScope),
     };
 
     if (enableStreaming) {
@@ -348,6 +356,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             context_item_count: event.context_item_count,
             estimated_context_tokens: event.estimated_context_tokens,
             context_truncated: event.context_truncated,
+            retrieval_enabled: event.retrieval_enabled,
+            retrieved_chunk_count: event.retrieved_chunk_count,
             created_at: new Date().toISOString(),
           });
         },
@@ -619,6 +629,92 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   </select>
                 </div>
 
+                {/* Knowledge / Hybrid Retrieval (Step 7) */}
+                <div className="p-3 rounded-lg bg-slate-950/70 border border-indigo-500/20 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Database className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="text-xs font-semibold text-slate-200">Knowledge / Retrieval</span>
+                    </div>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={retrievalEnabled}
+                        onChange={(e) => setRetrievalEnabled(e.target.checked)}
+                        className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
+                      />
+                      <span className="text-xs font-medium text-slate-300">
+                        Search knowledge (RAG)
+                      </span>
+                    </label>
+                  </div>
+
+                  {retrievalEnabled && (
+                    <div className="space-y-2.5 pt-2 border-t border-slate-800 text-xs">
+                      {/* Top Results */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Top results</span>
+                        <div className="flex items-center gap-1.5 font-mono">
+                          {[4, 8, 12, 16].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setRetrievalTopK(num)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                                retrievalTopK === num
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                              }`}
+                            >
+                              {num}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Scope Selector */}
+                      <div className="space-y-1">
+                        <span className="text-slate-400 block text-[11px]">Retrieval Scope</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-[11px] transition-colors ${
+                              retrievalProjectScope
+                                ? "bg-indigo-950/40 border-indigo-500/40 text-indigo-200 font-medium"
+                                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="rag_scope"
+                              checked={retrievalProjectScope}
+                              onChange={() => setRetrievalProjectScope(true)}
+                              className="accent-indigo-500"
+                            />
+                            <span>Current Project</span>
+                          </label>
+
+                          <label
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-[11px] transition-colors ${
+                              !retrievalProjectScope
+                                ? "bg-indigo-950/40 border-indigo-500/40 text-indigo-200 font-medium"
+                                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="rag_scope"
+                              checked={!retrievalProjectScope}
+                              onChange={() => setRetrievalProjectScope(false)}
+                              className="accent-indigo-500"
+                            />
+                            <span>Entire Workspace</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* SSE Streaming Toggle */}
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
                   <div className="text-xs">
@@ -843,6 +939,64 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                 </div>
               )}
 
+              {/* Retrieved Sources Inspection Panel (Step 7) */}
+              {activeRun?.retrieval_sources && activeRun.retrieval_sources.length > 0 && (
+                <div className="mt-4 p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 font-semibold text-slate-200">
+                      <Database className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Retrieved Knowledge Sources ({activeRun.retrieval_sources.length})</span>
+                    </div>
+                    {activeRun.retrieval_latency_ms !== null && activeRun.retrieval_latency_ms !== undefined && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Search Latency: {activeRun.retrieval_latency_ms}ms
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {activeRun.retrieval_sources.map((src, idx) => (
+                      <div
+                        key={src.chunk_id || idx}
+                        className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="font-mono text-indigo-400 font-bold text-[11px]">
+                            {idx + 1}.
+                          </span>
+                          <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="font-medium text-slate-100">{src.filename}</span>
+                            {src.page_number && (
+                              <span className="text-[11px] text-slate-400 ml-2 font-mono">
+                                • Page {src.page_number}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 font-mono text-[11px] shrink-0">
+                          {src.score !== null && src.score !== undefined && (
+                            <span className="px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-500/20 text-indigo-300">
+                              Relevance: {(src.score * 100).toFixed(0)}%
+                            </span>
+                          )}
+                          {src.vector_score !== null && src.vector_score !== undefined && (
+                            <span className="px-1.5 py-0.5 rounded bg-purple-950/40 border border-purple-800/30 text-purple-300 text-[10px] hidden sm:inline">
+                              Vec: {src.vector_score.toFixed(2)}
+                            </span>
+                          )}
+                          {src.keyword_score !== null && src.keyword_score !== undefined && (
+                            <span className="px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/30 text-cyan-300 text-[10px] hidden sm:inline">
+                              KW: {src.keyword_score.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Execution Run Telemetry Footer Bar */}
               {activeRun && (
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-400">
@@ -862,6 +1016,11 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         {activeRun.context_truncated && (
                           <span className="text-amber-400 ml-1">(Truncated)</span>
                         )}
+                      </span>
+                    )}
+                    {activeRun.retrieval_enabled && (
+                      <span>
+                        • RAG: <strong className="text-purple-400">{activeRun.retrieved_chunk_count || 0} chunks</strong> ({activeRun.retrieval_latency_ms || 0}ms)
                       </span>
                     )}
                     {activeRun.latency_ms !== null && activeRun.latency_ms !== undefined && (

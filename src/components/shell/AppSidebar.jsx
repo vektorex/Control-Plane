@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ListTodo,
   FolderKanban,
+  Files,
   Settings,
   Cpu,
   Terminal,
@@ -21,6 +22,7 @@ const iconMap = {
   LayoutDashboard,
   ListTodo,
   FolderKanban,
+  Files,
   Terminal,
   Settings,
 };

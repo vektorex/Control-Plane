@@ -10,6 +10,7 @@ from backend.app.db.models.guid import GUID
 if TYPE_CHECKING:
     from backend.app.db.models.user import User
     from backend.app.db.models.project import Project
+    from backend.app.db.models.document import Document
 
 
 class Workspace(Base):
@@ -58,6 +59,13 @@ class Workspace(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="desc(Project.created_at)",
+    )
+    documents: Mapped[List["Document"]] = relationship(
+        "Document",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="desc(Document.created_at)",
     )
 
     def __repr__(self) -> str:

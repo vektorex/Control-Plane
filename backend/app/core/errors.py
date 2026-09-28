@@ -48,6 +48,30 @@ class InvalidStateError(AppError):
     status_code = status.HTTP_400_BAD_REQUEST
 
 
+class BadRequestError(AppError):
+    """Raised when client sends an invalid or malformed request payload."""
+    code = "BAD_REQUEST"
+    status_code = status.HTTP_400_BAD_REQUEST
+
+
+class UnsupportedMediaTypeError(AppError):
+    """Raised when client uploads an unsupported file format or MIME type."""
+    code = "UNSUPPORTED_MEDIA_TYPE"
+    status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+
+
+class StorageError(AppError):
+    """Raised when storage upload, download, or delete fails."""
+    code = "STORAGE_ERROR"
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class ExtractionError(AppError):
+    """Raised when document content parsing or text extraction fails."""
+    code = "EXTRACTION_ERROR"
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
 class DatabaseError(AppError):
     """Raised when an unexpected database execution error occurs."""
     code = "DATABASE_ERROR"

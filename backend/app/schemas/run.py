@@ -21,6 +21,10 @@ class RunBase(BaseModel):
     estimated_context_tokens: Optional[int] = Field(default=None, ge=0, description="Estimated token count of assembled context")
     context_truncated: Optional[bool] = Field(default=False, description="Whether context budget truncation occurred")
     context_sources: Optional[List[str]] = Field(default=None, description="List of unique context sources used")
+    retrieval_enabled: Optional[bool] = Field(default=False, description="Whether hybrid document retrieval was executed")
+    retrieved_chunk_count: Optional[int] = Field(default=None, ge=0, description="Count of retrieved chunks from knowledge base")
+    retrieval_latency_ms: Optional[int] = Field(default=None, ge=0, description="Latency spent executing hybrid retrieval and reranking")
+    retrieval_sources: Optional[List[Dict[str, Any]]] = Field(default=None, description="Retrieved source document references and scores")
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -48,6 +52,10 @@ class RunResponse(BaseModel):
     estimated_context_tokens: Optional[int] = None
     context_truncated: Optional[bool] = False
     context_sources: Optional[List[str]] = None
+    retrieval_enabled: Optional[bool] = False
+    retrieved_chunk_count: Optional[int] = None
+    retrieval_latency_ms: Optional[int] = None
+    retrieval_sources: Optional[List[Dict[str, Any]]] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

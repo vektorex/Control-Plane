@@ -30,6 +30,9 @@ class TaskRunRequest(BaseModel):
     model: Optional[str] = Field(default="gpt-4o-mini", description="Target model identifier (e.g. gpt-4o-mini)")
     temperature: Optional[float] = Field(default=0.2, ge=0.0, le=2.0, description="Sampling temperature")
     max_context_tokens: Optional[int] = Field(default=8000, ge=1, le=128000, description="Max token budget for context assembly")
+    retrieval_enabled: Optional[bool] = Field(default=False, description="Enable hybrid RAG document retrieval")
+    retrieval_top_k: Optional[int] = Field(default=8, ge=1, le=50, description="Top K document chunks to retrieve")
+    retrieval_project_scope: Optional[bool] = Field(default=True, description="Scope retrieval to current project vs entire workspace")
 
 
 class TaskResponse(BaseModel):

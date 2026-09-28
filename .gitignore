@@ -47,8 +47,10 @@ venv/
 ENV/
 env/
 
-# databases
+# databases & local document storage
 *.db
 *.sqlite
 *.sqlite3
+.storage/
+*.storage
 

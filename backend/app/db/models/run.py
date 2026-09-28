@@ -51,6 +51,12 @@ class Run(Base):
     estimated_context_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     context_truncated: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     context_sources: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+
+    # Step 7: Hybrid RAG & Retrieval Telemetry Metadata
+    retrieval_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    retrieved_chunk_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    retrieval_latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    retrieval_sources: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

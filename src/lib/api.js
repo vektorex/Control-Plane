@@ -53,8 +53,10 @@ export async function apiClient(endpoint, options = {}) {
     } catch {}
   }
 
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
   const defaultHeaders = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     Accept: "application/json",
     ...(authHeader ? { Authorization: authHeader } : {}),
     ...headers,
@@ -64,7 +66,7 @@ export async function apiClient(endpoint, options = {}) {
     const response = await fetch(url, {
       method,
       headers: defaultHeaders,
-      body: body ? JSON.stringify(body) : undefined,
+      body: isFormData ? body : body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
 

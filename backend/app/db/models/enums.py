@@ -16,3 +16,12 @@ class RunStatus(str, enum.Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class DocumentStatus(str, enum.Enum):
+    """Lifecycle statuses for document ingestion and indexing."""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+

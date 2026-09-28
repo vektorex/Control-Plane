@@ -31,6 +31,12 @@ export const siteConfig = {
       description: "Organize work streams, knowledge contexts, and toolsets",
     },
     {
+      label: "Documents",
+      href: "/app/documents",
+      icon: "Files",
+      description: "Manage uploaded knowledge base, chunking, and vector index",
+    },
+    {
       label: "Playground",
       href: "/app/playground",
       icon: "Terminal",

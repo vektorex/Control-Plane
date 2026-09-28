@@ -83,10 +83,13 @@ class ContextEngine:
         return package
 
 
-# Default global engine instance
-default_context_engine = ContextEngine()
+# Default global engine instance (lazily initialized)
+_default_context_engine: Optional[ContextEngine] = None
 
 
 def get_context_engine() -> ContextEngine:
     """Dependency injector / factory function for ContextEngine."""
-    return default_context_engine
+    global _default_context_engine
+    if _default_context_engine is None:
+        _default_context_engine = ContextEngine()
+    return _default_context_engine

@@ -16,6 +16,7 @@ from backend.app.schemas.task import (
     TaskResponse,
     TaskListResponse,
     TaskRunRequest,
+    RetrievalPreviewResponse,
 )
 from backend.app.schemas.run import (
     RunCreate,
@@ -32,6 +33,7 @@ from backend.app.schemas.context import (
 from backend.app.services.context.engine import get_context_engine, ContextEngine
 from backend.app.services.context.token_estimator import estimate_tokens
 from backend.app.services.llm.factory import LLMProviderFactory, get_llm_factory
+from backend.app.services.retrieval import RetrievalRouter, get_retrieval_router
 from backend.app.services.task_execution import TaskExecutionService
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -291,4 +293,42 @@ async def inspect_task_context(
         dropped_items_count=package.dropped_items_count,
         formatted_prompt_preview=preview,
     )
+
+
+# --- Step 8: Retrieval Router Preview Endpoint ---
+
+@router.post("/{task_id}/retrieval/preview", response_model=RetrievalPreviewResponse)
+async def preview_task_retrieval(
+    task_id: UUID,
+    request: Optional[TaskRunRequest] = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    router_instance: RetrievalRouter = Depends(get_retrieval_router),
+) -> RetrievalPreviewResponse:
+    """
+    Development/debug endpoint to inspect the structured RetrievalDecision for a task
+    without executing the LLM or persisting an execution Run record.
+    Enforces user ownership and tenant isolation.
+    """
+    task_repo = TaskRepository(session)
+    task = await task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
+
+    req = request or TaskRunRequest()
+    decision = await router_instance.decide(
+        task=task,
+        retrieval_mode=req.retrieval_mode,
+        retrieval_strategy=req.retrieval_strategy,
+        retrieval_scope=req.retrieval_scope,
+        retrieval_top_k=req.retrieval_top_k,
+        query=req.query,
+        retrieval_enabled=req.retrieval_enabled,
+        retrieval_project_scope=req.retrieval_project_scope,
+        session=session,
+    )
+
+    return RetrievalPreviewResponse(
+        task_id=task.id,
+        decision=decision,
+    )
+
 

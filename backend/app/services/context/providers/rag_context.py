@@ -7,33 +7,25 @@ from backend.app.db.models.task import Task
 from backend.app.services.context.base import ContextProvider
 from backend.app.services.context.models import ContextItem, ContextSourceType
 from backend.app.services.context.token_estimator import estimate_context_item_tokens
-from backend.app.services.embeddings.factory import get_embedding_provider
-from backend.app.services.retrieval.hybrid import HybridRetriever
-from backend.app.services.retrieval.keyword import KeywordRetriever
+from backend.app.services.retrieval.decision import (
+    RetrievalDecision,
+    RetrievalMode,
+    RetrievalScope,
+    RetrievalStrategy,
+)
 from backend.app.services.retrieval.models import RetrievalCandidate, RetrievalResult
-from backend.app.services.retrieval.reranker import LocalReranker
-from backend.app.services.retrieval.vector import VectorRetriever
+from backend.app.services.retrieval.router import RetrievalRouter, get_retrieval_router
 
 
 class RAGContextProvider(ContextProvider):
     """
-    Context Provider that performs Hybrid RAG Retrieval (Vector + Keyword Search + Reranking)
-    over user-owned documents within the task's workspace and optional project scope.
+    Context Provider that consumes RetrievalDecision from RetrievalRouter and executes
+    the selected retrieval strategy (None, Keyword, Vector, Hybrid, Multi-Query)
+    over user-owned documents within the task's workspace/project boundary.
     """
 
-    def __init__(self, hybrid_retriever: Optional[HybridRetriever] = None) -> None:
-        if hybrid_retriever is not None:
-            self.hybrid_retriever = hybrid_retriever
-        else:
-            embedding_provider = get_embedding_provider()
-            vector_retriever = VectorRetriever(embedding_provider=embedding_provider)
-            keyword_retriever = KeywordRetriever()
-            reranker = LocalReranker()
-            self.hybrid_retriever = HybridRetriever(
-                vector_retriever=vector_retriever,
-                keyword_retriever=keyword_retriever,
-                reranker=reranker,
-            )
+    def __init__(self, router: Optional[RetrievalRouter] = None) -> None:
+        self.router = router or get_retrieval_router()
 
     @property
     def provider_id(self) -> str:
@@ -45,18 +37,20 @@ class RAGContextProvider(ContextProvider):
 
     async def can_handle(self, task: Task, **kwargs: Any) -> bool:
         """
-        Applies when retrieval is explicitly enabled via kwargs or task configuration,
-        and a valid database session and task workspace are present.
+        Determines whether RAG context processing should participate.
+        Returns False only if explicitly disabled via mode='never'.
         """
         if not task:
             return False
 
-        # Check kwargs flag first, fallback to task metadata
-        retrieval_enabled = kwargs.get("retrieval_enabled")
-        if retrieval_enabled is None and hasattr(task, "metadata_json") and task.metadata_json:
-            retrieval_enabled = task.metadata_json.get("retrieval_enabled", False)
+        mode = kwargs.get("retrieval_mode")
+        if mode is None and hasattr(task, "metadata_json") and task.metadata_json:
+            mode = task.metadata_json.get("retrieval_mode")
 
-        return bool(retrieval_enabled)
+        if mode == RetrievalMode.NEVER.value:
+            return False
+
+        return True
 
     async def collect(
         self,
@@ -65,27 +59,28 @@ class RAGContextProvider(ContextProvider):
         **kwargs: Any,
     ) -> List[RetrievalCandidate]:
         """
-        Executes Hybrid Retrieval (Vector + Keyword + Reranking) against document chunks.
+        Evaluates retrieval decision via the RetrievalRouter and dispatches to the selected retriever.
         """
         if session is None:
             logger.warning("[RAGContextProvider] Database session is missing. Skipping retrieval.")
             return []
 
-        # 1. Determine retrieval query
-        query = kwargs.get("query")
-        if not query or not str(query).strip():
-            # Build query from task directive and title
-            parts = [task.title]
-            if task.instructions:
-                parts.append(task.instructions)
-            elif task.description:
-                parts.append(task.description)
-            query = " ".join(parts).strip()
+        # 1. Obtain or compute RetrievalDecision
+        decision: Optional[RetrievalDecision] = kwargs.get("retrieval_decision")
+        if decision is None:
+            decision = await self.router.decide(task, **kwargs)
 
-        if not query:
+        telemetry_callback = kwargs.get("retrieval_telemetry_callback")
+
+        # 2. Check if retrieval is deemed unnecessary
+        if not decision.retrieval_required or decision.strategy == RetrievalStrategy.NONE:
+            logger.info(f"[RAGContextProvider] Retrieval not required for task '{task.id}' ({decision.reason})")
+            if callable(telemetry_callback):
+                empty_res = RetrievalResult(query=decision.query, retrieval_latency_ms=0)
+                telemetry_callback({"decision": decision, "result": empty_res})
             return []
 
-        # 2. Determine workspace and project scoping
+        # 3. Determine workspace and project scoping
         workspace_id = None
         if hasattr(task, "project") and task.project and hasattr(task.project, "workspace_id"):
             workspace_id = task.project.workspace_id
@@ -98,32 +93,27 @@ class RAGContextProvider(ContextProvider):
 
         if not workspace_id:
             logger.warning(f"[RAGContextProvider] Could not resolve workspace for task '{task.id}'. Skipping retrieval.")
+            if callable(telemetry_callback):
+                empty_res = RetrievalResult(query=decision.query, retrieval_latency_ms=0)
+                telemetry_callback({"decision": decision, "result": empty_res})
             return []
 
-        project_scope = kwargs.get("retrieval_project_scope", kwargs.get("project_scope", True))
-        project_id = task.project_id if project_scope else None
-
-        # 3. Determine top_k limit
-        top_k = kwargs.get("retrieval_top_k", kwargs.get("top_k", 8))
-
         logger.info(
-            f"[RAGContextProvider] Running hybrid retrieval for task '{task.id}' "
-            f"in workspace '{workspace_id}' (project='{project_id}', top_k={top_k})"
+            f"[RAGContextProvider] Executing '{decision.strategy.value}' retrieval for task '{task.id}' "
+            f"in workspace '{workspace_id}' (scope='{decision.scope.value}', top_k={decision.top_k})"
         )
 
-        # 4. Run hybrid retriever
-        result: RetrievalResult = await self.hybrid_retriever.retrieve(
-            query=query,
+        # 4. Execute retrieval strategy via Router
+        result: RetrievalResult = await self.router.execute(
+            decision=decision,
             workspace_id=workspace_id,
             session=session,
-            project_id=project_id,
-            top_k=top_k,
+            project_id=task.project_id,
         )
 
-        # 5. Record telemetry if collector is provided in kwargs
-        telemetry_callback = kwargs.get("retrieval_telemetry_callback")
+        # 5. Record telemetry
         if callable(telemetry_callback):
-            telemetry_callback(result)
+            telemetry_callback({"decision": decision, "result": result})
 
         return result.candidates
 

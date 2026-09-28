@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.base import Base
@@ -57,6 +57,15 @@ class Run(Base):
     retrieved_chunk_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
     retrieval_latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     retrieval_sources: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
+
+    # Step 8: Intelligent Retrieval Router Telemetry Metadata
+    retrieval_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    retrieval_required: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    retrieval_strategy: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    retrieval_scope: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    retrieval_top_k: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    retrieval_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    retrieval_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

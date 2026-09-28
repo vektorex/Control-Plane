@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     RAG_DEFAULT_TOP_K: int = 8
     RAG_DEFAULT_MAX_CONTEXT_TOKENS: int = 6000
 
+    # Step 8: Retrieval Router Limits & Settings
+    MAX_RETRIEVAL_QUERIES: int = 4
+    MAX_RETRIEVAL_TOP_K: int = 25
+    MAX_RETRIEVAL_RESULTS: int = 50
+
 
 settings = Settings()
 

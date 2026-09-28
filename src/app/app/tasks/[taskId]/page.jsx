@@ -44,6 +44,14 @@ import {
   AlertTriangle,
   Code,
   Compass,
+  ChevronDown,
+  ChevronUp,
+  GitBranch,
+  Network,
+  Search,
+  HelpCircle,
+  Cpu,
+  SlidersHorizontal,
 } from "lucide-react";
 
 export default function TaskWorkspacePage({ params: paramsProp }) {
@@ -83,10 +91,17 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [temperature, setTemperature] = useState(0.2);
   const [enableStreaming, setEnableStreaming] = useState(true);
 
-  // Hybrid RAG Retrieval settings (Step 7)
-  const [retrievalEnabled, setRetrievalEnabled] = useState(true);
+  // Step 8: Intelligent Retrieval Router settings
+  const [retrievalMode, setRetrievalMode] = useState("auto"); // "auto" | "always" | "never"
+  const [retrievalStrategy, setRetrievalStrategy] = useState(""); // "" (auto), "hybrid", "vector", "keyword", "multi_query"
+  const [retrievalScope, setRetrievalScope] = useState("project"); // "project" | "workspace"
   const [retrievalTopK, setRetrievalTopK] = useState(8);
-  const [retrievalProjectScope, setRetrievalProjectScope] = useState(true);
+  const [showAdvancedRetrieval, setShowAdvancedRetrieval] = useState(false);
+
+  // Retrieval Router Preview / Debug state (Step 8)
+  const [previewDecision, setPreviewDecision] = useState(null);
+  const [isPreviewingRetrieval, setIsPreviewingRetrieval] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
 
   // Execution & Run state
   const [activeRun, setActiveRun] = useState(null);
@@ -186,6 +201,38 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       console.error("[TaskWorkspace] Error inspecting context:", err);
     } finally {
       setIsLoadingInspect(false);
+    }
+  };
+
+  // Step 8: Preview Retrieval Router Decision
+  const handlePreviewRetrieval = async () => {
+    if (!taskId) return;
+    try {
+      setIsPreviewingRetrieval(true);
+      setPreviewError(null);
+      // Auto-save any updated instructions first
+      try {
+        await taskService.updateTask(taskId, {
+          title: title.trim(),
+          instructions: instructions.trim(),
+          context_text: contextText.trim() || null,
+        });
+      } catch {}
+
+      const payload = {
+        retrieval_mode: retrievalMode,
+        retrieval_strategy: retrievalStrategy || undefined,
+        retrieval_scope: retrievalScope,
+        retrieval_top_k: Number(retrievalTopK),
+      };
+
+      const res = await taskService.previewTaskRetrieval(taskId, payload);
+      setPreviewDecision(res.decision);
+    } catch (err) {
+      console.error("[TaskWorkspace] Error previewing retrieval:", err);
+      setPreviewError(err.message || "Failed to preview retrieval decision.");
+    } finally {
+      setIsPreviewingRetrieval(false);
     }
   };
 
@@ -335,9 +382,11 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       model: selectedModel,
       temperature: Number(temperature),
       max_context_tokens: Number(contextBudget),
-      retrieval_enabled: Boolean(retrievalEnabled),
+      retrieval_mode: retrievalMode,
+      retrieval_strategy: retrievalStrategy || undefined,
+      retrieval_scope: retrievalScope,
       retrieval_top_k: Number(retrievalTopK),
-      retrieval_project_scope: Boolean(retrievalProjectScope),
+      retrieval_project_scope: retrievalScope === "project",
     };
 
     if (enableStreaming) {
@@ -356,7 +405,13 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             context_item_count: event.context_item_count,
             estimated_context_tokens: event.estimated_context_tokens,
             context_truncated: event.context_truncated,
+            retrieval_mode: retrievalMode,
+            retrieval_required: event.retrieval_enabled,
             retrieval_enabled: event.retrieval_enabled,
+            retrieval_strategy: event.retrieval_strategy,
+            retrieval_scope: event.retrieval_scope,
+            retrieval_confidence: event.retrieval_confidence,
+            retrieval_reason: event.retrieval_reason,
             retrieved_chunk_count: event.retrieved_chunk_count,
             created_at: new Date().toISOString(),
           });
@@ -431,6 +486,23 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
   };
 
+  const getStrategyBadge = (strategy) => {
+    switch (strategy?.toLowerCase()) {
+      case "hybrid":
+        return <Badge variant="success">Hybrid (Vector+KW)</Badge>;
+      case "vector":
+        return <Badge variant="info">Vector (Semantic)</Badge>;
+      case "keyword":
+        return <Badge variant="warning">Keyword (Exact)</Badge>;
+      case "multi_query":
+        return <Badge variant="purple" className="bg-purple-900/60 text-purple-200 border-purple-700">Multi-Query</Badge>;
+      case "none":
+        return <Badge variant="outline">None</Badge>;
+      default:
+        return <Badge variant="default">{strategy || "Inferred"}</Badge>;
+    }
+  };
+
   const getPriorityBadge = (priority) => {
     if (priority >= 90) return <Badge variant="destructive">Critical ({priority})</Badge>;
     if (priority >= 70) return <Badge variant="warning">High ({priority})</Badge>;
@@ -438,7 +510,6 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     return <Badge variant="default">Low ({priority})</Badge>;
   };
 
-  // Rough estimation helper for UI
   const estimateTokensLocal = (text) => {
     if (!text) return 0;
     return Math.max(Math.ceil(text.trim().length / 4), 1);
@@ -538,8 +609,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                 <textarea
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
-                  placeholder="Explain exactly what the AI model must accomplish (e.g., 'Analyze authentication flow and identify security weaknesses')..."
-                  rows={5}
+                  placeholder="Explain exactly what the AI model must accomplish (e.g., 'What does our authentication implementation do?' or 'Summarize this paragraph')..."
+                  rows={4}
                   className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
                   required
                 />
@@ -555,7 +626,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   value={contextText}
                   onChange={(e) => setContextText(e.target.value)}
                   placeholder="Inherent background context (e.g. 'FastAPI backend using JWT authentication')..."
-                  rows={3}
+                  rows={2}
                   className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
                 />
               </div>
@@ -585,132 +656,242 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   </select>
                 </div>
 
-                {/* Temperature Slider */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-medium text-slate-300">Temperature</span>
-                    <span className="font-mono text-indigo-400 font-semibold">{temperature}</span>
+                {/* Temperature & Budget row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-medium text-slate-300">Temperature</span>
+                      <span className="font-mono text-indigo-400 font-semibold">{temperature}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={temperature}
+                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                      className="w-full accent-indigo-500 cursor-pointer"
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={temperature}
-                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                    className="w-full accent-indigo-500 cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>0.0 (Deterministic)</span>
-                    <span>0.2 (Focused)</span>
-                    <span>1.0 (Creative)</span>
+
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-medium text-slate-300">Context Budget</span>
+                      <span className="font-mono text-indigo-400 font-semibold">{contextBudget} tok</span>
+                    </div>
+                    <select
+                      value={contextBudget}
+                      onChange={(e) => setContextBudget(Number(e.target.value))}
+                      className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono cursor-pointer"
+                    >
+                      <option value={2000}>2k tokens</option>
+                      <option value={4000}>4k tokens</option>
+                      <option value={8000}>8k tokens</option>
+                      <option value={16000}>16k tokens</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* Context Budget Selector */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-medium text-slate-300 flex items-center gap-1">
-                      <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Context Budget</span>
-                    </span>
-                    <span className="font-mono text-indigo-400 font-semibold">{contextBudget} tokens</span>
-                  </div>
-                  <select
-                    value={contextBudget}
-                    onChange={(e) => setContextBudget(Number(e.target.value))}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono cursor-pointer"
-                  >
-                    <option value={2000}>2,000 tokens (Compact)</option>
-                    <option value={4000}>4,000 tokens (Balanced)</option>
-                    <option value={8000}>8,000 tokens (Standard)</option>
-                    <option value={16000}>16,000 tokens (Extended)</option>
-                    <option value={32000}>32,000 tokens (Deep Context)</option>
-                  </select>
-                </div>
-
-                {/* Knowledge / Hybrid Retrieval (Step 7) */}
-                <div className="p-3 rounded-lg bg-slate-950/70 border border-indigo-500/20 space-y-2.5">
+                {/* Step 8: Intelligent Retrieval Router Panel */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/25 space-y-3 shadow-inner">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Database className="w-3.5 h-3.5 text-indigo-400" />
-                      <span className="text-xs font-semibold text-slate-200">Knowledge / Retrieval</span>
+                      <Network className="w-4 h-4 text-indigo-400" />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-100 block">
+                          Retrieval Router
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Knowledge grounding & strategy orchestration
+                        </span>
+                      </div>
                     </div>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={retrievalEnabled}
-                        onChange={(e) => setRetrievalEnabled(e.target.checked)}
-                        className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
-                      />
-                      <span className="text-xs font-medium text-slate-300">
-                        Search knowledge (RAG)
-                      </span>
-                    </label>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={handlePreviewRetrieval}
+                      disabled={isPreviewingRetrieval}
+                      className="text-[11px] text-indigo-300 hover:text-indigo-100"
+                    >
+                      {isPreviewingRetrieval ? "Routing..." : "Preview Decision"}
+                    </Button>
                   </div>
 
-                  {retrievalEnabled && (
-                    <div className="space-y-2.5 pt-2 border-t border-slate-800 text-xs">
-                      {/* Top Results */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Top results</span>
-                        <div className="flex items-center gap-1.5 font-mono">
-                          {[4, 8, 12, 16].map((num) => (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => setRetrievalTopK(num)}
-                              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
-                                retrievalTopK === num
-                                  ? "bg-indigo-600 text-white"
-                                  : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
-                              }`}
+                  {/* Retrieval Mode Radio Group */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-medium text-slate-300 block">
+                      Retrieval Mode:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "auto", label: "Automatic", desc: "Router decides" },
+                        { id: "always", label: "Always", desc: "Force retrieval" },
+                        { id: "never", label: "Never", desc: "No retrieval" },
+                      ].map((mode) => (
+                        <label
+                          key={mode.id}
+                          className={`flex flex-col p-2 rounded-lg border cursor-pointer transition-all ${
+                            retrievalMode === mode.id
+                              ? "bg-indigo-950/70 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/30"
+                              : "bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="radio"
+                              name="retrieval_mode_selector"
+                              value={mode.id}
+                              checked={retrievalMode === mode.id}
+                              onChange={() => setRetrievalMode(mode.id)}
+                              className="accent-indigo-500"
+                            />
+                            <span className="text-xs font-semibold">{mode.label}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 pl-4 mt-0.5">{mode.desc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Collapsible Advanced Retrieval Options */}
+                  {retrievalMode !== "never" && (
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={() => setShowAdvancedRetrieval(!showAdvancedRetrieval)}
+                        className="flex items-center justify-between w-full text-[11px] text-slate-400 hover:text-slate-200 transition-colors py-0.5"
+                      >
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Advanced Routing Options</span>
+                        </span>
+                        {showAdvancedRetrieval ? (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
+                      {showAdvancedRetrieval && (
+                        <div className="space-y-3 pt-2.5">
+                          {/* Strategy Override */}
+                          <div>
+                            <label className="text-[11px] text-slate-300 block mb-1">
+                              Strategy Override
+                            </label>
+                            <select
+                              value={retrievalStrategy}
+                              onChange={(e) => setRetrievalStrategy(e.target.value)}
+                              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono cursor-pointer"
                             >
-                              {num}
-                            </button>
-                          ))}
+                              <option value="">Auto / Inferred by Router</option>
+                              <option value="hybrid">Hybrid (Vector + BM25 Keyword)</option>
+                              <option value="vector">Vector (Semantic Embedding)</option>
+                              <option value="keyword">Keyword (Exact BM25 Match)</option>
+                              <option value="multi_query">Multi-Query (Query Expansion)</option>
+                            </select>
+                          </div>
+
+                          {/* Scope Override */}
+                          <div>
+                            <label className="text-[11px] text-slate-300 block mb-1">
+                              Retrieval Scope Boundary
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setRetrievalScope("project")}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium border text-center transition-colors ${
+                                  retrievalScope === "project"
+                                    ? "bg-indigo-950/60 border-indigo-500/50 text-indigo-200"
+                                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300"
+                                }`}
+                              >
+                                Project Scope
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRetrievalScope("workspace")}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium border text-center transition-colors ${
+                                  retrievalScope === "workspace"
+                                    ? "bg-indigo-950/60 border-indigo-500/50 text-indigo-200"
+                                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300"
+                                }`}
+                              >
+                                Workspace Scope
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Top K Results */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-300">Candidate Top-K</span>
+                            <div className="flex items-center gap-1 font-mono">
+                              {[4, 8, 12, 16, 24].map((num) => (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => setRetrievalTopK(num)}
+                                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                                    retrievalTopK === num
+                                      ? "bg-indigo-600 text-white"
+                                      : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                                  }`}
+                                >
+                                  {num}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Router Preview Live Result Card */}
+                  {previewDecision && (
+                    <div className="p-3 rounded-lg bg-slate-900/90 border border-indigo-500/30 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-200">
+                          <Compass className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Router Decision Preview</span>
+                        </div>
+                        {previewDecision.retrieval_required ? (
+                          <Badge variant="success">Required</Badge>
+                        ) : (
+                          <Badge variant="outline">Not Required</Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 font-mono text-[11px] pt-1 border-t border-slate-800">
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">Strategy</span>
+                          <strong className="text-indigo-300">{previewDecision.strategy}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">Scope</span>
+                          <strong className="text-purple-300">{previewDecision.scope}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">Confidence</span>
+                          <strong className="text-emerald-300">
+                            {Math.round((previewDecision.confidence || 1.0) * 100)}%
+                          </strong>
                         </div>
                       </div>
 
-                      {/* Scope Selector */}
-                      <div className="space-y-1">
-                        <span className="text-slate-400 block text-[11px]">Retrieval Scope</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          <label
-                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-[11px] transition-colors ${
-                              retrievalProjectScope
-                                ? "bg-indigo-950/40 border-indigo-500/40 text-indigo-200 font-medium"
-                                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="rag_scope"
-                              checked={retrievalProjectScope}
-                              onChange={() => setRetrievalProjectScope(true)}
-                              className="accent-indigo-500"
-                            />
-                            <span>Current Project</span>
-                          </label>
+                      {previewDecision.reason && (
+                        <p className="text-[11px] text-slate-300/90 leading-relaxed font-mono bg-slate-950/60 p-2 rounded border border-slate-800/80">
+                          <span className="text-indigo-400 font-semibold">Why: </span>
+                          {previewDecision.reason}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                          <label
-                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-[11px] transition-colors ${
-                              !retrievalProjectScope
-                                ? "bg-indigo-950/40 border-indigo-500/40 text-indigo-200 font-medium"
-                                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="rag_scope"
-                              checked={!retrievalProjectScope}
-                              onChange={() => setRetrievalProjectScope(false)}
-                              className="accent-indigo-500"
-                            />
-                            <span>Entire Workspace</span>
-                          </label>
-                        </div>
-                      </div>
+                  {previewError && (
+                    <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-[11px]">
+                      {previewError}
                     </div>
                   )}
                 </div>
@@ -758,7 +939,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             </CardContent>
           </Card>
 
-          {/* Context Engine Ingestion Section (Step 6) */}
+          {/* Context Management Section (Step 6) */}
           <Card>
             <CardHeader className="py-3 px-4 border-b border-slate-800 flex flex-row items-center justify-between">
               <div className="flex items-center gap-2">
@@ -939,61 +1120,90 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                 </div>
               )}
 
-              {/* Retrieved Sources Inspection Panel (Step 7) */}
-              {activeRun?.retrieval_sources && activeRun.retrieval_sources.length > 0 && (
-                <div className="mt-4 p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
+              {/* Step 8: Retrieval Decision Observability Panel */}
+              {activeRun && (
+                <div className="mt-4 p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800 text-xs">
                     <div className="flex items-center gap-2 font-semibold text-slate-200">
-                      <Database className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Retrieved Knowledge Sources ({activeRun.retrieval_sources.length})</span>
+                      <Network className="w-4 h-4 text-indigo-400" />
+                      <span>Retrieval Decision:</span>
+                      {activeRun.retrieval_required || activeRun.retrieval_enabled ? (
+                        <Badge variant="success">Used</Badge>
+                      ) : (
+                        <Badge variant="outline">Not required</Badge>
+                      )}
                     </div>
-                    {activeRun.retrieval_latency_ms !== null && activeRun.retrieval_latency_ms !== undefined && (
-                      <span className="text-[10px] font-mono text-slate-400">
-                        Search Latency: {activeRun.retrieval_latency_ms}ms
-                      </span>
+
+                    {(activeRun.retrieval_required || activeRun.retrieval_enabled) && (
+                      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                        <span>Strategy: <strong className="text-indigo-300">{activeRun.retrieval_strategy || "Hybrid"}</strong></span>
+                        <span>• Scope: <strong className="text-purple-300">{activeRun.retrieval_scope || "Project"}</strong></span>
+                        <span>• Sources: <strong className="text-cyan-300">{activeRun.retrieved_chunk_count || activeRun.retrieval_sources?.length || 0}</strong></span>
+                        {activeRun.retrieval_confidence !== null && activeRun.retrieval_confidence !== undefined && (
+                          <span>• Conf: <strong className="text-emerald-300">{Math.round(activeRun.retrieval_confidence * 100)}%</strong></span>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <div className="space-y-1.5">
-                    {activeRun.retrieval_sources.map((src, idx) => (
-                      <div
-                        key={src.chunk_id || idx}
-                        className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="font-mono text-indigo-400 font-bold text-[11px]">
-                            {idx + 1}.
-                          </span>
-                          <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
-                          <div className="truncate">
-                            <span className="font-medium text-slate-100">{src.filename}</span>
-                            {src.page_number && (
-                              <span className="text-[11px] text-slate-400 ml-2 font-mono">
-                                • Page {src.page_number}
+
+                  {/* Why retrieval? Explanation Card */}
+                  {activeRun.retrieval_reason && (
+                    <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 flex items-start gap-2">
+                      <HelpCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-indigo-300">Why retrieval: </span>
+                        <span>{activeRun.retrieval_reason}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Retrieved Sources list */}
+                  {activeRun.retrieval_sources && activeRun.retrieval_sources.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[11px] font-semibold text-slate-300 block">
+                        Grounded Sources ({activeRun.retrieval_sources.length})
+                      </span>
+                      {activeRun.retrieval_sources.map((src, idx) => (
+                        <div
+                          key={src.chunk_id || idx}
+                          className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="font-mono text-indigo-400 font-bold text-[11px]">
+                              {idx + 1}.
+                            </span>
+                            <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+                            <div className="truncate">
+                              <span className="font-medium text-slate-100">{src.filename}</span>
+                              {src.page_number && (
+                                <span className="text-[11px] text-slate-400 ml-2 font-mono">
+                                  • Page {src.page_number}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 font-mono text-[11px] shrink-0">
+                            {src.score !== null && src.score !== undefined && (
+                              <span className="px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-500/20 text-indigo-300">
+                                Relevance: {(src.score * 100).toFixed(0)}%
+                              </span>
+                            )}
+                            {src.vector_score !== null && src.vector_score !== undefined && (
+                              <span className="px-1.5 py-0.5 rounded bg-purple-950/40 border border-purple-800/30 text-purple-300 text-[10px] hidden sm:inline">
+                                Vec: {src.vector_score.toFixed(2)}
+                              </span>
+                            )}
+                            {src.keyword_score !== null && src.keyword_score !== undefined && (
+                              <span className="px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/30 text-cyan-300 text-[10px] hidden sm:inline">
+                                KW: {src.keyword_score.toFixed(2)}
                               </span>
                             )}
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2 font-mono text-[11px] shrink-0">
-                          {src.score !== null && src.score !== undefined && (
-                            <span className="px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-500/20 text-indigo-300">
-                              Relevance: {(src.score * 100).toFixed(0)}%
-                            </span>
-                          )}
-                          {src.vector_score !== null && src.vector_score !== undefined && (
-                            <span className="px-1.5 py-0.5 rounded bg-purple-950/40 border border-purple-800/30 text-purple-300 text-[10px] hidden sm:inline">
-                              Vec: {src.vector_score.toFixed(2)}
-                            </span>
-                          )}
-                          {src.keyword_score !== null && src.keyword_score !== undefined && (
-                            <span className="px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/30 text-cyan-300 text-[10px] hidden sm:inline">
-                              KW: {src.keyword_score.toFixed(2)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1016,11 +1226,6 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         {activeRun.context_truncated && (
                           <span className="text-amber-400 ml-1">(Truncated)</span>
                         )}
-                      </span>
-                    )}
-                    {activeRun.retrieval_enabled && (
-                      <span>
-                        • RAG: <strong className="text-purple-400">{activeRun.retrieved_chunk_count || 0} chunks</strong> ({activeRun.retrieval_latency_ms || 0}ms)
                       </span>
                     )}
                     {activeRun.latency_ms !== null && activeRun.latency_ms !== undefined && (
@@ -1184,6 +1389,18 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         <span className="text-xs text-slate-300 font-mono hidden md:inline">
                           {run.model_name}
                         </span>
+                      )}
+                      {run.retrieval_required || run.retrieval_enabled ? (
+                        <div className="hidden sm:flex items-center gap-1.5">
+                          {getStrategyBadge(run.retrieval_strategy)}
+                          <Badge variant="outline" className="text-[10px] text-purple-300 border-purple-800/40">
+                            {run.retrieval_scope || "project"}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-slate-500 hidden sm:inline-flex">
+                          No retrieval
+                        </Badge>
                       )}
                     </div>
 

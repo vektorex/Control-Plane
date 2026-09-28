@@ -30,8 +30,12 @@ class TaskRunRequest(BaseModel):
     model: Optional[str] = Field(default="gpt-4o-mini", description="Target model identifier (e.g. gpt-4o-mini)")
     temperature: Optional[float] = Field(default=0.2, ge=0.0, le=2.0, description="Sampling temperature")
     max_context_tokens: Optional[int] = Field(default=8000, ge=1, le=128000, description="Max token budget for context assembly")
-    retrieval_enabled: Optional[bool] = Field(default=False, description="Enable hybrid RAG document retrieval")
+    retrieval_mode: Optional[str] = Field(default="auto", description="Retrieval mode: auto, always, or never")
+    retrieval_strategy: Optional[str] = Field(default=None, description="Optional strategy override: hybrid, vector, keyword, multi_query, none")
+    retrieval_scope: Optional[str] = Field(default=None, description="Optional scope override: project or workspace")
     retrieval_top_k: Optional[int] = Field(default=8, ge=1, le=50, description="Top K document chunks to retrieve")
+    query: Optional[str] = Field(default=None, description="Optional explicit retrieval query override")
+    retrieval_enabled: Optional[bool] = Field(default=None, description="Legacy boolean flag: True=always, False=never")
     retrieval_project_scope: Optional[bool] = Field(default=True, description="Scope retrieval to current project vs entire workspace")
 
 
@@ -51,6 +55,14 @@ class TaskResponse(BaseModel):
     context_count: Optional[int] = 0
 
 
+from backend.app.services.retrieval.decision import RetrievalDecision
+
+
 class TaskListResponse(BaseModel):
     tasks: List[TaskResponse]
     total: int
+
+
+class RetrievalPreviewResponse(BaseModel):
+    task_id: UUID
+    decision: RetrievalDecision

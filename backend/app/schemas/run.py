@@ -25,6 +25,13 @@ class RunBase(BaseModel):
     retrieved_chunk_count: Optional[int] = Field(default=None, ge=0, description="Count of retrieved chunks from knowledge base")
     retrieval_latency_ms: Optional[int] = Field(default=None, ge=0, description="Latency spent executing hybrid retrieval and reranking")
     retrieval_sources: Optional[List[Dict[str, Any]]] = Field(default=None, description="Retrieved source document references and scores")
+    retrieval_mode: Optional[str] = Field(default=None, description="Retrieval routing mode used (auto, always, never)")
+    retrieval_required: Optional[bool] = Field(default=None, description="Whether retrieval was deemed necessary by router")
+    retrieval_strategy: Optional[str] = Field(default=None, description="Strategy selected by router (hybrid, vector, keyword, multi_query, none)")
+    retrieval_scope: Optional[str] = Field(default=None, description="Scope selected by router (project, workspace)")
+    retrieval_top_k: Optional[int] = Field(default=None, description="Top-K limit determined by router")
+    retrieval_reason: Optional[str] = Field(default=None, description="Explanation for routing decision")
+    retrieval_confidence: Optional[float] = Field(default=None, description="Confidence score of the routing decision (0.0 - 1.0)")
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -56,6 +63,13 @@ class RunResponse(BaseModel):
     retrieved_chunk_count: Optional[int] = None
     retrieval_latency_ms: Optional[int] = None
     retrieval_sources: Optional[List[Dict[str, Any]]] = None
+    retrieval_mode: Optional[str] = None
+    retrieval_required: Optional[bool] = None
+    retrieval_strategy: Optional[str] = None
+    retrieval_scope: Optional[str] = None
+    retrieval_top_k: Optional[int] = None
+    retrieval_reason: Optional[str] = None
+    retrieval_confidence: Optional[float] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

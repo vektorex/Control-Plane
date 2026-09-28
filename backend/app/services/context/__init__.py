@@ -10,7 +10,6 @@ from backend.app.services.context.builders.context_builder import ContextBuilder
 from backend.app.services.context.engine import (
     ContextEngine,
     get_context_engine,
-    default_context_engine,
 )
 from backend.app.services.context.token_estimator import (
     estimate_tokens,
@@ -29,7 +28,6 @@ __all__ = [
     "ContextBuilder",
     "ContextEngine",
     "get_context_engine",
-    "default_context_engine",
     "estimate_tokens",
     "estimate_context_item_tokens",
     "TaskContextProvider",

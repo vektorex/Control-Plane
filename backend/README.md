@@ -1,6 +1,6 @@
 # AI Work Layer — Backend Service
 
-A high-performance Python FastAPI service providing a provider-agnostic Context Engine & LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, multi-tenant isolation, Supabase Auth JWT verification, and Alembic database migrations.
+A high-performance Python FastAPI service providing a provider-agnostic Context Engine, Intelligent Retrieval Router, Hybrid RAG with Vector + BM25 + Multi-Query strategies, LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, multi-tenant isolation, Supabase Auth JWT verification, and Alembic database migrations.
 
 ---
 
@@ -15,21 +15,36 @@ Request ──► Authentication ──► Authorization / Ownership ──► V
 Next.js Frontend (Port 3000)
        │
        ▼ (HTTP Bearer JWT / SSE Stream)
-FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /api/context, /api/llm, /api/models, /api/health)
+FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /api/documents, /api/context, /api/llm, /api/models, /api/health)
        │
        ├── Core Security & Auth Layer
        │     ├── get_current_user (JWT verification via Supabase secret or JWKS)
        │     ├── verify_workspace_access / verify_project_access / verify_task_access
        │     └── AuthService (Idempotent user & default workspace bootstrap)
        │
+       ├── Intelligent Retrieval Router (Step 8)
+       │     ├── RetrievalDecisionProvider Interface
+       │     ├── RuleBasedDecisionProvider (Deterministic Intent, Phrase, Scope & Grounding Analysis)
+       │     ├── Modes: auto, always, never
+       │     ├── Strategy Dispatcher: None, Keyword, Vector, Hybrid, Multi-Query
+       │     └── Router Preview Endpoint (/api/tasks/{task_id}/retrieval/preview)
+       │
        ├── Context Engine (Step 6)
-       │     ├── ContextProvider Registry (task_context, manual_context, future vector/web/git)
+       │     ├── ContextProvider Registry (task_context, manual_context, rag_context)
        │     ├── Local Deterministic Token Estimator
        │     ├── ContextBuilder (Deduplication, Priority Sorting, Budget Enforcement)
        │     └── ContextPackage Assembly & LLM Message Formatting
        │
+       ├── Retrieval Strategies & Ingestion (Step 7 & 8)
+       │     ├── HybridRetriever (Reciprocal Rank Fusion - RRF)
+       │     ├── VectorRetriever (pgvector cosine similarity)
+       │     ├── KeywordRetriever (Lexical term coverage & sublinear TF scoring)
+       │     ├── MultiQueryRetriever (Query generation, concurrent search, fusion & reranking)
+       │     ├── LocalReranker (Deterministic term density & position alignment)
+       │     └── Document Ingestion (PDF, Markdown, TXT, DOCX extractors & structure chunker)
+       │
        ├── LLM Abstraction Layer (Dynamic Provider & Model Resolution)
-       │     └── BaseLLMProvider -> OpenAIProvider, Anthropic, Gemini, Local
+       │     └── BaseLLMProvider -> OpenAIProvider, Anthropic, Gemini, Mock
        │
        └── Multi-Tenant Repository Layer (Decoupled Persistence Scoped to Owner)
              ├── UserRepository
@@ -37,6 +52,7 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
              ├── ProjectRepository (scoped by workspace owner)
              ├── TaskRepository (scoped by project/workspace owner)
              ├── ContextRepository (scoped by task/workspace owner)
+             ├── DocumentRepository (scoped by workspace owner)
              └── RunRepository (scoped by task/workspace owner)
                    │
                    ▼
@@ -45,17 +61,23 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
 
 ---
 
-## 🧠 Context Engine Abstraction
+## 🧭 Intelligent Retrieval Router (Step 8)
 
-The Context Engine enables multi-source context collection and packaging without tightly coupling execution to any single retrieval mechanism.
+The Retrieval Router analyzes task instructions, user mode preferences, and grounding signals to decide whether external knowledge retrieval is necessary and dispatches the optimal strategy.
 
-### Key Classes (`backend/app/services/context/`):
-- `ContextProvider`: Abstract base class with `can_handle()`, `collect()`, `normalize()`, `provide()`.
-- `TaskContextProvider`: Extracts baseline context from the `Task` entity (`context_text`, instructions).
-- `ManualContextProvider`: Gathers user-attached `TaskContext` records.
-- `ContextProviderRegistry`: Registry for dynamic registration of future RAG, vector, web, and tool providers.
-- `ContextBuilder`: Deduplicates identical content via SHA-256 fingerprints, sorts by priority/relevance/recency, enforces `max_context_tokens` budget limits, and produces `ContextPackage`.
-- `TaskExecutionService`: Orchestrates `ContextEngine.build_context()` -> message formatting -> LLM invocation -> Run telemetry persistence.
+```
+Task
+ ↓
+Retrieval Router (RuleBasedDecisionProvider)
+ ↓
+Decision (RetrievalDecision)
+ ↓
+Retriever (None / Keyword / Vector / Hybrid / Multi-Query)
+ ↓
+ContextEngine
+ ↓
+LLM
+```
 
 ---
 
@@ -75,20 +97,6 @@ Copy `.env.example` to `.env`:
 ```bash
 cp backend/.env.example backend/.env
 ```
-Set your database, Supabase Auth secret, and provider API keys:
-```env
-# PostgreSQL connection (AsyncPG driver)
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/ai_work_layer
-
-# Supabase Auth
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# OpenAI configuration
-OPENAI_API_KEY=sk-...
-OPENAI_DEFAULT_MODEL=gpt-4o-mini
-```
 
 ### 4. Run Database Migrations
 ```bash
@@ -107,9 +115,9 @@ API Documentation will be available at:
 
 ## 🧪 Running Tests
 
-The test suite validates authentication, cross-tenant isolation, Context Engine collection, budget enforcement, token estimation, model completion, streaming, and error handling:
+The test suite validates authentication, cross-tenant isolation, retrieval routing policies, multi-query expansion, hybrid RAG, context assembly, budget enforcement, model completion, streaming, and error handling:
 ```bash
-python -m pytest backend/tests -v
+python -m pytest -v
 ```
 
 ---
@@ -136,23 +144,27 @@ python -m pytest backend/tests -v
 - `POST   /api/projects/{project_id}/tasks` — Create task under owned project
 - `GET    /api/projects/{project_id}/tasks` — List tasks under owned project
 
-### 4. Tasks & Context (Multi-Tenant Scoped)
+### 4. Documents & Ingestion (Step 7)
+- `POST   /api/workspaces/{workspace_id}/documents` — Multipart document upload with background ingestion
+- `GET    /api/workspaces/{workspace_id}/documents` — List documents in workspace
+- `GET    /api/documents/{document_id}` — Get document metadata & status
+- `GET    /api/documents/{document_id}/chunks` — Inspect indexed vector chunks
+- `DELETE /api/documents/{document_id}` — Delete document and chunks
+
+### 5. Tasks, Retrieval Router & Context
 - `GET    /api/tasks` — List tasks for authenticated user
 - `GET    /api/tasks/{task_id}` — Get task by ID (404 if unowned)
 - `PATCH  /api/tasks/{task_id}` — Update owned task
 - `DELETE /api/tasks/{task_id}` — Cascade delete owned task
+- `POST   /api/tasks/{task_id}/retrieval/preview` — Debug preview of structured `RetrievalDecision`
 - `POST   /api/tasks/{task_id}/context` — Create manual context item for task
 - `GET    /api/tasks/{task_id}/context` — List context items for task
 - `GET    /api/tasks/{task_id}/context/inspect` — Debug inspection view of assembled context package
 - `PATCH  /api/context/{context_id}` — Update individual context item
 - `DELETE /api/context/{context_id}` — Delete individual context item
 
-### 5. Task AI Execution & Runs (Multi-Tenant Scoped)
-- `POST   /api/tasks/{task_id}/run` — Execute task via Context Engine & LLM
-- `POST   /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming
+### 6. Task AI Execution & Runs (Multi-Tenant Scoped)
+- `POST   /api/tasks/{task_id}/run` — Execute task via Retrieval Router + Context Engine + LLM
+- `POST   /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming + retrieval decision telemetry
 - `GET    /api/tasks/{task_id}/runs` — List runs for owned task
 - `POST   /api/tasks/{task_id}/runs` — Record run telemetry for owned task
-
-### 6. LLM Generation (Authenticated)
-- `POST /api/llm/generate` — Non-streaming direct completion
-- `POST /api/llm/generate/stream` — Real-time Server-Sent Events (SSE) token stream

@@ -123,8 +123,8 @@ export const taskService = {
             const parsed = JSON.parse(dataStr);
             if (parsed.type === "run_start") {
               onRunStart?.(parsed);
-            } else if (parsed.type === "content_delta") {
-              onChunk?.(parsed.delta);
+            } else if (parsed.type === "chunk" || parsed.type === "content_delta") {
+              onChunk?.(parsed.content ?? parsed.delta ?? "");
             } else if (parsed.type === "run_completed") {
               onRunCompleted?.(parsed.run);
             } else if (parsed.type === "error" || parsed.error) {
@@ -145,6 +145,16 @@ export const taskService = {
       }
       onError?.(err);
     }
+  },
+
+  /**
+   * Preview intelligent retrieval routing decision for a task (Step 8 dev debug)
+   */
+  async previewTaskRetrieval(taskId, payload = {}) {
+    return apiClient(`/tasks/${taskId}/retrieval/preview`, {
+      method: "POST",
+      body: payload,
+    });
   },
 
   /**
@@ -192,3 +202,4 @@ export const taskService = {
     });
   },
 };
+

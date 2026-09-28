@@ -59,19 +59,28 @@ class TaskExecutionService:
         max_context_tokens = request.max_context_tokens or 8000
         retrieval_telemetry = {}
 
-        def _on_retrieval_telemetry(result):
-            retrieval_telemetry["result"] = result
+        def _on_retrieval_telemetry(data):
+            if isinstance(data, dict):
+                retrieval_telemetry["decision"] = data.get("decision")
+                retrieval_telemetry["result"] = data.get("result")
+            else:
+                retrieval_telemetry["result"] = data
 
         context_package = await self.context_engine.build_context(
             task=task,
             session=self.session,
             max_context_tokens=max_context_tokens,
-            retrieval_enabled=request.retrieval_enabled,
+            retrieval_mode=request.retrieval_mode,
+            retrieval_strategy=request.retrieval_strategy,
+            retrieval_scope=request.retrieval_scope,
             retrieval_top_k=request.retrieval_top_k,
+            query=request.query,
+            retrieval_enabled=request.retrieval_enabled,
             retrieval_project_scope=request.retrieval_project_scope,
             retrieval_telemetry_callback=_on_retrieval_telemetry,
         )
 
+        ret_decision = retrieval_telemetry.get("decision")
         ret_res = retrieval_telemetry.get("result")
         ret_sources = None
         ret_chunk_count = 0
@@ -92,18 +101,35 @@ class TaskExecutionService:
                 for c in ret_res.candidates
             ]
 
+        # Extract structured decision telemetry
+        is_retrieval_required = ret_decision.retrieval_required if ret_decision else bool(request.retrieval_enabled)
+        decision_strategy = ret_decision.strategy.value if ret_decision else (request.retrieval_strategy or "hybrid")
+        decision_scope = ret_decision.scope.value if ret_decision else ("project" if request.retrieval_project_scope else "workspace")
+        decision_top_k = ret_decision.top_k if ret_decision else (request.retrieval_top_k or 8)
+        decision_reason = ret_decision.reason if ret_decision else None
+        decision_confidence = ret_decision.confidence if ret_decision else None
+        decision_mode = request.retrieval_mode or ("always" if request.retrieval_enabled else "auto")
+
         # 2. Build structured messages from context package
         messages = self.context_engine.builder.format_as_messages(context_package, task)
 
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
 
-        # 3. Create Run in 'queued' status with full context and retrieval telemetry
+        # 3. Create Run in 'queued' status with full context and retrieval decision telemetry
         input_snapshot = {
             "model": model_name,
             "temperature": request.temperature,
             "max_context_tokens": max_context_tokens,
-            "retrieval_enabled": bool(request.retrieval_enabled),
+            "retrieval_mode": decision_mode,
+            "retrieval_decision": {
+                "required": is_retrieval_required,
+                "strategy": decision_strategy,
+                "scope": decision_scope,
+                "top_k": decision_top_k,
+                "reason": decision_reason,
+                "confidence": decision_confidence,
+            },
             "context_summary": {
                 "item_count": context_package.total_items,
                 "estimated_tokens": context_package.estimated_tokens,
@@ -124,10 +150,17 @@ class TaskExecutionService:
             estimated_context_tokens=context_package.estimated_tokens,
             context_truncated=context_package.truncated,
             context_sources=context_package.sources,
-            retrieval_enabled=bool(request.retrieval_enabled),
-            retrieved_chunk_count=ret_chunk_count if request.retrieval_enabled else None,
-            retrieval_latency_ms=ret_latency if request.retrieval_enabled else None,
-            retrieval_sources=ret_sources if request.retrieval_enabled else None,
+            retrieval_enabled=is_retrieval_required,
+            retrieved_chunk_count=ret_chunk_count if is_retrieval_required else 0,
+            retrieval_latency_ms=ret_latency if is_retrieval_required else 0,
+            retrieval_sources=ret_sources if is_retrieval_required else None,
+            retrieval_mode=decision_mode,
+            retrieval_required=is_retrieval_required,
+            retrieval_strategy=decision_strategy,
+            retrieval_scope=decision_scope,
+            retrieval_top_k=decision_top_k,
+            retrieval_reason=decision_reason,
+            retrieval_confidence=decision_confidence,
         )
         self.session.add(run)
         await self.session.flush()
@@ -149,7 +182,7 @@ class TaskExecutionService:
             logger.info(
                 f"[TaskExecution] Invoking model '{model_name}' for task '{task.id}' "
                 f"(run '{run.id}', context_items={context_package.total_items}, "
-                f"context_tokens={context_package.estimated_tokens})"
+                f"context_tokens={context_package.estimated_tokens}, retrieval={is_retrieval_required})"
             )
             response = await provider.generate(llm_request)
             latency_ms = int((time.perf_counter() - start_time) * 1000)
@@ -206,19 +239,28 @@ class TaskExecutionService:
         max_context_tokens = request.max_context_tokens or 8000
         retrieval_telemetry = {}
 
-        def _on_retrieval_telemetry(result):
-            retrieval_telemetry["result"] = result
+        def _on_retrieval_telemetry(data):
+            if isinstance(data, dict):
+                retrieval_telemetry["decision"] = data.get("decision")
+                retrieval_telemetry["result"] = data.get("result")
+            else:
+                retrieval_telemetry["result"] = data
 
         context_package = await self.context_engine.build_context(
             task=task,
             session=self.session,
             max_context_tokens=max_context_tokens,
-            retrieval_enabled=request.retrieval_enabled,
+            retrieval_mode=request.retrieval_mode,
+            retrieval_strategy=request.retrieval_strategy,
+            retrieval_scope=request.retrieval_scope,
             retrieval_top_k=request.retrieval_top_k,
+            query=request.query,
+            retrieval_enabled=request.retrieval_enabled,
             retrieval_project_scope=request.retrieval_project_scope,
             retrieval_telemetry_callback=_on_retrieval_telemetry,
         )
 
+        ret_decision = retrieval_telemetry.get("decision")
         ret_res = retrieval_telemetry.get("result")
         ret_sources = None
         ret_chunk_count = 0
@@ -239,6 +281,14 @@ class TaskExecutionService:
                 for c in ret_res.candidates
             ]
 
+        is_retrieval_required = ret_decision.retrieval_required if ret_decision else bool(request.retrieval_enabled)
+        decision_strategy = ret_decision.strategy.value if ret_decision else (request.retrieval_strategy or "hybrid")
+        decision_scope = ret_decision.scope.value if ret_decision else ("project" if request.retrieval_project_scope else "workspace")
+        decision_top_k = ret_decision.top_k if ret_decision else (request.retrieval_top_k or 8)
+        decision_reason = ret_decision.reason if ret_decision else None
+        decision_confidence = ret_decision.confidence if ret_decision else None
+        decision_mode = request.retrieval_mode or ("always" if request.retrieval_enabled else "auto")
+
         # 2. Build structured messages from context package
         messages = self.context_engine.builder.format_as_messages(context_package, task)
 
@@ -249,7 +299,15 @@ class TaskExecutionService:
             "model": model_name,
             "temperature": request.temperature,
             "max_context_tokens": max_context_tokens,
-            "retrieval_enabled": bool(request.retrieval_enabled),
+            "retrieval_mode": decision_mode,
+            "retrieval_decision": {
+                "required": is_retrieval_required,
+                "strategy": decision_strategy,
+                "scope": decision_scope,
+                "top_k": decision_top_k,
+                "reason": decision_reason,
+                "confidence": decision_confidence,
+            },
             "context_summary": {
                 "item_count": context_package.total_items,
                 "estimated_tokens": context_package.estimated_tokens,
@@ -271,18 +329,25 @@ class TaskExecutionService:
             estimated_context_tokens=context_package.estimated_tokens,
             context_truncated=context_package.truncated,
             context_sources=context_package.sources,
-            retrieval_enabled=bool(request.retrieval_enabled),
-            retrieved_chunk_count=ret_chunk_count if request.retrieval_enabled else None,
-            retrieval_latency_ms=ret_latency if request.retrieval_enabled else None,
-            retrieval_sources=ret_sources if request.retrieval_enabled else None,
+            retrieval_enabled=is_retrieval_required,
+            retrieved_chunk_count=ret_chunk_count if is_retrieval_required else 0,
+            retrieval_latency_ms=ret_latency if is_retrieval_required else 0,
+            retrieval_sources=ret_sources if is_retrieval_required else None,
+            retrieval_mode=decision_mode,
+            retrieval_required=is_retrieval_required,
+            retrieval_strategy=decision_strategy,
+            retrieval_scope=decision_scope,
+            retrieval_top_k=decision_top_k,
+            retrieval_reason=decision_reason,
+            retrieval_confidence=decision_confidence,
             started_at=datetime.now(timezone.utc),
         )
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
 
-        # Notify frontend of run ID and context telemetry immediately
-        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated, 'retrieval_enabled': bool(request.retrieval_enabled), 'retrieved_chunk_count': ret_chunk_count})}\n\n"
+        # Notify frontend of run ID, context, and retrieval decision telemetry immediately
+        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated, 'retrieval_enabled': is_retrieval_required, 'retrieval_strategy': decision_strategy, 'retrieval_scope': decision_scope, 'retrieval_confidence': decision_confidence, 'retrieval_reason': decision_reason, 'retrieved_chunk_count': ret_chunk_count})}\n\n"
 
         llm_request = LLMGenerateRequest(
             model=model_name,

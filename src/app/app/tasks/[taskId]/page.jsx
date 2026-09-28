@@ -112,9 +112,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [webSearchQuery, setWebSearchQuery] = useState("");
   const [webSearchLimit, setWebSearchLimit] = useState(5);
   const [webSearchRecencyDays, setWebSearchRecencyDays] = useState("");
-  const [availableTools, setAvailableTools] = useState([]);
-
-  // Step 10: Execution Plan Preview & Live Execution Steps state
+  // Step 10 & 11: Execution Plan & LLM Planning state
+  const [plannerMode, setPlannerMode] = useState("hybrid"); // "hybrid" (Auto) | "deterministic" | "llm"
+  const [planningState, setPlanningState] = useState(null); // null | "analyzing" | "evaluating" | "replanning"
+  const [completionEvaluation, setCompletionEvaluation] = useState(null);
+  const [iterationCount, setIterationCount] = useState(1);
+  const [repairCount, setRepairCount] = useState(0);
   const [executionPlan, setExecutionPlan] = useState(null);
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
   const [planError, setPlanError] = useState(null);
@@ -277,6 +280,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
       const payload = {
         model: selectedModel || undefined,
+        planner_mode: plannerMode,
         temperature: Number(temperature),
         max_context_tokens: Number(contextBudget),
         retrieval_mode: retrievalMode,
@@ -294,6 +298,9 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
       const plan = await taskService.planTask(taskId, payload);
       setExecutionPlan(plan);
+      if (plan?.metadata?.repair_count !== undefined) {
+        setRepairCount(plan.metadata.repair_count);
+      }
       if (plan?.steps) {
         setLiveSteps(
           plan.steps.map((st, idx) => ({
@@ -459,6 +466,10 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     setExecutionError(null);
     setOutputStream("");
     setIsRunning(true);
+    setPlanningState("analyzing");
+    setCompletionEvaluation(null);
+    setIterationCount(1);
+    setRepairCount(0);
     setElapsedMs(0);
     setActiveRun(null);
 
@@ -486,6 +497,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
     const runPayload = {
       model: selectedModel,
+      planner_mode: plannerMode,
       temperature: Number(temperature),
       max_context_tokens: Number(contextBudget),
       retrieval_mode: retrievalMode,
@@ -514,6 +526,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             task_id: taskId,
             status: "running",
             model_name: selectedModel,
+            planner_mode: plannerMode,
             context_item_count: event.context_item_count,
             estimated_context_tokens: event.estimated_context_tokens,
             context_truncated: event.context_truncated,
@@ -531,8 +544,16 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             created_at: new Date().toISOString(),
           });
         },
+        onPlanningStart: (event) => {
+          setPlanningState("analyzing");
+          if (event.iteration) setIterationCount(event.iteration);
+        },
         onPlanGenerated: (plan) => {
+          setPlanningState(null);
           setExecutionPlan(plan);
+          if (plan?.metadata?.repair_count !== undefined) {
+            setRepairCount(plan.metadata.repair_count);
+          }
           if (plan?.steps) {
             setLiveSteps(
               plan.steps.map((st, idx) => ({
@@ -548,6 +569,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
           }
         },
         onStepStart: (stepRecord) => {
+          setPlanningState(null);
           setLiveSteps((prev) => {
             const exists = prev.some((s) => s.id === stepRecord.id);
             if (exists) {
@@ -578,12 +600,52 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             )
           );
         },
+        onEvaluating: () => {
+          setPlanningState("evaluating");
+        },
+        onEvaluationCompleted: (evalData) => {
+          setCompletionEvaluation(evalData);
+          if (!evalData?.complete) {
+            setPlanningState("replanning");
+          } else {
+            setPlanningState(null);
+          }
+        },
+        onReplanGenerated: (plan, iter) => {
+          setPlanningState(null);
+          if (iter) setIterationCount(iter);
+          setExecutionPlan(plan);
+          if (plan?.steps) {
+            setLiveSteps(
+              plan.steps.map((st, idx) => ({
+                id: st.id,
+                step_index: idx + 1,
+                step_type: st.type,
+                status: idx === 0 ? "running" : "pending",
+                tool_name: st.tool,
+                retrieval_strategy: st.strategy,
+                model: st.model,
+              }))
+            );
+          }
+        },
         onChunk: (delta) => {
+          setPlanningState(null);
           accumulated += delta;
           setOutputStream(accumulated);
         },
         onRunCompleted: (completedRun) => {
+          setPlanningState(null);
           setActiveRun(completedRun);
+          if (completedRun.completion_evaluation) {
+            setCompletionEvaluation(completedRun.completion_evaluation);
+          }
+          if (completedRun.repair_count !== undefined) {
+            setRepairCount(completedRun.repair_count);
+          }
+          if (completedRun.iteration_count) {
+            setIterationCount(completedRun.iteration_count);
+          }
           if (completedRun.execution_plan) {
             setExecutionPlan(completedRun.execution_plan);
           }
@@ -594,12 +656,14 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
           fetchTaskRuns();
         },
         onError: (err) => {
+          setPlanningState(null);
           clearInterval(timerRef.current);
           setIsRunning(false);
           setExecutionError(err.message || "Execution error encountered during task run.");
           fetchTaskRuns();
         },
         onComplete: () => {
+          setPlanningState(null);
           clearInterval(timerRef.current);
           setIsRunning(false);
         },
@@ -607,7 +671,17 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     } else {
       try {
         const completedRun = await taskService.executeTask(taskId, runPayload);
+        setPlanningState(null);
         setActiveRun(completedRun);
+        if (completedRun.completion_evaluation) {
+          setCompletionEvaluation(completedRun.completion_evaluation);
+        }
+        if (completedRun.repair_count !== undefined) {
+          setRepairCount(completedRun.repair_count);
+        }
+        if (completedRun.iteration_count) {
+          setIterationCount(completedRun.iteration_count);
+        }
         if (completedRun.execution_plan) {
           setExecutionPlan(completedRun.execution_plan);
         }
@@ -617,6 +691,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         setOutputStream(completedRun.output_content || "");
         await fetchTaskRuns();
       } catch (err) {
+        setPlanningState(null);
         setExecutionError(err.message || "Failed to execute task.");
         await fetchTaskRuns();
       } finally {
@@ -630,6 +705,18 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     setActiveRun(run);
     setOutputStream(run.output_content || "");
     setExecutionError(run.error_message || null);
+    setPlanningState(null);
+    if (run.completion_evaluation) {
+      setCompletionEvaluation(run.completion_evaluation);
+    } else {
+      setCompletionEvaluation(null);
+    }
+    if (run.repair_count !== undefined) {
+      setRepairCount(run.repair_count);
+    }
+    if (run.iteration_count) {
+      setIterationCount(run.iteration_count);
+    }
     if (run.execution_plan) {
       setExecutionPlan(run.execution_plan);
     }
@@ -1209,17 +1296,17 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   </div>
                 </div>
 
-                {/* Step 10: Execution Plan Preview Card */}
+                {/* Step 10 & 11: Execution Plan & Planning Mode Card */}
                 <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/25 space-y-3 shadow-inner">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Workflow className="w-4 h-4 text-cyan-400" />
                       <div>
                         <span className="text-xs font-semibold text-slate-100 block">
-                          Execution Plan
+                          Execution Plan & Planner
                         </span>
                         <span className="text-[10px] text-slate-400 block">
-                          Deterministic orchestration pipeline
+                          LLM-assisted planning & execution bounds
                         </span>
                       </div>
                     </div>
@@ -1234,13 +1321,60 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                     </Button>
                   </div>
 
+                  {/* Planning Mode Selector (Step 11) */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-medium text-slate-300 block">
+                      Planning Mode:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "hybrid", label: "Automatic", desc: "Hybrid LLM + Baseline" },
+                        { id: "deterministic", label: "Deterministic", desc: "Rule-based Pipeline" },
+                        { id: "llm", label: "LLM-Assisted", desc: "Structured + Validation" },
+                      ].map((mode) => (
+                        <label
+                          key={mode.id}
+                          className={`flex flex-col p-2 rounded-lg border cursor-pointer transition-all ${
+                            plannerMode === mode.id
+                              ? "bg-cyan-950/70 border-cyan-500 text-white shadow-sm ring-1 ring-cyan-500/30"
+                              : "bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="radio"
+                              name="planner_mode_selector"
+                              value={mode.id}
+                              checked={plannerMode === mode.id}
+                              onChange={() => setPlannerMode(mode.id)}
+                              className="accent-cyan-500"
+                            />
+                            <span className="text-xs font-semibold">{mode.label}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 pl-4 mt-0.5 leading-tight">{mode.desc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
                   {executionPlan && (
-                    <div className="space-y-2 pt-1">
+                    <div className="space-y-2 pt-1 border-t border-slate-800/80">
                       <div className="flex items-center justify-between text-[11px] text-slate-400 pb-1 border-b border-slate-800">
                         <span>
                           Planned Steps: <strong className="text-white font-mono">{executionPlan.steps?.length || 0}</strong>
                         </span>
-                        <span className="font-mono text-[10px] text-slate-400">Deterministic • Max 10</span>
+                        <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                          {executionPlan.metadata?.planner_mode && (
+                            <Badge variant="outline" className="text-[9px] capitalize text-cyan-300">
+                              {executionPlan.metadata.planner_mode}
+                            </Badge>
+                          )}
+                          {executionPlan.metadata?.repair_count > 0 && (
+                            <Badge variant="warning" className="text-[9px]">
+                              {executionPlan.metadata.repair_count} repair
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-1.5">
@@ -1482,13 +1616,82 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
             {/* Live Response Content Viewport */}
             <CardContent className="flex-1 p-4 bg-slate-950/90 font-mono text-xs overflow-y-auto flex flex-col justify-between">
-              {/* Step 10: Orchestration Execution Step Tracker */}
+              {/* Step 11: Live Planning Banner */}
+              {isRunning && planningState === "analyzing" && (
+                <div className="mb-3.5 p-3.5 rounded-xl bg-indigo-950/80 border border-indigo-500/40 flex items-center justify-between shadow-lg shadow-indigo-950/50 animate-pulse">
+                  <div className="flex items-center gap-2.5 text-indigo-200 text-xs font-semibold">
+                    <Sparkles className="w-4 h-4 text-indigo-400 animate-spin" />
+                    <span>Analyzing task & synthesizing execution plan...</span>
+                  </div>
+                  <Badge variant="warning" className="text-[10px]">
+                    Planning (Iter {iterationCount})
+                  </Badge>
+                </div>
+              )}
+
+              {/* Step 11: Live Evidence Evaluation Card */}
+              {(planningState === "evaluating" || completionEvaluation) && (
+                <div className={`mb-3.5 p-3 rounded-xl border text-xs font-mono space-y-1.5 ${
+                  completionEvaluation?.complete
+                    ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-200"
+                    : "bg-amber-950/40 border-amber-500/40 text-amber-200"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-semibold">
+                      {completionEvaluation?.complete ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      )}
+                      <span>Evidence Evaluation (Iteration {iterationCount})</span>
+                    </div>
+                    {planningState === "evaluating" ? (
+                      <Badge variant="info" dot>Evaluating Evidence</Badge>
+                    ) : completionEvaluation?.complete ? (
+                      <Badge variant="success">Evidence Complete</Badge>
+                    ) : (
+                      <Badge variant="warning">Missing Info • Re-planning</Badge>
+                    )}
+                  </div>
+                  {completionEvaluation?.reason && (
+                    <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
+                      <span className="text-slate-200 font-semibold">Evaluation: </span>
+                      {completionEvaluation.reason}
+                    </p>
+                  )}
+                  {completionEvaluation?.missing_information?.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] text-amber-400 font-semibold">Missing:</span>
+                      {completionEvaluation.missing_information.map((item, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800/60 text-amber-300 text-[10px]">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 10 & 11: Orchestration Execution Step Tracker */}
               {(isRunning || (liveSteps && liveSteps.length > 0)) && (
                 <div className="mb-4 p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-semibold text-slate-200 text-xs">
                       <Workflow className="w-4 h-4 text-cyan-400" />
-                      <span>Orchestration Execution</span>
+                      <span>Execution Plan</span>
+                      <Badge variant="outline" className="text-[10px] capitalize text-cyan-300 border-cyan-800/40 font-mono">
+                        {activeRun?.planner_mode || plannerMode}
+                      </Badge>
+                      {iterationCount > 1 && (
+                        <Badge variant="purple" className="text-[10px] bg-purple-950 text-purple-300 border-purple-800 font-mono">
+                          Iter {iterationCount}
+                        </Badge>
+                      )}
+                      {repairCount > 0 && (
+                        <Badge variant="warning" className="text-[10px] font-mono">
+                          {repairCount} repair
+                        </Badge>
+                      )}
                       {isRunning ? (
                         <Badge variant="info" dot>Running</Badge>
                       ) : activeRun?.failed_step ? (
@@ -1929,11 +2132,26 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         : "hover:bg-slate-850/40"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                       <span className="font-mono text-xs text-indigo-400 font-medium">
                         {run.id.slice(0, 8)}...
                       </span>
                       {getStatusBadge(run.status)}
+                      {run.planner_mode && (
+                        <Badge variant="outline" className="text-[10px] text-cyan-300 border-cyan-800/40 capitalize font-mono">
+                          {run.planner_mode}
+                        </Badge>
+                      )}
+                      {run.iteration_count > 1 && (
+                        <Badge variant="purple" className="text-[10px] bg-purple-950 text-purple-300 border-purple-800 font-mono">
+                          {run.iteration_count} iters
+                        </Badge>
+                      )}
+                      {run.repair_count > 0 && (
+                        <Badge variant="warning" className="text-[10px] font-mono">
+                          {run.repair_count} repair
+                        </Badge>
+                      )}
                       {run.model_name && (
                         <span className="text-xs text-slate-300 font-mono hidden md:inline">
                           {run.model_name}

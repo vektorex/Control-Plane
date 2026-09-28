@@ -44,6 +44,132 @@ class OrchestrationExecutor:
         self.llm_factory = llm_factory or get_llm_factory()
         self.web_context_provider = WebContextProvider(tool_executor=self.tool_executor)
 
+    async def execute_single_step(
+        self,
+        step: ExecutionStepPlan,
+        step_index: int,
+        task: Task,
+        state: ExecutionState,
+        accumulated_context_items: List[ContextItem],
+        retrieval_sources_meta: List[Dict[str, Any]],
+        user: Optional[User] = None,
+        session: Optional[AsyncSession] = None,
+        policy: Optional[FailurePolicy] = None,
+        on_step_start: Optional[Callable[[ExecutionStepRecord], Any]] = None,
+        on_step_complete: Optional[Callable[[ExecutionStepRecord], Any]] = None,
+        on_step_failed: Optional[Callable[[ExecutionStepRecord], Any]] = None,
+    ) -> ExecutionStepRecord:
+        """
+        Executes a single step, updating step records and accumulated items.
+        """
+        active_policy = policy or FailurePolicy()
+        tool_name = step.tool if step.type == StepType.TOOL else None
+        strategy = step.strategy if step.type == StepType.RETRIEVE else None
+
+        record = state.get_or_create_step_record(
+            step_id=step.id,
+            step_index=step_index,
+            step_type=step.type.value if hasattr(step.type, "value") else str(step.type),
+            tool_name=tool_name,
+            retrieval_strategy=strategy,
+        )
+        record.mark_started()
+
+        if callable(on_step_start):
+            try:
+                on_step_start(record)
+            except Exception as cb_err:
+                logger.warning(f"[OrchestrationExecutor] on_step_start callback error: {cb_err}")
+
+        try:
+            step_type_str = step.type.value if hasattr(step.type, "value") else str(step.type)
+
+            if step_type_str == StepType.RETRIEVE.value:
+                res_summary = await self._execute_retrieve_step(
+                    step=step,
+                    task=task,
+                    session=session,
+                    user=user,
+                    accumulated_items=accumulated_context_items,
+                    retrieval_sources=retrieval_sources_meta,
+                    state=state,
+                )
+                record.mark_completed(res_summary)
+
+            elif step_type_str == StepType.TOOL.value:
+                res_summary = await self._execute_tool_step(
+                    step=step,
+                    user=user,
+                    accumulated_items=accumulated_context_items,
+                    state=state,
+                )
+                record.mark_completed(res_summary)
+
+            elif step_type_str == StepType.CONTEXT.value:
+                res_summary = await self._execute_context_step(
+                    step=step,
+                    task=task,
+                    session=session,
+                    accumulated_items=accumulated_context_items,
+                    state=state,
+                )
+                record.mark_completed(res_summary)
+
+            elif step_type_str == StepType.GENERATE.value:
+                res_summary = await self._execute_generate_step(
+                    step=step,
+                    task=task,
+                    accumulated_items=accumulated_context_items,
+                    retrieval_sources=retrieval_sources_meta,
+                    state=state,
+                    session=session,
+                )
+                record.mark_completed(res_summary)
+
+            else:
+                raise StepExecutionError(f"Unhandled step type: {step_type_str}", step_id=step.id)
+
+            if callable(on_step_complete):
+                try:
+                    on_step_complete(record)
+                except Exception as cb_err:
+                    logger.warning(f"[OrchestrationExecutor] on_step_complete callback error: {cb_err}")
+
+            return record
+
+        except Exception as step_err:
+            err_msg = str(step_err)
+            err_code = getattr(step_err, "code", "STEP_EXECUTION_ERROR")
+            logger.error(f"[OrchestrationExecutor] Step '{step.id}' ({step.type}) failed: {err_msg}")
+
+            record.mark_failed(error_code=err_code, error_message=err_msg)
+            state.record_error(step.id, error_code=err_code, error_message=err_msg)
+
+            if callable(on_step_failed):
+                try:
+                    on_step_failed(record)
+                except Exception as cb_err:
+                    logger.warning(f"[OrchestrationExecutor] on_step_failed callback error: {cb_err}")
+
+            is_required = step.required or active_policy.strict_mode
+            if step.type == StepType.RETRIEVE and active_policy.retrieval_required:
+                is_required = True
+            elif step.type == StepType.TOOL and step.tool == "web_search" and active_policy.web_search_required:
+                is_required = True
+
+            if is_required:
+                state.complete()
+                raise StepExecutionError(
+                    f"Required plan step '{step.id}' failed: {err_msg}",
+                    step_id=step.id,
+                    details={"error_code": err_code, "error_message": err_msg},
+                )
+            else:
+                logger.info(
+                    f"[OrchestrationExecutor] Optional step '{step.id}' failed; continuing execution per policy."
+                )
+                return record
+
     async def execute(
         self,
         task: Task,
@@ -54,141 +180,50 @@ class OrchestrationExecutor:
         on_step_start: Optional[Callable[[ExecutionStepRecord], Any]] = None,
         on_step_complete: Optional[Callable[[ExecutionStepRecord], Any]] = None,
         on_step_failed: Optional[Callable[[ExecutionStepRecord], Any]] = None,
+        state: Optional[ExecutionState] = None,
+        accumulated_items: Optional[List[ContextItem]] = None,
         **kwargs: Any,
     ) -> ExecutionState:
         """
         Synchronously executes all steps in the plan from start to finish.
         """
         active_policy = policy or FailurePolicy()
-        state = ExecutionState(task_id=str(task.id), plan=plan)
+        exec_state = state or ExecutionState(task_id=str(task.id), plan=plan)
 
         start_perf = time.perf_counter()
         timeout_seconds = settings.MAX_EXECUTION_TIME_SECONDS
 
         logger.info(f"[OrchestrationExecutor] Starting execution for task '{task.id}' with {len(plan.steps)} steps.")
 
-        # Accumulated context items across all steps
-        accumulated_context_items: List[ContextItem] = []
+        accumulated_context_items = accumulated_items if accumulated_items is not None else []
         retrieval_sources_meta: List[Dict[str, Any]] = []
 
         for idx, step in enumerate(plan.steps):
-            state.current_step_index = idx
+            exec_state.current_step_index = idx
 
-            # Check timeout threshold
             elapsed_seconds = time.perf_counter() - start_perf
             if elapsed_seconds > timeout_seconds:
                 raise OrchestrationTimeoutError(
                     f"Execution exceeded maximum allowed timeout of {timeout_seconds}s (elapsed: {elapsed_seconds:.2f}s)."
                 )
 
-            tool_name = step.tool if step.type == StepType.TOOL else None
-            strategy = step.strategy if step.type == StepType.RETRIEVE else None
-
-            record = state.get_or_create_step_record(
-                step_id=step.id,
+            await self.execute_single_step(
+                step=step,
                 step_index=idx,
-                step_type=step.type.value if hasattr(step.type, "value") else str(step.type),
-                tool_name=tool_name,
-                retrieval_strategy=strategy,
+                task=task,
+                state=exec_state,
+                accumulated_context_items=accumulated_context_items,
+                retrieval_sources_meta=retrieval_sources_meta,
+                user=user,
+                session=session,
+                policy=active_policy,
+                on_step_start=on_step_start,
+                on_step_complete=on_step_complete,
+                on_step_failed=on_step_failed,
             )
-            record.mark_started()
 
-            if callable(on_step_start):
-                try:
-                    on_step_start(record)
-                except Exception as cb_err:
-                    logger.warning(f"[OrchestrationExecutor] on_step_start callback error: {cb_err}")
-
-            try:
-                # Dispatch execution by step type
-                step_type_str = step.type.value if hasattr(step.type, "value") else str(step.type)
-
-                if step_type_str == StepType.RETRIEVE.value:
-                    res_summary = await self._execute_retrieve_step(
-                        step=step,
-                        task=task,
-                        session=session,
-                        user=user,
-                        accumulated_items=accumulated_context_items,
-                        retrieval_sources=retrieval_sources_meta,
-                        state=state,
-                    )
-                    record.mark_completed(res_summary)
-
-                elif step_type_str == StepType.TOOL.value:
-                    res_summary = await self._execute_tool_step(
-                        step=step,
-                        user=user,
-                        accumulated_items=accumulated_context_items,
-                        state=state,
-                    )
-                    record.mark_completed(res_summary)
-
-                elif step_type_str == StepType.CONTEXT.value:
-                    res_summary = await self._execute_context_step(
-                        step=step,
-                        task=task,
-                        session=session,
-                        accumulated_items=accumulated_context_items,
-                        state=state,
-                    )
-                    record.mark_completed(res_summary)
-
-                elif step_type_str == StepType.GENERATE.value:
-                    res_summary = await self._execute_generate_step(
-                        step=step,
-                        task=task,
-                        accumulated_items=accumulated_context_items,
-                        retrieval_sources=retrieval_sources_meta,
-                        state=state,
-                        session=session,
-                    )
-                    record.mark_completed(res_summary)
-
-                else:
-                    raise StepExecutionError(f"Unhandled step type: {step_type_str}", step_id=step.id)
-
-                if callable(on_step_complete):
-                    try:
-                        on_step_complete(record)
-                    except Exception as cb_err:
-                        logger.warning(f"[OrchestrationExecutor] on_step_complete callback error: {cb_err}")
-
-            except Exception as step_err:
-                err_msg = str(step_err)
-                err_code = getattr(step_err, "code", "STEP_EXECUTION_ERROR")
-                logger.error(f"[OrchestrationExecutor] Step '{step.id}' ({step.type}) failed: {err_msg}")
-
-                record.mark_failed(error_code=err_code, error_message=err_msg)
-                state.record_error(step.id, error_code=err_code, error_message=err_msg)
-
-                if callable(on_step_failed):
-                    try:
-                        on_step_failed(record)
-                    except Exception as cb_err:
-                        logger.warning(f"[OrchestrationExecutor] on_step_failed callback error: {cb_err}")
-
-                # Evaluate failure policy
-                is_required = step.required or active_policy.strict_mode
-                if step.type == StepType.RETRIEVE and active_policy.retrieval_required:
-                    is_required = True
-                elif step.type == StepType.TOOL and step.tool == "web_search" and active_policy.web_search_required:
-                    is_required = True
-
-                if is_required:
-                    state.complete()
-                    raise StepExecutionError(
-                        f"Required plan step '{step.id}' failed: {err_msg}",
-                        step_id=step.id,
-                        details={"error_code": err_code, "error_message": err_msg},
-                    )
-                else:
-                    logger.info(
-                        f"[OrchestrationExecutor] Optional step '{step.id}' failed; continuing execution per policy."
-                    )
-
-        state.complete()
-        return state
+        exec_state.complete()
+        return exec_state
 
     async def _execute_retrieve_step(
         self,
@@ -312,7 +347,6 @@ class OrchestrationExecutor:
         session: Optional[AsyncSession] = None,
     ) -> Dict[str, Any]:
         """Assembles context package, enforces budget, formats messages, and executes LLM generation."""
-        # Also ensure task & manual context items are included if not already added
         has_task_ctx = any(it.source_type == "task" for it in accumulated_items)
         if not has_task_ctx:
             task_provider = self.context_engine.get_provider("task_context")
@@ -327,7 +361,6 @@ class OrchestrationExecutor:
                 m_items = await manual_provider.collect(task, session=session)
                 accumulated_items.extend(manual_provider.normalize(m_items))
 
-        # Build prioritized & budget-enforced context package
         max_context_tokens = step.metadata.get("max_context_tokens", 8000) if step.metadata else 8000
         budget = ContextBudget(max_context_tokens=max_context_tokens)
         context_package = self.context_engine.builder.build(
@@ -344,7 +377,6 @@ class OrchestrationExecutor:
             "sources": list(context_package.sources),
         }
 
-        # Format messages for LLM
         messages = self.context_engine.builder.format_as_messages(context_package, task)
 
         target_model = step.model or settings.OPENAI_DEFAULT_MODEL

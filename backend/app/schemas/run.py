@@ -47,6 +47,13 @@ class RunBase(BaseModel):
     step_count: Optional[int] = Field(default=0, ge=0, description="Total number of plan steps executed")
     failed_step: Optional[Dict[str, Any]] = Field(default=None, description="Details of step that encountered failure, if any")
 
+    # Step 11: LLM-Assisted Planning & Agentic Loop Metadata
+    planner_mode: Optional[str] = Field(default=None, description="Planning mode used (deterministic, llm, hybrid, auto)")
+    planner_model: Optional[str] = Field(default=None, description="LLM model used for planning")
+    repair_count: Optional[int] = Field(default=0, ge=0, description="Number of plan repair attempts performed")
+    iteration_count: Optional[int] = Field(default=1, ge=1, description="Number of agentic execution loop iterations performed")
+    completion_evaluation: Optional[Dict[str, Any]] = Field(default=None, description="Structured completion evaluator decision")
+
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -97,9 +104,15 @@ class RunResponse(BaseModel):
     final_model: Optional[str] = None
     step_count: Optional[int] = 0
     failed_step: Optional[Dict[str, Any]] = None
+    planner_mode: Optional[str] = None
+    planner_model: Optional[str] = None
+    repair_count: Optional[int] = 0
+    iteration_count: Optional[int] = 1
+    completion_evaluation: Optional[Dict[str, Any]] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
 
 
 

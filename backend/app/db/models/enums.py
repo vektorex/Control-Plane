@@ -13,9 +13,14 @@ class RunStatus(str, enum.Enum):
     """Centralized execution statuses for Task Runs."""
     QUEUED = "queued"
     RUNNING = "running"
+    PLANNING = "planning"
+    EXECUTING = "executing"
+    EVALUATING = "evaluating"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    PARTIAL = "partial"
+
 
 
 class DocumentStatus(str, enum.Enum):

@@ -1,6 +1,6 @@
 # AI Work Layer — Backend Service
 
-A high-performance Python FastAPI service providing a provider-agnostic Tool System, Web Search Provider Integration, Context Engine, Intelligent Retrieval Router, Hybrid RAG with Vector + BM25 + Multi-Query strategies, LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, multi-tenant isolation, Supabase Auth JWT verification, and Alembic database migrations.
+A high-performance Python FastAPI service providing an LLM-Assisted Planning System, Bounded Agentic Loop, provider-agnostic Tool System, Web Search Provider Integration, Context Engine, Intelligent Retrieval Router, Hybrid RAG with Vector + BM25 + Multi-Query strategies, LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, multi-tenant isolation, Supabase Auth JWT verification, and Alembic database migrations.
 
 ---
 
@@ -22,12 +22,16 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
        │     ├── verify_workspace_access / verify_project_access / verify_task_access
        │     └── AuthService (Idempotent user & default workspace bootstrap)
        │
-       ├── Orchestration Engine (Step 10)
-       │     ├── Orchestrator (Lifecycle coordinator, SSE streaming event dispatch)
-       │     ├── ExecutionPlanner (Deterministic step planning based on task, retrieval & tool modes)
-       │     ├── PlanValidator (Step types, tool permissions, retrieval strategies, step limits)
-       │     ├── OrchestrationExecutor (Sequential step execution, failure & fallback policies)
-       │     ├── ExecutionState (Intermediate context items, tool results, retrieval results, errors)
+       ├── Orchestration Engine & LLM Planning (Step 10 & 11)
+       │     ├── Orchestrator (Lifecycle coordinator, bounded agent loop, SSE streaming event dispatch)
+       │     ├── ExecutionPlanner (Hybrid, Deterministic, LLM-Assisted planning dispatcher)
+       │     ├── LLMPlanningProvider (Structured ExecutionPlan generation, prompt isolation, 1 controlled repair attempt)
+       │     ├── HybridPlanner (Deterministic baseline + LLM proposal + safe automatic fallback)
+       │     ├── PlanValidator (6-Layer Validation: schema, capabilities, permissions, security policies, limits, task config)
+       │     ├── CompletionEvaluator (Structured evidence assessment, missing information diagnostics)
+       │     ├── AntiLoopDetector (Tracks action signatures to prevent repeated queries / tool calls)
+       │     ├── OrchestrationExecutor (Step execution, tool validation, context merging, failure handling)
+       │     ├── ExecutionState (State tracking: iteration, planning_mode, proposed_plan, validated_plan, completion_evaluation)
        │     └── Plan Preview Endpoint (/api/tasks/{task_id}/plan)
        │
        ├── Tool System & Web Search Provider (Step 9)
@@ -69,7 +73,7 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
              ├── TaskRepository (scoped by project/workspace owner)
              ├── ContextRepository (scoped by task/workspace owner)
              ├── DocumentRepository (scoped by workspace owner)
-             └── RunRepository (scoped by task/workspace owner - tracking execution_plan, execution_steps, orchestration_duration_ms, tools_used, retrieval_strategies, final_model, step_count, failed_step)
+             └── RunRepository (scoped by task/workspace owner - tracking planner_mode, planner_model, repair_count, iteration_count, completion_evaluation, execution_plan, execution_steps, orchestration_duration_ms, tools_used, retrieval_strategies, final_model, step_count, failed_step)
                    │
                    ▼
              PostgreSQL Database (AsyncPG + SQLAlchemy 2.x ORM)
@@ -78,28 +82,36 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
 
 ---
 
-## 🛠️ Tool System & Web Search Architecture (Step 9)
+## 🤖 LLM-Assisted Planning & Bounded Agentic Loop (Step 11)
 
 ```
-Task
- ↓
-Tool Registry
- ↓
-Tool Executor
- ↓
-Web Search Provider (DuckDuckGo / Tavily / Serper / Mock)
- ↓
-Normalized Result ({ title, url, snippet, source, published_at, metadata })
- ↓
-WebContextProvider
- ↓
-ContextEngine
- ↓
-LLM
+                 TASK
+                   ↓
+             Hybrid Planner
+              ↙         ↘
+       Deterministic      LLM (1 controlled repair attempt)
+              ↘         ↙
+              Proposed Plan
+                    ↓
+              Plan Validator (6-Layer Security & Bounds)
+                    ↓
+              Approved Plan
+                    ↓
+                 Execute (Retrieval / Web Search / Context)
+                    ↓
+                 Observe Evidence
+                    ↓
+             Completion Evaluator (Structured LLM Check)
+              ↙          ↘
+          Complete      Continue (Missing Info)
+             ↓             ↓
+       Final Generate   Re-plan (Anti-Loop Detection)
+                           ↓
+                        Execute
 ```
 
 ### Untrusted External Content Boundary
-Web search data is untrusted:
+Web search and document retrieval content is strictly treated as untrusted data:
 ```
 System Instructions (Highest Trust)
       ↓
@@ -107,29 +119,9 @@ User Task (Trusted User Intent)
       ↓
 Trusted Application Context
       ↓
-[EXTERNAL UNTRUSTED WEB CONTENT - FACTUAL REFERENCE ONLY]
+[EXTERNAL UNTRUSTED WEB / DOCUMENT CONTENT - FACTUAL REFERENCE ONLY]
       ↓
 LLM Execution
-```
-
----
-
-## 🧭 Intelligent Retrieval Router (Step 8)
-
-The Retrieval Router analyzes task instructions, user mode preferences, and grounding signals to decide whether external knowledge retrieval is necessary and dispatches the optimal strategy.
-
-```
-Task
- ↓
-Retrieval Router (RuleBasedDecisionProvider)
- ↓
-Decision (RetrievalDecision)
- ↓
-Retriever (None / Keyword / Vector / Hybrid / Multi-Query)
- ↓
-ContextEngine
- ↓
-LLM
 ```
 
 ---
@@ -138,7 +130,7 @@ LLM
 
 ### 1. Requirements
 - Python 3.10+ (Tested on Python 3.12)
-- PostgreSQL 14+ (or compatible)
+- PostgreSQL 14+ (or compatible SQLite for testing)
 
 ### 2. Install Dependencies
 ```bash
@@ -151,10 +143,16 @@ Copy `.env.example` to `.env`:
 cp backend/.env.example backend/.env
 ```
 
-Key Step 9 Environment Variables:
+Key Environment Variables:
 ```env
+# Step 11: Planner Configuration
+PLANNER_MODEL_PROVIDER=openai
+PLANNER_MODEL=gpt-4o-mini
+DEFAULT_PLANNER_MODE=hybrid # Options: hybrid, deterministic, llm
+
+# Step 9: Web Search Configuration
 WEB_SEARCH_PROVIDER=duckduckgo # Options: duckduckgo, tavily, serper, mock
-WEB_SEARCH_API_KEY=            # API key for tavily or serper (duckduckgo requires no key)
+WEB_SEARCH_API_KEY=
 WEB_SEARCH_DEFAULT_LIMIT=5
 WEB_SEARCH_MAX_LIMIT=20
 WEB_SEARCH_TIMEOUT_SECONDS=10.0
@@ -178,60 +176,40 @@ API Documentation will be available at:
 
 ## 🧪 Running Tests
 
-The test suite validates authentication, cross-tenant isolation, tool registry, tool execution, web search providers, untrusted boundaries, retrieval routing policies, multi-query expansion, hybrid RAG, context assembly, budget enforcement, model completion, streaming, and error handling:
+The test suite validates authentication, cross-tenant isolation, LLM planning, plan repair, hybrid fallback, bounded loop iterations, anti-loop detection, completion evaluation, tool registry, tool execution, web search providers, untrusted boundaries, retrieval routing policies, multi-query expansion, hybrid RAG, context assembly, budget enforcement, model completion, streaming, and error handling:
 ```bash
-python -m pytest -v
+$env:PYTHONPATH="."
+pytest backend/tests -v
 ```
 
 ---
 
 ## 📡 API Reference
 
-### 1. Authentication & Profiles
-- `GET /api/auth/me` — Retrieve authenticated user profile and default workspace context
+### 1. Orchestration & LLM-Assisted Planning (Step 10 & 11)
+- `POST /api/tasks/{task_id}/plan` — Propose and validate structured `ExecutionPlan` using selected `planner_mode` (`hybrid`, `deterministic`, `llm`).
+- `POST /api/tasks/{task_id}/run` — Execute task via Bounded Agentic Loop, evaluating evidence completeness and replanning when needed.
+- `POST /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming for `planning_start`, `plan_generated`, `step_start`, `step_completed`, `step_failed`, `evaluating`, `evaluation_completed`, `replan_generated`, `content_delta`, and `run_completed` events.
+- `GET  /api/tasks/{task_id}/runs` — List historical runs with planning mode, repair count, iteration count, and completion evaluation.
 
-### 2. Workspaces (Multi-Tenant Scoped)
-- `POST   /api/workspaces` — Create workspace owned by authenticated user
-- `GET    /api/workspaces` — List workspaces owned by authenticated user
-- `GET    /api/workspaces/{workspace_id}` — Get workspace by ID (404 if unowned)
-- `PATCH  /api/workspaces/{workspace_id}` — Update owned workspace
-- `DELETE /api/workspaces/{workspace_id}` — Cascade delete owned workspace
-- `POST   /api/workspaces/{workspace_id}/projects` — Create project under owned workspace
-- `GET    /api/workspaces/{workspace_id}/projects` — List projects in owned workspace
-
-### 3. Projects (Multi-Tenant Scoped)
-- `GET    /api/projects` — List all projects belonging to user's workspaces
-- `GET    /api/projects/{project_id}` — Get project by ID (404 if unowned)
-- `PATCH  /api/projects/{project_id}` — Update owned project
-- `DELETE /api/projects/{project_id}` — Cascade delete owned project
-- `POST   /api/projects/{project_id}/tasks` — Create task under owned project
-- `GET    /api/projects/{project_id}/tasks` — List tasks under owned project
-
-### 4. Tools & Web Search (Step 9)
+### 2. Tools & Web Search (Step 9)
 - `GET  /api/tools` — List registered tools available to the authenticated user
 - `POST /api/tools/{tool_name}/execute` — Direct testing/execution endpoint returning normalized `ToolResult`
 
-### 5. Documents & Ingestion (Step 7)
+### 3. Retrieval Router & Preview (Step 8)
+- `POST /api/tasks/{task_id}/retrieval/preview` — Debug preview of structured `RetrievalDecision`
+
+### 4. Documents & Ingestion (Step 7)
 - `POST   /api/workspaces/{workspace_id}/documents` — Multipart document upload with background ingestion
 - `GET    /api/workspaces/{workspace_id}/documents` — List documents in workspace
 - `GET    /api/documents/{document_id}` — Get document metadata & status
 - `GET    /api/documents/{document_id}/chunks` — Inspect indexed vector chunks
 - `DELETE /api/documents/{document_id}` — Delete document and chunks
 
-### 6. Tasks, Retrieval Router & Context
+### 5. Authentication, Tasks & Workspaces
+- `GET    /api/auth/me` — Retrieve authenticated user profile
+- `GET    /api/workspaces` — List workspaces owned by authenticated user
+- `GET    /api/projects` — List projects in user's workspaces
 - `GET    /api/tasks` — List tasks for authenticated user
-- `GET    /api/tasks/{task_id}` — Get task by ID (404 if unowned)
-- `PATCH  /api/tasks/{task_id}` — Update owned task
-- `DELETE /api/tasks/{task_id}` — Cascade delete owned task
-- `POST   /api/tasks/{task_id}/retrieval/preview` — Debug preview of structured `RetrievalDecision`
 - `POST   /api/tasks/{task_id}/context` — Create manual context item for task
-- `GET    /api/tasks/{task_id}/context` — List context items for task
 - `GET    /api/tasks/{task_id}/context/inspect` — Debug inspection view of assembled context package
-- `PATCH  /api/context/{context_id}` — Update individual context item
-- `DELETE /api/context/{context_id}` — Delete individual context item
-
-### 7. Task AI Execution & Runs (Multi-Tenant Scoped)
-- `POST   /api/tasks/{task_id}/run` — Execute task via Retrieval Router + Tools + Context Engine + LLM
-- `POST   /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming + tools & retrieval telemetry
-- `GET    /api/tasks/{task_id}/runs` — List runs for owned task
-- `POST   /api/tasks/{task_id}/runs` — Record run telemetry for owned task

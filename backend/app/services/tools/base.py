@@ -23,6 +23,15 @@ class BaseTool(ABC):
             return self.input_schema.model_json_schema()
         return {}
 
+    def validate_input(self, raw_input: Any) -> Any:
+        """Validates and parses raw dictionary arguments into the tool's Pydantic input schema."""
+        if hasattr(self, "input_schema") and self.input_schema is not None:
+            if isinstance(raw_input, dict):
+                return self.input_schema.model_validate(raw_input)
+            elif isinstance(raw_input, self.input_schema):
+                return raw_input
+        return raw_input
+
     def check_permission(
         self,
         user: Optional[User] = None,

@@ -16,6 +16,7 @@ from backend.app.schemas.task import (
     TaskResponse,
     TaskListResponse,
     TaskRunRequest,
+    TaskPlanRequest,
     RetrievalPreviewResponse,
 )
 from backend.app.schemas.run import (
@@ -116,15 +117,15 @@ async def delete_task(
 @router.post("/{task_id}/plan", response_model=ExecutionPlan)
 async def plan_task(
     task_id: UUID,
-    request: Optional[TaskRunRequest] = None,
+    request: Optional[TaskPlanRequest] = None,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
     factory: LLMProviderFactory = Depends(get_llm_factory),
 ) -> ExecutionPlan:
     """
-    Synthesize and preview the deterministic ExecutionPlan for a task without executing it.
+    Synthesize, validate, and preview the ExecutionPlan for a task using the configured planner without executing it.
     """
-    req = request or TaskRunRequest()
+    req = request or TaskPlanRequest()
     service = TaskExecutionService(session, factory)
     return await service.plan_task(task_id, user, req)
 

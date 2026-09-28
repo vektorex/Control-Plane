@@ -46,6 +46,10 @@ class TaskRunRequest(BaseModel):
     web_search_limit: Optional[int] = Field(default=5, ge=1, le=20, description="Max web search result items to retrieve")
     web_search_recency_days: Optional[int] = Field(default=None, ge=1, le=365, description="Optional recency window in days")
 
+    # Step 11: LLM-Assisted Planning & Agentic Loop Configuration
+    planner_mode: Optional[str] = Field(default="hybrid", description="Planning mode: deterministic, llm, hybrid, auto")
+    max_agent_iterations: Optional[int] = Field(default=3, ge=1, le=5, description="Max iterations for bounded agentic loop")
+
 
 
 class TaskResponse(BaseModel):
@@ -75,3 +79,8 @@ class TaskListResponse(BaseModel):
 class RetrievalPreviewResponse(BaseModel):
     task_id: UUID
     decision: RetrievalDecision
+
+
+class TaskPlanRequest(TaskRunRequest):
+    pass
+

@@ -59,6 +59,16 @@ class ExecutionState(BaseModel):
     task_id: str
     plan: ExecutionPlan
     current_step_index: int = 0
+    iteration: int = 1
+    planning_mode: str = "hybrid"
+    planner_model: Optional[str] = None
+    proposed_plan: Optional[Dict[str, Any]] = None
+    validated_plan: Optional[Dict[str, Any]] = None
+    validation_errors: List[str] = Field(default_factory=list)
+    repair_count: int = 0
+    completion_evaluation: Optional[Dict[str, Any]] = None
+    action_history: List[str] = Field(default_factory=list)
+
     step_records: List[ExecutionStepRecord] = Field(default_factory=list)
     context_items: List[Any] = Field(default_factory=list)
     retrieval_results: List[Any] = Field(default_factory=list)
@@ -97,3 +107,8 @@ class ExecutionState(BaseModel):
         self.completed_at = datetime.now(timezone.utc)
         delta = self.completed_at - self.started_at
         self.elapsed_time_ms = int(delta.total_seconds() * 1000)
+
+    @property
+    def is_completed(self) -> bool:
+        return self.completed_at is not None
+

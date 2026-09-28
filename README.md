@@ -278,6 +278,74 @@ $$\text{User} \longrightarrow \text{Workspace} \longrightarrow \text{Project} \l
 
 ## 🚀 Local Development Setup
 
+---
+
+## 🤖 LLM-Assisted Planning & Bounded Agentic Loop (Step 11)
+
+Step 11 upgrades the deterministic `ExecutionPlanner` into an **LLM-Assisted Planning System** capable of analyzing a task, evaluating available capabilities, and proposing an execution plan while strictly enforcing safety boundaries.
+
+> **Core Principle**: The LLM may **PLAN**. The application decides whether the plan is **SAFE and VALID**. The executor performs only validated actions. The LLM NEVER directly controls tools or arbitrary code execution.
+
+### 1. Planning Architecture
+
+```
+                 TASK
+                   ↓
+             Hybrid Planner
+              ↙         ↘
+       Deterministic      LLM (1 controlled repair attempt)
+              ↘         ↙
+              Proposed Plan
+                    ↓
+              Plan Validator (6-Layer Security & Bounds)
+                    ↓
+              Approved Plan
+                    ↓
+                 Execute (Retrieval / Web Search / Context)
+                    ↓
+                 Observe Evidence
+                    ↓
+             Completion Evaluator (Structured LLM Check)
+              ↙          ↘
+          Complete      Continue (Missing Info)
+             ↓             ↓
+       Final Generate   Re-plan (Anti-Loop Detection)
+                           ↓
+                        Execute
+```
+
+### 2. Planning Modes
+- **`hybrid` (Automatic - Default)**: Deterministic planner establishes a safe baseline, LLM proposes a richer plan, `PlanValidator` verifies it, and the system automatically falls back to the deterministic baseline if LLM planning fails.
+- **`deterministic`**: Pure rule-based execution pipeline without LLM planning overhead.
+- **`llm`**: Direct LLM planning with schema/policy validation, one repair attempt, and safe failure.
+
+### 3. Dedicated Planning Prompt & Strict Trust Boundaries
+- **TRUSTED Input**: System rules, application policies, registered capabilities, task configuration.
+- **UNTRUSTED Data**: Web search content, retrieved document chunks, external tool outputs.
+- Prompt injection protection prevents untrusted documents or web content from executing arbitrary tools or altering permissions.
+
+### 4. 6-Layer Plan Validation
+Every proposed plan undergoes strict validation before any action executes:
+1. **Layer 1: Schema Validation**: Validates step structures, required types, and IDs against Pydantic models.
+2. **Layer 2: Capability Validation**: Rejects invented tools, unknown retrieval strategies, or unconfigured providers.
+3. **Layer 3: Permission Validation**: Verifies user permissions and workspace ownership for all requested actions.
+4. **Layer 4: Security Policy Validation**: Rejects arbitrary code, shell commands, and untrusted tool creation.
+5. **Layer 5: Execution Limits**: Enforces `MAX_PLAN_STEPS=10`, `MAX_TOOL_CALLS_PER_PLAN=5`, `MAX_RETRIEVAL_CALLS_PER_PLAN=3`.
+6. **Layer 6: Task Configuration Validation**: Ensures tools or retrieval are enabled in task settings before allowing them in steps.
+
+### 5. Plan Repair Mechanism
+If the LLM generates an invalid plan:
+- The system performs at most **ONE** controlled repair attempt providing explicit validation error diagnostics.
+- If the repaired plan is valid, it proceeds to validation and execution.
+- If the second attempt fails, it falls back safely (in hybrid mode) or halts execution without looping.
+
+### 6. Bounded Agentic Loop & Anti-Loop Protection
+- **Bounded Iterations**: Hard-capped at `MAX_AGENT_ITERATIONS=3` (hard upper limit 5).
+- **CompletionEvaluator**: Structured evaluation determining if sufficient evidence exists to answer the task or identifying specific missing information.
+- **AntiLoopDetector**: Tracks action signatures (`tool + normalized input`, `retrieval strategy + query`). If an action is repeated identically, execution terminates immediately with a partial/completed result.
+
+---
+
 ### 1. Backend Setup & Database Migrations
 
 ```bash
@@ -287,10 +355,10 @@ pip install -r backend/requirements.txt
 # 2. Configure environment
 cp backend/.env.example backend/.env
 
-# 3. Apply Alembic database migrations (up to revision 008)
+# 3. Apply Alembic database migrations (up to revision 009)
 python -m alembic -c backend/alembic.ini upgrade head
 
-# 4. Run full test suite (145 passing unit, integration, and security tests)
+# 4. Run full test suite (172 passing unit, integration, and security tests)
 python -m pytest -v
 
 # 5. Start FastAPI backend server
@@ -312,23 +380,23 @@ npm run dev
 
 ---
 
-## ✅ Step 10 Verification Checklist
+## ✅ Step 11 Verification Checklist
 
-- [x] Provider-independent Orchestrator engine (`backend/app/services/orchestration/`).
-- [x] Structured `ExecutionPlan` with typed steps (`context`, `retrieve`, `tool`, `generate`).
-- [x] Deterministic `ExecutionPlanner` using task configuration, retrieval mode, tool mode, and `RetrievalRouter`.
-- [x] Strict `PlanValidator` validating step types, tools, retrieval strategies, permissions, and step limits.
-- [x] Server-side safety execution limits (`MAX_PLAN_STEPS=10`, `MAX_TOOL_CALLS_PER_PLAN=5`, `MAX_RETRIEVAL_CALLS_PER_PLAN=3`, `MAX_EXECUTION_TIME_SECONDS=60.0`).
-- [x] Sequential `OrchestrationExecutor` with normalized step execution and timeout handling.
-- [x] Shared intermediate `ExecutionState` tracking context items, retrieval results, tool results, errors, and timing without leaking secrets.
-- [x] Context merging through `ContextEngine` preserving source priorities and prompt injection trust boundaries.
-- [x] Final generation through decoupled `LLMProviderFactory` and provider adapters.
-- [x] `TaskExecutionService` refactored to orchestrate via `Orchestrator` while managing auth, Run lifecycle, and persistence.
-- [x] Alembic migration `008_orchestration_execution_metadata` adding `execution_plan`, `execution_steps`, `orchestration_duration_ms`, `tools_used`, `retrieval_strategies`, `final_model`, `step_count`, `failed_step` to `Run`.
-- [x] `POST /api/tasks/{task_id}/plan` preview endpoint.
-- [x] `POST /api/tasks/{task_id}/run` and `POST /api/tasks/{task_id}/run/stream` updated to execute through `Orchestrator`.
-- [x] Frontend Task Workspace (`/app/tasks/[taskId]`) with Execution Plan Preview, Live Step Execution Tracker (✓ Completed, ● Running, ✕ Failed), and step duration telemetry.
-- [x] 145/145 passing backend tests covering planning, validation, sequential execution, context merging, failures, timeouts, limits, multi-tenant security, and streaming.
+- [x] Pluggable `LLMPlanningProvider` generating structured `ExecutionPlan` with strict Pydantic validation.
+- [x] Dedicated planning prompt with trusted vs untrusted data boundaries.
+- [x] Filtered `AvailableCapabilities` preventing LLM from inventing tools, strategies, or providers.
+- [x] 6-Layer `PlanValidator` enforcing schema, capabilities, permissions, security policies, limits, and task config.
+- [x] Controlled plan repair mechanism (max 1 repair attempt) with safe fallback.
+- [x] `HybridPlanner` combining deterministic baseline, LLM proposal, and automated safe fallback.
+- [x] Separate `PLANNER_MODEL_PROVIDER` and `PLANNER_MODEL` configuration.
+- [x] `CompletionEvaluator` providing structured completion decisions with missing information diagnostics.
+- [x] `AntiLoopDetector` preventing duplicate actions across iterations.
+- [x] Bounded agentic loop with `MAX_AGENT_ITERATIONS=3`.
+- [x] Alembic migration `009_llm_planner_and_agent_loop` updating `Run` model and `RunStatus` enum (`PLANNING`, `EXECUTING`, `EVALUATING`, `PARTIAL`).
+- [x] `POST /api/tasks/{task_id}/plan` supporting `planner_mode` (`hybrid`, `deterministic`, `llm`).
+- [x] `POST /api/tasks/{task_id}/run` and `/run/stream` supporting real-time planning, evaluation, replanning, and streaming SSE events.
+- [x] Frontend Task Workspace (`/app/tasks/[taskId]`) with Planning Mode selector, Live Planning indicator, Evidence Evaluation card, and Run History observability.
+- [x] 172/172 passing backend tests covering planning, repair, hybrid fallback, bounded loop, security, and streaming.
 - [x] Next.js production build passing with pure JavaScript.
 
 

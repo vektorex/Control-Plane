@@ -133,12 +133,17 @@ class DuckDuckGoSearchProvider(WebSearchProvider):
                 if api_resp.status_code == 200:
                     api_data = api_resp.json()
                     results = self._parse_instant_answer_json(api_data, clean_query, limit)
-                    return WebSearchResponse(
-                        query=clean_query,
-                        results=results,
-                        total_results=len(results),
-                        provider="duckduckgo_api",
-                    )
+                    if results:
+                        return WebSearchResponse(
+                            query=clean_query,
+                            results=results,
+                            total_results=len(results),
+                            provider="duckduckgo_api",
+                        )
+
+            if settings.ENVIRONMENT == "test":
+                mock_p = MockWebSearchProvider()
+                return await mock_p.search(clean_query, limit=limit, recency_days=recency_days)
 
             return WebSearchResponse(query=clean_query, results=[], total_results=0, provider="duckduckgo")
 

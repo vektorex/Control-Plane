@@ -93,6 +93,16 @@ class Settings(BaseSettings):
     MAX_RETRIEVAL_CALLS_PER_PLAN: int = 3
     MAX_EXECUTION_TIME_SECONDS: float = 60.0
 
+    # Step 11: LLM-Assisted Planning & Agentic Loop Settings
+    PLANNER_MODEL_PROVIDER: str = "openai"
+    PLANNER_MODEL: str = "gpt-4o-mini"
+    PLANNER_DEFAULT_MODE: str = "hybrid"  # deterministic | llm | hybrid | auto
+    PLANNER_TIMEOUT_SECONDS: float = 30.0
+    MAX_PLAN_REPAIR_ATTEMPTS: int = 1
+    MAX_AGENT_ITERATIONS: int = 3
+    EVALUATOR_MODEL: str = "gpt-4o-mini"
+
+
 
 settings = Settings()
 

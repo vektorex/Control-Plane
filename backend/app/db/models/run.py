@@ -83,6 +83,14 @@ class Run(Base):
     step_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
     failed_step: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
+    # Step 11: LLM-Assisted Planning & Agentic Loop Metadata
+    planner_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    planner_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    repair_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    iteration_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=1)
+    completion_evaluation: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+
+
     created_at: Mapped[datetime] = mapped_column(
 
         DateTime(timezone=True),

@@ -33,7 +33,7 @@ class PlanValidationError(OrchestrationError):
         )
 
 
-class ExecutionLimitExceededError(OrchestrationError):
+class ExecutionLimitExceededError(PlanValidationError):
     """Raised when an ExecutionPlan exceeds configured server-side limits."""
     code: str = "EXECUTION_LIMIT_EXCEEDED"
     status_code: int = 400
@@ -42,9 +42,9 @@ class ExecutionLimitExceededError(OrchestrationError):
         super().__init__(
             message=message,
             details=details,
-            status_code=400,
-            code="EXECUTION_LIMIT_EXCEEDED",
         )
+        self.code = "EXECUTION_LIMIT_EXCEEDED"
+        self.status_code = 400
 
 
 class StepExecutionError(OrchestrationError):

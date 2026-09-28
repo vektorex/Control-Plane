@@ -74,10 +74,14 @@ export const taskService = {
       onRunCompleted,
       onError,
       onComplete,
+      onPlanningStart,
       onPlanGenerated,
       onStepStart,
       onStepCompleted,
       onStepFailed,
+      onEvaluating,
+      onEvaluationCompleted,
+      onReplanGenerated,
       signal,
     }
   ) {
@@ -138,6 +142,8 @@ export const taskService = {
             const parsed = JSON.parse(dataStr);
             if (parsed.type === "run_start") {
               onRunStart?.(parsed);
+            } else if (parsed.type === "planning_start") {
+              onPlanningStart?.(parsed);
             } else if (parsed.type === "plan_generated") {
               onPlanGenerated?.(parsed.plan);
             } else if (parsed.type === "step_start") {
@@ -146,6 +152,12 @@ export const taskService = {
               onStepCompleted?.(parsed.step);
             } else if (parsed.type === "step_failed") {
               onStepFailed?.(parsed.step);
+            } else if (parsed.type === "evaluating") {
+              onEvaluating?.(parsed);
+            } else if (parsed.type === "evaluation_completed") {
+              onEvaluationCompleted?.(parsed.evaluation);
+            } else if (parsed.type === "replan_generated") {
+              onReplanGenerated?.(parsed.plan, parsed.iteration);
             } else if (parsed.type === "chunk" || parsed.type === "content_delta") {
               onChunk?.(parsed.content ?? parsed.delta ?? "");
             } else if (parsed.type === "run_completed") {

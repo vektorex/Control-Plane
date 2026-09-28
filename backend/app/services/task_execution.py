@@ -112,6 +112,9 @@ class TaskExecutionService:
         tools_planned = [s.tool for s in tool_steps if s.tool]
 
         plan_json = plan.model_dump(mode="json")
+        planner_mode = plan.metadata.get("planner_mode") or request.planner_mode or "hybrid"
+        planner_model = plan.metadata.get("planner_model")
+        repair_count = plan.metadata.get("repair_count", 0)
 
         # 3. Create initial Run in 'running' status
         start_time = time.perf_counter()
@@ -121,6 +124,10 @@ class TaskExecutionService:
             model_provider=provider.provider_id,
             model_name=model_name,
             final_model=model_name,
+            planner_mode=planner_mode,
+            planner_model=planner_model,
+            repair_count=repair_count,
+            iteration_count=1,
             input_snapshot={
                 "model": model_name,
                 "temperature": request.temperature,
@@ -145,11 +152,11 @@ class TaskExecutionService:
         await self.session.flush()
         await self.session.refresh(run)
 
-        # 4. Execute Orchestration Plan
+        # 4. Execute Orchestration Plan with bounded agentic loop
         try:
-            state = await self.orchestrator.executor.execute(
+            state = await self.orchestrator.execute_task(
                 task=task,
-                plan=plan,
+                request=request,
                 user=user,
                 session=self.session,
             )
@@ -214,6 +221,15 @@ class TaskExecutionService:
             run.tool_latency_ms = tool_latency_total
             run.tool_errors = tool_errors if tool_errors else None
             run.tool_executions = tool_executions if tool_executions else None
+
+            # Step 11 updates
+            run.planner_mode = state.planning_mode or planner_mode
+            run.planner_model = state.planner_model or planner_model
+            run.repair_count = state.repair_count
+            run.iteration_count = state.iteration
+            run.completion_evaluation = state.completion_evaluation
+            if state.validated_plan:
+                run.execution_plan = state.validated_plan.model_dump(mode="json")
 
             # Input snapshot update with web sources and context summary
             snap = dict(run.input_snapshot) if run.input_snapshot else {}
@@ -284,6 +300,9 @@ class TaskExecutionService:
         raw_scope = retrieval_meta.get("scope")
         retrieval_scope = raw_scope.value if hasattr(raw_scope, "value") else (str(raw_scope) if raw_scope else None)
         plan_json = plan.model_dump(mode="json")
+        planner_mode = plan.metadata.get("planner_mode") or request.planner_mode or "hybrid"
+        planner_model = plan.metadata.get("planner_model")
+        repair_count = plan.metadata.get("repair_count", 0)
 
         # Pre-calculate initial context metadata for run_start event
         init_items = []
@@ -309,6 +328,10 @@ class TaskExecutionService:
             model_provider=provider.provider_id,
             model_name=model_name,
             final_model=model_name,
+            planner_mode=planner_mode,
+            planner_model=planner_model,
+            repair_count=repair_count,
+            iteration_count=1,
             execution_plan=plan_json,
             retrieval_enabled=retrieval_required,
             retrieval_mode=request.retrieval_mode or "auto",
@@ -326,7 +349,7 @@ class TaskExecutionService:
         await self.session.refresh(run)
 
         # Emit run_start
-        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'execution_plan': plan_json, 'tools_used': run.tools_used, 'retrieval_enabled': retrieval_required, 'context_item_count': init_pkg.total_items, 'estimated_context_tokens': init_pkg.estimated_tokens, 'context_truncated': init_pkg.truncated, 'context_sources': list(init_pkg.sources)})}\n\n"
+        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'execution_plan': plan_json, 'orchestration_plan': plan_json, 'tools_used': run.tools_used, 'retrieval_enabled': retrieval_required, 'context_item_count': init_pkg.total_items, 'estimated_context_tokens': init_pkg.estimated_tokens, 'context_truncated': init_pkg.truncated, 'context_sources': list(init_pkg.sources)})}\n\n"
 
         accumulated_output = ""
         step_records_final = []
@@ -341,6 +364,8 @@ class TaskExecutionService:
             ):
                 if event.get("type") == "chunk":
                     accumulated_output += event.get("content", "")
+                elif event.get("type") == "content_delta":
+                    accumulated_output += event.get("delta", "")
                 elif event.get("type") == "step_completed" and event.get("step"):
                     step_records_final.append(event.get("step"))
                 elif event.get("type") == "orchestration_completed" and event.get("state"):
@@ -357,6 +382,38 @@ class TaskExecutionService:
             run.orchestration_duration_ms = elapsed_ms
             run.step_count = len(step_records_final)
             run.execution_steps = step_records_final
+
+            ctx_meta = final_orch_state.get("metadata", {}).get("context_package", {}) if final_orch_state else {}
+            tok_meta = final_orch_state.get("token_usage", {}) if final_orch_state else {}
+            run.estimated_context_tokens = ctx_meta.get("estimated_tokens", init_pkg.estimated_tokens)
+            run.context_truncated = ctx_meta.get("truncated", init_pkg.truncated)
+            run.context_item_count = len(final_orch_state.get("context_items", [])) if final_orch_state else init_pkg.total_items
+            run.context_sources = list(set(it.get("source_type", "task") for it in final_orch_state.get("context_items", []))) if final_orch_state else list(init_pkg.sources)
+            run.retrieved_chunk_count = len(final_orch_state.get("retrieval_results", [])) if final_orch_state else 0
+            run.retrieval_latency_ms = sum(r.get("duration_ms", 0) for r in step_records_final if r.get("step_type") == "retrieve") if run.retrieved_chunk_count else None
+            run.input_tokens = tok_meta.get("input_tokens")
+            run.output_tokens = tok_meta.get("output_tokens")
+            run.total_tokens = tok_meta.get("total_tokens")
+
+            if final_orch_state:
+                run.planner_mode = final_orch_state.get("planning_mode", planner_mode)
+                run.planner_model = final_orch_state.get("planner_model", planner_model)
+                run.repair_count = final_orch_state.get("repair_count", repair_count)
+                run.iteration_count = final_orch_state.get("iteration", 1)
+                run.completion_evaluation = final_orch_state.get("completion_evaluation")
+
+            # Harvest tool results from stream
+            if final_orch_state and final_orch_state.get("tool_results"):
+                t_used = []
+                t_lat = 0
+                for tr in final_orch_state["tool_results"]:
+                    tn = tr.get("tool_name", "unknown")
+                    if tn not in t_used:
+                        t_used.append(tn)
+                    t_lat += tr.get("latency_ms", 0)
+                run.tools_used = t_used
+                run.tool_call_count = len(final_orch_state["tool_results"])
+                run.tool_latency_ms = t_lat
 
             ctx_meta = final_orch_state.get("metadata", {}).get("context_package", {}) if final_orch_state else {}
             tok_meta = final_orch_state.get("token_usage", {}) if final_orch_state else {}

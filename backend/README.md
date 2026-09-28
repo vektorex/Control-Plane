@@ -22,6 +22,14 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
        │     ├── verify_workspace_access / verify_project_access / verify_task_access
        │     └── AuthService (Idempotent user & default workspace bootstrap)
        │
+       ├── Orchestration Engine (Step 10)
+       │     ├── Orchestrator (Lifecycle coordinator, SSE streaming event dispatch)
+       │     ├── ExecutionPlanner (Deterministic step planning based on task, retrieval & tool modes)
+       │     ├── PlanValidator (Step types, tool permissions, retrieval strategies, step limits)
+       │     ├── OrchestrationExecutor (Sequential step execution, failure & fallback policies)
+       │     ├── ExecutionState (Intermediate context items, tool results, retrieval results, errors)
+       │     └── Plan Preview Endpoint (/api/tasks/{task_id}/plan)
+       │
        ├── Tool System & Web Search Provider (Step 9)
        │     ├── BaseTool Interface (name, description, input_schema, requires_auth, execute, check_permission)
        │     ├── ToolRegistry (Centralized registration, lookup, Pydantic input validation)
@@ -61,10 +69,11 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
              ├── TaskRepository (scoped by project/workspace owner)
              ├── ContextRepository (scoped by task/workspace owner)
              ├── DocumentRepository (scoped by workspace owner)
-             └── RunRepository (scoped by task/workspace owner - tracking tools_used, tool_call_count, tool_latency_ms, tool_errors, tool_executions)
+             └── RunRepository (scoped by task/workspace owner - tracking execution_plan, execution_steps, orchestration_duration_ms, tools_used, retrieval_strategies, final_model, step_count, failed_step)
                    │
                    ▼
              PostgreSQL Database (AsyncPG + SQLAlchemy 2.x ORM)
+
 ```
 
 ---

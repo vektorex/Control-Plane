@@ -33,6 +33,7 @@ from backend.app.schemas.context import (
 from backend.app.services.context.engine import get_context_engine, ContextEngine
 from backend.app.services.context.token_estimator import estimate_tokens
 from backend.app.services.llm.factory import LLMProviderFactory, get_llm_factory
+from backend.app.services.orchestration.plan import ExecutionPlan
 from backend.app.services.retrieval import RetrievalRouter, get_retrieval_router
 from backend.app.services.task_execution import TaskExecutionService
 
@@ -110,7 +111,23 @@ async def delete_task(
     return None
 
 
-# --- Task AI Execution Endpoints ---
+# --- Task AI Execution & Orchestration Endpoints ---
+
+@router.post("/{task_id}/plan", response_model=ExecutionPlan)
+async def plan_task(
+    task_id: UUID,
+    request: Optional[TaskRunRequest] = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    factory: LLMProviderFactory = Depends(get_llm_factory),
+) -> ExecutionPlan:
+    """
+    Synthesize and preview the deterministic ExecutionPlan for a task without executing it.
+    """
+    req = request or TaskRunRequest()
+    service = TaskExecutionService(session, factory)
+    return await service.plan_task(task_id, user, req)
+
 
 @router.post("/{task_id}/run", response_model=RunResponse, status_code=status.HTTP_201_CREATED)
 async def execute_task(
@@ -121,8 +138,8 @@ async def execute_task(
     factory: LLMProviderFactory = Depends(get_llm_factory),
 ) -> RunResponse:
     """
-    Execute a Task against the LLM abstraction and record the resulting execution Run.
-    Enforces user ownership and full telemetry capture.
+    Execute a Task through the Orchestration Engine and record the resulting execution Run.
+    Enforces user ownership and full execution telemetry capture.
     """
     req = request or TaskRunRequest()
     service = TaskExecutionService(session, factory)

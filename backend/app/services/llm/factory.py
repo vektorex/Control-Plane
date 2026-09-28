@@ -65,6 +65,14 @@ class LLMProviderFactory:
             f"Model '{model_id}' is not supported by any registered LLM provider."
         )
 
+    def has_provider_for_model(self, model_id: str) -> bool:
+        """Check if any registered provider supports the given model identifier."""
+        try:
+            self.get_provider_for_model(model_id)
+            return True
+        except ModelNotFoundError:
+            return False
+
     def list_all_models(self) -> ModelListResponse:
         """Aggregate models and provider readiness from all registered providers."""
         all_models: List[ModelInfo] = []

@@ -37,6 +37,14 @@ class ToolRegistry:
         """Retrieves a registered tool by identifier."""
         return self._tools.get(tool_name)
 
+    def get(self, tool_name: str) -> Optional[BaseTool]:
+        """Alias for get_tool."""
+        return self._tools.get(tool_name)
+
+    def has_tool(self, tool_name: str) -> bool:
+        """Returns True if the tool identifier is registered in the registry."""
+        return tool_name in self._tools
+
     def get_tool_or_raise(self, tool_name: str) -> BaseTool:
         """Retrieves a registered tool or raises ToolNotFoundError."""
         tool = self.get_tool(tool_name)

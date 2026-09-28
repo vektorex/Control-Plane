@@ -152,44 +152,127 @@ Users can configure how retrieval decisions are governed:
 
 ---
 
+## 🧠 Production Orchestration Engine Architecture (Step 10)
+
+The AI Work Layer features a production-oriented Orchestration Engine that coordinates task configuration, context, retrieval, tools, and LLM generation through a deterministic, observable execution plan.
+
+```
+Task
+ ↓
+Orchestrator
+ ↓
+Execution Planner (Deterministic)
+ ↓
+Execution Plan (Validated)
+ ↓
+Orchestration Executor
+ ├── Step 1: Context Assembly / Hybrid Retrieval
+ ├── Step 2: Tool Execution (Web Search)
+ └── Step 3: Final Context Merging & LLM Generation
+ ↓
+Execution Results
+ ↓
+Final LLM Response
+ ↓
+Run (with Step Records & Telemetry)
+```
+
+### 1. Structured Execution Plan (`ExecutionPlan`)
+Each execution plan is structured, deterministic, and validated prior to execution:
+```json
+{
+  "id": "plan_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "task_id": "c1f72782-b4ea-4c46-953e-2faec03df6dc",
+  "steps": [
+    {
+      "id": "step_1",
+      "type": "retrieve",
+      "strategy": "hybrid",
+      "scope": "project",
+      "required": false
+    },
+    {
+      "id": "step_2",
+      "type": "tool",
+      "tool": "web_search",
+      "input": { "query": "Latest React changes", "limit": 5 },
+      "required": false
+    },
+    {
+      "id": "step_3",
+      "type": "generate",
+      "model": "gpt-4o",
+      "temperature": 0.2,
+      "required": true
+    }
+  ],
+  "max_steps": 10,
+  "timeout_seconds": 60.0
+}
+```
+
+### 2. Supported Step Types & Extensibility
+- `context`: Assembles manual and task baseline context items.
+- `retrieve`: Dispatches intelligent knowledge search (`hybrid`, `vector`, `keyword`, `multi_query`).
+- `tool`: Invokes registered provider-independent tools (e.g. `web_search`).
+- `generate`: Merges accumulated context via `ContextEngine` and executes LLM generation.
+- *Extensible for future*: `transform`, `evaluate`, `retry`, `human_approval`.
+
+### 3. Server-Side Safety & Execution Limits
+- `MAX_PLAN_STEPS=10`
+- `MAX_TOOL_CALLS_PER_PLAN=5`
+- `MAX_RETRIEVAL_CALLS_PER_PLAN=3`
+- `MAX_CONTEXT_TOKENS=16000`
+- `MAX_EXECUTION_TIME_SECONDS=60.0`
+
+### 4. Failure & Fallback Policies
+- **Strict Mode**: If any required step fails, execution halts and the run is marked as failed.
+- **Configurable Fallback Mode**: If an optional retrieval or web search step fails (e.g. provider downtime), the executor logs the failure in `ExecutionStepRecord`, attaches the diagnostic to state, and safely proceeds with the remaining available context.
+- **Generation Failure**: Immediately records the failure and marks the run failed.
+
+---
+
 ## 🔐 Multi-Tenant Security & Isolation
 
 Every document, chunk, context item, and task execution strictly enforces multi-tenant ownership:
 $$\text{User} \longrightarrow \text{Workspace} \longrightarrow \text{Project} \longrightarrow \text{Document} \longrightarrow \text{DocumentChunk}$$
 
-- **Cross-Tenant Isolation**: User A can NEVER search, retrieve, preview, execute tools, or access runs across User B's boundaries.
-- **Tenant Scope Enforcement**: All SQL queries, tool calls, and vector searches filter on `workspace_id` and `project_id` at the database layer.
-- **Safety Limits**: Configurable server-side limits (`WEB_SEARCH_MAX_LIMIT=20`, `MAX_TOOL_CALLS_PER_TASK=5`, `MAX_RETRIEVAL_RESULTS=50`).
+- **Cross-Tenant Isolation**: User A can NEVER search, retrieve, preview, plan, execute tools, or access runs across User B's boundaries.
+- **Tenant Scope Enforcement**: All SQL queries, tool calls, vector searches, and execution plans filter on `workspace_id` and `project_id` at the database layer.
+- **Untrusted Web Content Demarcation**: All search engine snippets and external text are flagged as untrusted context to prevent prompt injection.
 
 ---
 
 ## 📡 API Reference
 
+### Orchestration & Task Execution (Step 10)
+- `POST /api/tasks/{task_id}/plan` — Preview the deterministic `ExecutionPlan` without executing the task.
+- `POST /api/tasks/{task_id}/run` — Execute task through the Orchestrator pipeline, persisting `execution_plan`, `execution_steps`, and full telemetry on the `Run`.
+- `POST /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming for `plan_generated`, `step_start`, `step_completed`, `step_failed`, `content_delta`, and `run_completed` events.
+
 ### Tools & Web Search (Step 9)
-- `GET  /api/tools` — List registered tools available to the authenticated user
-- `POST /api/tools/{tool_name}/execute` — Direct testing/execution endpoint returning normalized `ToolResult`
+- `GET  /api/tools` — List registered tools available to the authenticated user.
+- `POST /api/tools/{tool_name}/execute` — Direct testing/execution endpoint returning normalized `ToolResult`.
 
 ### Retrieval Router & Preview (Step 8)
-- `POST /api/tasks/{task_id}/retrieval/preview` — Inspect the structured `RetrievalDecision` for a task without executing the LLM or creating a run record.
+- `POST /api/tasks/{task_id}/retrieval/preview` — Inspect the structured `RetrievalDecision` for a task.
 
 ### Document Management & Uploads (Step 7)
-- `POST   /api/workspaces/{workspace_id}/documents` — Multipart upload for PDF, TXT, Markdown, DOCX with background ingestion
-- `GET    /api/workspaces/{workspace_id}/documents` — List workspace documents with project and status filters
-- `GET    /api/documents/{document_id}` — Get document status, metadata, and chunk count
-- `GET    /api/documents/{document_id}/chunks` — Inspect indexed vector chunks for a document
-- `DELETE /api/documents/{document_id}` — Delete document, vector chunks, and stored file
+- `POST   /api/workspaces/{workspace_id}/documents` — Multipart upload for PDF, TXT, Markdown, DOCX with background ingestion.
+- `GET    /api/workspaces/{workspace_id}/documents` — List workspace documents with project and status filters.
+- `GET    /api/documents/{document_id}` — Get document status, metadata, and chunk count.
+- `GET    /api/documents/{document_id}/chunks` — Inspect indexed vector chunks for a document.
+- `DELETE /api/documents/{document_id}` — Delete document, vector chunks, and stored file.
 
 ### Tasks, Context & Hybrid AI Execution
-- `POST   /api/projects/{project_id}/tasks` — Create task
-- `GET    /api/projects/{project_id}/tasks` — List tasks
-- `GET    /api/tasks/{task_id}` — Get task
-- `PATCH  /api/tasks/{task_id}` — Update task
-- `DELETE /api/tasks/{task_id}` — Delete task
-- `POST   /api/tasks/{task_id}/context` — Create manual context item
-- `GET    /api/tasks/{task_id}/context` — List context items
-- `GET    /api/tasks/{task_id}/context/inspect` — Debug view of assembled ContextPackage & prompt
-- `POST   /api/tasks/{task_id}/run` — Execute task with Retrieval Router + Tools + ContextEngine + Telemetry
-- `POST   /api/tasks/{task_id}/run/stream` — Execute task with SSE streaming + Tools + Retrieval Router Telemetry
+- `POST   /api/projects/{project_id}/tasks` — Create task.
+- `GET    /api/projects/{project_id}/tasks` — List tasks.
+- `GET    /api/tasks/{task_id}` — Get task.
+- `PATCH  /api/tasks/{task_id}` — Update task.
+- `DELETE /api/tasks/{task_id}` — Delete task.
+- `POST   /api/tasks/{task_id}/context` — Create manual context item.
+- `GET    /api/tasks/{task_id}/context` — List context items.
+- `GET    /api/tasks/{task_id}/context/inspect` — Debug view of assembled ContextPackage & prompt.
 
 ---
 
@@ -204,10 +287,10 @@ pip install -r backend/requirements.txt
 # 2. Configure environment
 cp backend/.env.example backend/.env
 
-# 3. Apply Alembic database migrations (up to revision 007)
+# 3. Apply Alembic database migrations (up to revision 008)
 python -m alembic -c backend/alembic.ini upgrade head
 
-# 4. Run full test suite (127 passing unit, integration, and security tests)
+# 4. Run full test suite (145 passing unit, integration, and security tests)
 python -m pytest -v
 
 # 5. Start FastAPI backend server
@@ -229,20 +312,23 @@ npm run dev
 
 ---
 
-## ✅ Step 9 Verification Checklist
+## ✅ Step 10 Verification Checklist
 
-- [x] Provider-independent `BaseTool` interface (`name`, `description`, `input_schema`, `requires_auth`, `execute`, `check_permission`).
-- [x] Centralized `ToolRegistry` with schema validation and metadata reflection.
-- [x] Resilient `ToolExecutor` with permission validation, timeouts, latency tracking, and normalized `ToolResult`.
-- [x] Pluggable `WebSearchProvider` interface with DuckDuckGo, Tavily, Serper, and Mock implementations.
-- [x] Strict `WebSearchInput` validation (query length, min/max limits, recency filters).
-- [x] Normalized `WebSearchResultItem` structure across all search providers.
-- [x] `WebContextProvider` converting search results into untrusted `ContextItem`s (`source_type="web"`, priority 60).
-- [x] Prompt injection trust boundary demarcations protecting system instructions from external web content.
-- [x] Development API endpoints `GET /api/tools` and `POST /api/tools/{tool_name}/execute`.
-- [x] Task tool configuration (`tool_mode`, `tools_enabled`, `enable_web_search`, `web_search_query`, `web_search_limit`, `web_search_recency_days`).
-- [x] Alembic migration `007_tool_execution_metadata` persisting `tools_used`, `tool_call_count`, `tool_latency_ms`, `tool_errors`, `tool_executions` on Runs.
-- [x] Frontend Task Workspace (`/app/tasks/[taskId]`) with Web Search toggle, query overrides, limit controls, grounded source cards with clickable URLs, and tool execution diagnostics.
-- [x] 127/127 passing backend tests across all Steps 1–9.
+- [x] Provider-independent Orchestrator engine (`backend/app/services/orchestration/`).
+- [x] Structured `ExecutionPlan` with typed steps (`context`, `retrieve`, `tool`, `generate`).
+- [x] Deterministic `ExecutionPlanner` using task configuration, retrieval mode, tool mode, and `RetrievalRouter`.
+- [x] Strict `PlanValidator` validating step types, tools, retrieval strategies, permissions, and step limits.
+- [x] Server-side safety execution limits (`MAX_PLAN_STEPS=10`, `MAX_TOOL_CALLS_PER_PLAN=5`, `MAX_RETRIEVAL_CALLS_PER_PLAN=3`, `MAX_EXECUTION_TIME_SECONDS=60.0`).
+- [x] Sequential `OrchestrationExecutor` with normalized step execution and timeout handling.
+- [x] Shared intermediate `ExecutionState` tracking context items, retrieval results, tool results, errors, and timing without leaking secrets.
+- [x] Context merging through `ContextEngine` preserving source priorities and prompt injection trust boundaries.
+- [x] Final generation through decoupled `LLMProviderFactory` and provider adapters.
+- [x] `TaskExecutionService` refactored to orchestrate via `Orchestrator` while managing auth, Run lifecycle, and persistence.
+- [x] Alembic migration `008_orchestration_execution_metadata` adding `execution_plan`, `execution_steps`, `orchestration_duration_ms`, `tools_used`, `retrieval_strategies`, `final_model`, `step_count`, `failed_step` to `Run`.
+- [x] `POST /api/tasks/{task_id}/plan` preview endpoint.
+- [x] `POST /api/tasks/{task_id}/run` and `POST /api/tasks/{task_id}/run/stream` updated to execute through `Orchestrator`.
+- [x] Frontend Task Workspace (`/app/tasks/[taskId]`) with Execution Plan Preview, Live Step Execution Tracker (✓ Completed, ● Running, ✕ Failed), and step duration telemetry.
+- [x] 145/145 passing backend tests covering planning, validation, sequential execution, context merging, failures, timeouts, limits, multi-tenant security, and streaming.
 - [x] Next.js production build passing with pure JavaScript.
+
 

@@ -49,6 +49,10 @@ class ContextEngine:
         """Removes a registered context provider."""
         return self.registry.unregister(provider_id)
 
+    def get_provider(self, provider_id: str) -> Optional[ContextProvider]:
+        """Retrieves a registered context provider by provider_id."""
+        return self.registry.get_provider(provider_id)
+
     async def build_context(
         self,
         task: Task,

@@ -65,7 +65,22 @@ export const taskService = {
   /**
    * Execute task via Server-Sent Events (SSE) streaming
    */
-  async executeTaskStream(taskId, payload, { onChunk, onRunStart, onRunCompleted, onError, onComplete, signal }) {
+  async executeTaskStream(
+    taskId,
+    payload,
+    {
+      onChunk,
+      onRunStart,
+      onRunCompleted,
+      onError,
+      onComplete,
+      onPlanGenerated,
+      onStepStart,
+      onStepCompleted,
+      onStepFailed,
+      signal,
+    }
+  ) {
     const url = `${env.orchestrator.apiUrl}/tasks/${taskId}/run/stream`;
     try {
       let authHeader = env.orchestrator.apiSecret ? `Bearer ${env.orchestrator.apiSecret}` : "";
@@ -123,6 +138,14 @@ export const taskService = {
             const parsed = JSON.parse(dataStr);
             if (parsed.type === "run_start") {
               onRunStart?.(parsed);
+            } else if (parsed.type === "plan_generated") {
+              onPlanGenerated?.(parsed.plan);
+            } else if (parsed.type === "step_start") {
+              onStepStart?.(parsed.step);
+            } else if (parsed.type === "step_completed") {
+              onStepCompleted?.(parsed.step);
+            } else if (parsed.type === "step_failed") {
+              onStepFailed?.(parsed.step);
             } else if (parsed.type === "chunk" || parsed.type === "content_delta") {
               onChunk?.(parsed.content ?? parsed.delta ?? "");
             } else if (parsed.type === "run_completed") {
@@ -148,9 +171,20 @@ export const taskService = {
   },
 
   /**
+   * Preview deterministic ExecutionPlan for a task without executing it (Step 10 Orchestrator)
+   */
+  async planTask(taskId, payload = {}) {
+    return apiClient(`/tasks/${taskId}/plan`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
    * Preview intelligent retrieval routing decision for a task (Step 8 dev debug)
    */
   async previewTaskRetrieval(taskId, payload = {}) {
+
     return apiClient(`/tasks/${taskId}/retrieval/preview`, {
       method: "POST",
       body: payload,

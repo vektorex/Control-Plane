@@ -73,6 +73,16 @@ class Run(Base):
     tool_latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
     tool_errors: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
     tool_executions: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
+
+    # Step 10: Orchestration Engine Execution Metadata
+    execution_plan: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    execution_steps: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
+    orchestration_duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    retrieval_strategies: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    final_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    step_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    failed_step: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
 
         DateTime(timezone=True),

@@ -2,29 +2,33 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
-from typing import AsyncIterator, List, Optional
+from typing import AsyncIterator, Dict, List, Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.errors import InvalidStateError, AppError
+from backend.app.core.errors import AppError, InvalidStateError
 from backend.app.core.logging import logger
-from backend.app.db.models.enums import TaskStatus, RunStatus
+from backend.app.db.models.enums import RunStatus, TaskStatus
 from backend.app.db.models.run import Run
 from backend.app.db.models.task import Task
 from backend.app.db.models.user import User
-from backend.app.repositories.task import TaskRepository
 from backend.app.repositories.run import RunRepository
+from backend.app.repositories.task import TaskRepository
 from backend.app.schemas.llm import ChatMessage, LLMGenerateRequest
 from backend.app.schemas.run import RunResponse
 from backend.app.schemas.task import TaskRunRequest
 from backend.app.services.context.engine import ContextEngine, get_context_engine
-from backend.app.services.llm.factory import LLMProviderFactory
+from backend.app.services.context.models import ContextBudget
+from backend.app.services.llm.factory import LLMProviderFactory, get_llm_factory
+from backend.app.services.orchestration.orchestrator import Orchestrator, get_orchestrator
+from backend.app.services.orchestration.plan import ExecutionPlan, StepType
 
 
 class TaskExecutionService:
     """
-    Service responsible for turning a Task entity into an AI request via the Context Engine,
-    orchestrating provider invocation, tools, and persisting execution runs with full context telemetry.
+    Service responsible for turning a Task entity into an orchestrated AI workflow
+    via the Orchestration Engine, coordinating planning, retrieval, tools, context,
+    and persisting execution runs with complete observability.
     """
 
     def __init__(
@@ -32,12 +36,38 @@ class TaskExecutionService:
         session: AsyncSession,
         factory: LLMProviderFactory,
         context_engine: Optional[ContextEngine] = None,
+        orchestrator: Optional[Orchestrator] = None,
     ):
         self.session = session
         self.factory = factory
         self.context_engine = context_engine or get_context_engine()
+        self.orchestrator = orchestrator or Orchestrator(
+            context_engine=self.context_engine,
+            llm_factory=self.factory,
+        )
         self.task_repo = TaskRepository(session)
         self.run_repo = RunRepository(session)
+
+    async def plan_task(
+        self,
+        task_id: UUID,
+        user: User,
+        request: TaskRunRequest,
+    ) -> ExecutionPlan:
+        """
+        Synthesizes, validates, and returns an ExecutionPlan for a task without executing it.
+        """
+        task = await self.task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
+        prompt_check = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
+        if not prompt_check:
+            raise InvalidStateError("Task has no instructions, description, or title to plan.")
+
+        return await self.orchestrator.plan_task(
+            task=task,
+            request=request,
+            user=user,
+            session=self.session,
+        )
 
     async def execute_task(
         self,
@@ -46,244 +76,176 @@ class TaskExecutionService:
         request: TaskRunRequest,
     ) -> Run:
         """
-        Executes a task synchronously against the LLM abstraction and records the run outcome.
-        Context is gathered, normalized, and budget-enforced by the ContextEngine across all active providers (RAG, Web, Task, Manual).
+        Executes a task through the Orchestration Engine and persists the resulting Run entity.
         """
         task = await self.task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
-
         prompt_check = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
         if not prompt_check:
             raise InvalidStateError("Task has no instructions, description, or title to execute.")
 
-        # 1. Gather & package context via ContextEngine
-        max_context_tokens = request.max_context_tokens or 8000
-        retrieval_telemetry = {}
-        tool_telemetry_list = []
-
-        def _on_retrieval_telemetry(data):
-            if isinstance(data, dict):
-                retrieval_telemetry["decision"] = data.get("decision")
-                retrieval_telemetry["result"] = data.get("result")
-            else:
-                retrieval_telemetry["result"] = data
-
-        def _on_tool_telemetry(data):
-            if data:
-                tool_telemetry_list.append(data)
-
-        context_package = await self.context_engine.build_context(
+        # 1. Generate & Validate Plan
+        plan = await self.orchestrator.plan_task(
             task=task,
-            session=self.session,
-            max_context_tokens=max_context_tokens,
-            retrieval_mode=request.retrieval_mode,
-            retrieval_strategy=request.retrieval_strategy,
-            retrieval_scope=request.retrieval_scope,
-            retrieval_top_k=request.retrieval_top_k,
-            query=request.query,
-            retrieval_enabled=request.retrieval_enabled,
-            retrieval_project_scope=request.retrieval_project_scope,
-            retrieval_telemetry_callback=_on_retrieval_telemetry,
-            tool_mode=request.tool_mode,
-            tools_enabled=request.tools_enabled,
-            enable_web_search=request.enable_web_search,
-            web_search_query=request.web_search_query,
-            web_search_limit=request.web_search_limit,
-            web_search_recency_days=request.web_search_recency_days,
+            request=request,
             user=user,
-            tool_telemetry_callback=_on_tool_telemetry,
+            session=self.session,
         )
-
-        ret_decision = retrieval_telemetry.get("decision")
-        ret_res = retrieval_telemetry.get("result")
-        ret_sources = None
-        ret_chunk_count = 0
-        ret_latency = 0
-        if ret_res:
-            ret_chunk_count = len(ret_res.candidates)
-            ret_latency = ret_res.retrieval_latency_ms
-            ret_sources = [
-                {
-                    "document_id": str(c.document_id),
-                    "chunk_id": str(c.chunk_id),
-                    "filename": c.filename,
-                    "page_number": c.page_number,
-                    "score": round(c.rerank_score or c.fusion_score, 4),
-                    "vector_score": round(c.vector_score, 4) if c.vector_score is not None else None,
-                    "keyword_score": round(c.keyword_score, 4) if c.keyword_score is not None else None,
-                }
-                for c in ret_res.candidates
-            ]
-
-        # Extract structured decision telemetry
-        is_retrieval_required = ret_decision.retrieval_required if ret_decision else bool(request.retrieval_enabled)
-        decision_strategy = ret_decision.strategy.value if ret_decision else (request.retrieval_strategy or "hybrid")
-        decision_scope = ret_decision.scope.value if ret_decision else ("project" if request.retrieval_project_scope else "workspace")
-        decision_top_k = ret_decision.top_k if ret_decision else (request.retrieval_top_k or 8)
-        decision_reason = ret_decision.reason if ret_decision else None
-        decision_confidence = ret_decision.confidence if ret_decision else None
-        decision_mode = request.retrieval_mode or ("always" if request.retrieval_enabled else "auto")
-
-        # Extract tool telemetry (Step 9)
-        tools_used = []
-        tool_call_count = len(tool_telemetry_list)
-        tool_latency_total = 0
-        tool_errors = []
-        tool_executions = []
-
-        for t in tool_telemetry_list:
-            t_name = getattr(t, "tool_name", None) or (t.get("tool_name") if isinstance(t, dict) else "unknown")
-            if t_name not in tools_used:
-                tools_used.append(t_name)
-            t_latency = getattr(t, "latency_ms", 0) or (t.get("latency_ms", 0) if isinstance(t, dict) else 0)
-            tool_latency_total += t_latency
-            t_success = getattr(t, "success", True) if not isinstance(t, dict) else t.get("success", True)
-            t_err = getattr(t, "error", None) or (t.get("error") if isinstance(t, dict) else None)
-
-            if not t_success and t_err:
-                err_dict = t_err.model_dump() if hasattr(t_err, "model_dump") else (t_err if isinstance(t_err, dict) else {"message": str(t_err)})
-                tool_errors.append({"tool": t_name, **err_dict})
-
-            exec_record = {
-                "tool_name": t_name,
-                "success": t_success,
-                "latency_ms": t_latency,
-            }
-            if t_err:
-                exec_record["error"] = t_err.model_dump() if hasattr(t_err, "model_dump") else t_err
-            tool_executions.append(exec_record)
-
-        # 2. Build structured messages from context package
-        messages = self.context_engine.builder.format_as_messages(context_package, task)
 
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
 
-        # 3. Create Run in 'queued' status with full context, retrieval, and tool telemetry
-        web_sources = [
-            {
-                "title": it.title,
-                "url": it.metadata.get("url"),
-                "source": it.metadata.get("source"),
-                "published_at": it.metadata.get("published_at"),
-                "snippet": it.content,
-            }
-            for it in context_package.items
-            if it.source_type == "web"
-        ]
+        # 2. Extract planning metadata for initial run snapshot
+        retrieval_meta = plan.metadata.get("retrieval_decision", {})
+        retrieval_required = retrieval_meta.get("retrieval_required", False)
+        raw_strat = retrieval_meta.get("strategy")
+        retrieval_strategy = raw_strat.value if hasattr(raw_strat, "value") else (str(raw_strat) if raw_strat else None)
+        raw_scope = retrieval_meta.get("scope")
+        retrieval_scope = raw_scope.value if hasattr(raw_scope, "value") else (str(raw_scope) if raw_scope else None)
+        retrieval_top_k = retrieval_meta.get("top_k")
+        retrieval_reason = retrieval_meta.get("reason")
+        retrieval_confidence = retrieval_meta.get("confidence")
 
-        input_snapshot = {
-            "model": model_name,
-            "temperature": request.temperature,
-            "max_context_tokens": max_context_tokens,
-            "retrieval_mode": decision_mode,
-            "retrieval_decision": {
-                "required": is_retrieval_required,
-                "strategy": decision_strategy,
-                "scope": decision_scope,
-                "top_k": decision_top_k,
-                "reason": decision_reason,
-                "confidence": decision_confidence,
-            },
-            "tool_config": {
-                "tool_mode": request.tool_mode,
-                "tools_enabled": request.tools_enabled,
-                "enable_web_search": request.enable_web_search,
-            },
-            "context_summary": {
-                "item_count": context_package.total_items,
-                "estimated_tokens": context_package.estimated_tokens,
-                "sources": context_package.sources,
-                "truncated": context_package.truncated,
-                "dropped_items": context_package.dropped_items_count,
-            },
-            "web_sources": web_sources,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-        }
+        retrieval_steps = [s for s in plan.steps if s.type == StepType.RETRIEVE]
+        retrieval_strategies = [s.strategy for s in retrieval_steps if s.strategy]
 
+        tool_steps = [s for s in plan.steps if s.type == StepType.TOOL]
+        tools_planned = [s.tool for s in tool_steps if s.tool]
+
+        plan_json = plan.model_dump(mode="json")
+
+        # 3. Create initial Run in 'running' status
+        start_time = time.perf_counter()
         run = Run(
             task_id=task.id,
-            status=RunStatus.QUEUED.value,
+            status=RunStatus.RUNNING.value,
             model_provider=provider.provider_id,
             model_name=model_name,
-            input_snapshot=input_snapshot,
-            context_item_count=context_package.total_items,
-            estimated_context_tokens=context_package.estimated_tokens,
-            context_truncated=context_package.truncated,
-            context_sources=context_package.sources,
-            retrieval_enabled=is_retrieval_required,
-            retrieved_chunk_count=ret_chunk_count if is_retrieval_required else 0,
-            retrieval_latency_ms=ret_latency if is_retrieval_required else 0,
-            retrieval_sources=ret_sources if is_retrieval_required else None,
-            retrieval_mode=decision_mode,
-            retrieval_required=is_retrieval_required,
-            retrieval_strategy=decision_strategy,
-            retrieval_scope=decision_scope,
-            retrieval_top_k=decision_top_k,
-            retrieval_reason=decision_reason,
-            retrieval_confidence=decision_confidence,
-            tools_used=tools_used if tools_used else None,
-            tool_call_count=tool_call_count,
-            tool_latency_ms=tool_latency_total,
-            tool_errors=tool_errors if tool_errors else None,
-            tool_executions=tool_executions if tool_executions else None,
+            final_model=model_name,
+            input_snapshot={
+                "model": model_name,
+                "temperature": request.temperature,
+                "max_context_tokens": request.max_context_tokens or 8000,
+                "execution_plan": plan_json,
+                "plan_reason": plan.plan_reason,
+            },
+            execution_plan=plan_json,
+            retrieval_enabled=retrieval_required,
+            retrieval_mode=request.retrieval_mode or "auto",
+            retrieval_required=retrieval_required,
+            retrieval_strategy=retrieval_strategy,
+            retrieval_scope=retrieval_scope,
+            retrieval_top_k=retrieval_top_k,
+            retrieval_reason=retrieval_reason,
+            retrieval_confidence=retrieval_confidence,
+            retrieval_strategies=retrieval_strategies if retrieval_strategies else None,
+            tools_used=tools_planned if tools_planned else None,
+            started_at=datetime.now(timezone.utc),
         )
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
 
-        # 4. Transition Run to 'running'
-        start_time = time.perf_counter()
-        run.status = RunStatus.RUNNING.value
-        run.started_at = datetime.now(timezone.utc)
-        await self.session.flush()
-
-        llm_request = LLMGenerateRequest(
-            model=model_name,
-            messages=messages,
-            temperature=request.temperature,
-        )
-
+        # 4. Execute Orchestration Plan
         try:
-            logger.info(
-                f"[TaskExecution] Invoking model '{model_name}' for task '{task.id}' "
-                f"(run '{run.id}', context_items={context_package.total_items}, "
-                f"context_tokens={context_package.estimated_tokens}, retrieval={is_retrieval_required}, "
-                f"tools={tools_used})"
+            state = await self.orchestrator.executor.execute(
+                task=task,
+                plan=plan,
+                user=user,
+                session=self.session,
             )
-            response = await provider.generate(llm_request)
-            latency_ms = int((time.perf_counter() - start_time) * 1000)
 
-            # 5. Persist completed Run
+            # 5. Harvest execution state telemetry
+            tools_used = []
+            tool_call_count = len(state.tool_results)
+            tool_latency_total = 0
+            tool_errors = []
+            tool_executions = []
+
+            for tr in state.tool_results:
+                t_name = tr.get("tool_name", "unknown")
+                if t_name not in tools_used:
+                    tools_used.append(t_name)
+                t_lat = tr.get("latency_ms", 0)
+                tool_latency_total += t_lat
+                t_succ = tr.get("success", True)
+                t_err = tr.get("error")
+                if not t_succ and t_err:
+                    tool_errors.append({"tool": t_name, "error": t_err})
+                tool_executions.append({
+                    "tool_name": t_name,
+                    "success": t_succ,
+                    "latency_ms": t_lat,
+                    "error": t_err,
+                })
+
+            # Harvest web sources for UI transparency
+            web_sources = []
+            for it in state.context_items:
+                if it.get("source_type") == "web":
+                    meta = it.get("metadata", {})
+                    web_sources.append({
+                        "title": it.get("title"),
+                        "url": meta.get("url"),
+                        "source": meta.get("source"),
+                        "published_at": meta.get("published_at"),
+                        "snippet": it.get("content"),
+                    })
+
+            # Context & Retrieval telemetry
+            ctx_meta = state.metadata.get("context_package", {})
             run.status = RunStatus.COMPLETED.value
-            run.output_content = response.content
-            run.latency_ms = latency_ms
+            run.output_content = state.generated_output
+            run.latency_ms = state.elapsed_time_ms
+            run.orchestration_duration_ms = state.elapsed_time_ms
+            run.step_count = len(state.step_records)
+            run.execution_steps = [r.model_dump(mode="json") for r in state.step_records]
+            run.context_item_count = len(state.context_items)
+            run.context_sources = list(set(it.get("source_type", "task") for it in state.context_items))
+            run.estimated_context_tokens = ctx_meta.get("estimated_tokens", 0)
+            run.context_truncated = ctx_meta.get("truncated", False)
+            run.retrieved_chunk_count = len(state.retrieval_results)
+            run.retrieval_sources = state.metadata.get("retrieval_sources")
+            run.retrieval_latency_ms = sum(r.duration_ms for r in state.step_records if r.step_type == "retrieve") if state.retrieval_results else None
+            run.input_tokens = state.token_usage.get("input_tokens", 0)
+            run.output_tokens = state.token_usage.get("output_tokens", 0)
+            run.total_tokens = state.token_usage.get("total_tokens", 0)
+            run.tools_used = tools_used if tools_used else None
+            run.tool_call_count = tool_call_count
+            run.tool_latency_ms = tool_latency_total
+            run.tool_errors = tool_errors if tool_errors else None
+            run.tool_executions = tool_executions if tool_executions else None
+
+            # Input snapshot update with web sources and context summary
+            snap = dict(run.input_snapshot) if run.input_snapshot else {}
+            snap["web_sources"] = web_sources
+            snap["context_summary"] = {
+                "item_count": run.context_item_count,
+                "estimated_tokens": run.estimated_context_tokens,
+                "truncated": run.context_truncated,
+                "sources": run.context_sources,
+            }
+            run.input_snapshot = snap
+
+            # Auto-mark task completed if not draft
+            if task.status != TaskStatus.DRAFT.value:
+                task.status = TaskStatus.COMPLETED.value
+                self.session.add(task)
+
             run.completed_at = datetime.now(timezone.utc)
-
-            if response.usage:
-                run.input_tokens = response.usage.input_tokens
-                run.output_tokens = response.usage.output_tokens
-                run.total_tokens = response.usage.total_tokens
-
-            # Update task status to active if still draft
-            if task.status == TaskStatus.DRAFT.value:
-                task.status = TaskStatus.ACTIVE.value
-
-            await self.session.commit()
+            await self.session.flush()
             await self.session.refresh(run)
+
             return run
 
-        except Exception as e:
-            latency_ms = int((time.perf_counter() - start_time) * 1000)
-            logger.error(f"[TaskExecution] Execution failed for run '{run.id}': {str(e)}")
-
+        except Exception as exc:
             run.status = RunStatus.FAILED.value
-            run.error_message = str(e)
-            run.latency_ms = latency_ms
+            run.error_message = str(exc)
             run.completed_at = datetime.now(timezone.utc)
-
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+            run.latency_ms = elapsed_ms
+            run.orchestration_duration_ms = elapsed_ms
             await self.session.commit()
-            await self.session.refresh(run)
-            raise
+            raise exc
 
     async def execute_task_stream(
         self,
@@ -293,266 +255,135 @@ class TaskExecutionService:
     ) -> AsyncIterator[str]:
         """
         Executes a task with Server-Sent Events (SSE) streaming while persisting the Run.
-        Context is gathered, normalized, and budget-enforced by the ContextEngine across all active providers (RAG, Web, Task, Manual).
         """
         task = await self.task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
-
         prompt_check = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
         if not prompt_check:
-            raise InvalidStateError("Task has no instructions, description, or title to execute.")
-
-        # 1. Gather & package context via ContextEngine
-        max_context_tokens = request.max_context_tokens or 8000
-        retrieval_telemetry = {}
-        tool_telemetry_list = []
-
-        def _on_retrieval_telemetry(data):
-            if isinstance(data, dict):
-                retrieval_telemetry["decision"] = data.get("decision")
-                retrieval_telemetry["result"] = data.get("result")
-            else:
-                retrieval_telemetry["result"] = data
-
-        def _on_tool_telemetry(data):
-            if data:
-                tool_telemetry_list.append(data)
-
-        context_package = await self.context_engine.build_context(
-            task=task,
-            session=self.session,
-            max_context_tokens=max_context_tokens,
-            retrieval_mode=request.retrieval_mode,
-            retrieval_strategy=request.retrieval_strategy,
-            retrieval_scope=request.retrieval_scope,
-            retrieval_top_k=request.retrieval_top_k,
-            query=request.query,
-            retrieval_enabled=request.retrieval_enabled,
-            retrieval_project_scope=request.retrieval_project_scope,
-            retrieval_telemetry_callback=_on_retrieval_telemetry,
-            tool_mode=request.tool_mode,
-            tools_enabled=request.tools_enabled,
-            enable_web_search=request.enable_web_search,
-            web_search_query=request.web_search_query,
-            web_search_limit=request.web_search_limit,
-            web_search_recency_days=request.web_search_recency_days,
-            user=user,
-            tool_telemetry_callback=_on_tool_telemetry,
-        )
-
-        ret_decision = retrieval_telemetry.get("decision")
-        ret_res = retrieval_telemetry.get("result")
-        ret_sources = None
-        ret_chunk_count = 0
-        ret_latency = 0
-        if ret_res:
-            ret_chunk_count = len(ret_res.candidates)
-            ret_latency = ret_res.retrieval_latency_ms
-            ret_sources = [
-                {
-                    "document_id": str(c.document_id),
-                    "chunk_id": str(c.chunk_id),
-                    "filename": c.filename,
-                    "page_number": c.page_number,
-                    "score": round(c.rerank_score or c.fusion_score, 4),
-                    "vector_score": round(c.vector_score, 4) if c.vector_score is not None else None,
-                    "keyword_score": round(c.keyword_score, 4) if c.keyword_score is not None else None,
-                }
-                for c in ret_res.candidates
-            ]
-
-        is_retrieval_required = ret_decision.retrieval_required if ret_decision else bool(request.retrieval_enabled)
-        decision_strategy = ret_decision.strategy.value if ret_decision else (request.retrieval_strategy or "hybrid")
-        decision_scope = ret_decision.scope.value if ret_decision else ("project" if request.retrieval_project_scope else "workspace")
-        decision_top_k = ret_decision.top_k if ret_decision else (request.retrieval_top_k or 8)
-        decision_reason = ret_decision.reason if ret_decision else None
-        decision_confidence = ret_decision.confidence if ret_decision else None
-        decision_mode = request.retrieval_mode or ("always" if request.retrieval_enabled else "auto")
-
-        # Extract tool telemetry (Step 9)
-        tools_used = []
-        tool_call_count = len(tool_telemetry_list)
-        tool_latency_total = 0
-        tool_errors = []
-        tool_executions = []
-
-        for t in tool_telemetry_list:
-            t_name = getattr(t, "tool_name", None) or (t.get("tool_name") if isinstance(t, dict) else "unknown")
-            if t_name not in tools_used:
-                tools_used.append(t_name)
-            t_latency = getattr(t, "latency_ms", 0) or (t.get("latency_ms", 0) if isinstance(t, dict) else 0)
-            tool_latency_total += t_latency
-            t_success = getattr(t, "success", True) if not isinstance(t, dict) else t.get("success", True)
-            t_err = getattr(t, "error", None) or (t.get("error") if isinstance(t, dict) else None)
-
-            if not t_success and t_err:
-                err_dict = t_err.model_dump() if hasattr(t_err, "model_dump") else (t_err if isinstance(t_err, dict) else {"message": str(t_err)})
-                tool_errors.append({"tool": t_name, **err_dict})
-
-            exec_record = {
-                "tool_name": t_name,
-                "success": t_success,
-                "latency_ms": t_latency,
-            }
-            if t_err:
-                exec_record["error"] = t_err.model_dump() if hasattr(t_err, "model_dump") else t_err
-            tool_executions.append(exec_record)
-
-        # 2. Build structured messages from context package
-        messages = self.context_engine.builder.format_as_messages(context_package, task)
+            yield f"data: {json.dumps({'type': 'error', 'error': 'Task has no instructions, description, or title.'})}\n\n"
+            return
 
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
 
-        web_sources = [
-            {
-                "title": it.title,
-                "url": it.metadata.get("url"),
-                "source": it.metadata.get("source"),
-                "published_at": it.metadata.get("published_at"),
-                "snippet": it.content,
-            }
-            for it in context_package.items
-            if it.source_type == "web"
-        ]
+        # 1. Generate & Validate Plan
+        try:
+            plan = await self.orchestrator.plan_task(
+                task=task,
+                request=request,
+                user=user,
+                session=self.session,
+            )
+        except Exception as plan_err:
+            yield f"data: {json.dumps({'type': 'error', 'error': {'code': 'PLAN_ERROR', 'message': str(plan_err)}})}\n\n"
+            return
 
-        input_snapshot = {
-            "model": model_name,
-            "temperature": request.temperature,
-            "max_context_tokens": max_context_tokens,
-            "retrieval_mode": decision_mode,
-            "retrieval_decision": {
-                "required": is_retrieval_required,
-                "strategy": decision_strategy,
-                "scope": decision_scope,
-                "top_k": decision_top_k,
-                "reason": decision_reason,
-                "confidence": decision_confidence,
-            },
-            "tool_config": {
-                "tool_mode": request.tool_mode,
-                "tools_enabled": request.tools_enabled,
-                "enable_web_search": request.enable_web_search,
-            },
-            "context_summary": {
-                "item_count": context_package.total_items,
-                "estimated_tokens": context_package.estimated_tokens,
-                "sources": context_package.sources,
-                "truncated": context_package.truncated,
-                "dropped_items": context_package.dropped_items_count,
-            },
-            "web_sources": web_sources,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-        }
+        retrieval_meta = plan.metadata.get("retrieval_decision", {})
+        retrieval_required = retrieval_meta.get("retrieval_required", False)
+        raw_strat = retrieval_meta.get("strategy")
+        retrieval_strategy = raw_strat.value if hasattr(raw_strat, "value") else (str(raw_strat) if raw_strat else None)
+        raw_scope = retrieval_meta.get("scope")
+        retrieval_scope = raw_scope.value if hasattr(raw_scope, "value") else (str(raw_scope) if raw_scope else None)
+        plan_json = plan.model_dump(mode="json")
 
-        # 3. Initialize Run in 'running' status with context, retrieval, and tool telemetry
+        # Pre-calculate initial context metadata for run_start event
+        init_items = []
+        task_prov = self.context_engine.get_provider("task_context")
+        if task_prov:
+            t_raw = await task_prov.collect(task, session=self.session)
+            init_items.extend(task_prov.normalize(t_raw))
+        man_prov = self.context_engine.get_provider("manual_context")
+        if man_prov:
+            m_raw = await man_prov.collect(task, session=self.session)
+            init_items.extend(man_prov.normalize(m_raw))
+
+        init_pkg = self.context_engine.builder.build(
+            raw_items=init_items,
+            budget=ContextBudget(max_context_tokens=request.max_context_tokens or 8000),
+        )
+
+        # 2. Create Run entity in DB
+        start_time = time.perf_counter()
         run = Run(
             task_id=task.id,
             status=RunStatus.RUNNING.value,
             model_provider=provider.provider_id,
             model_name=model_name,
-            input_snapshot=input_snapshot,
-            context_item_count=context_package.total_items,
-            estimated_context_tokens=context_package.estimated_tokens,
-            context_truncated=context_package.truncated,
-            context_sources=context_package.sources,
-            retrieval_enabled=is_retrieval_required,
-            retrieved_chunk_count=ret_chunk_count if is_retrieval_required else 0,
-            retrieval_latency_ms=ret_latency if is_retrieval_required else 0,
-            retrieval_sources=ret_sources if is_retrieval_required else None,
-            retrieval_mode=decision_mode,
-            retrieval_required=is_retrieval_required,
-            retrieval_strategy=decision_strategy,
-            retrieval_scope=decision_scope,
-            retrieval_top_k=decision_top_k,
-            retrieval_reason=decision_reason,
-            retrieval_confidence=decision_confidence,
-            tools_used=tools_used if tools_used else None,
-            tool_call_count=tool_call_count,
-            tool_latency_ms=tool_latency_total,
-            tool_errors=tool_errors if tool_errors else None,
-            tool_executions=tool_executions if tool_executions else None,
+            final_model=model_name,
+            execution_plan=plan_json,
+            retrieval_enabled=retrieval_required,
+            retrieval_mode=request.retrieval_mode or "auto",
+            retrieval_required=retrieval_required,
+            retrieval_strategy=retrieval_strategy,
+            retrieval_scope=retrieval_scope,
+            retrieval_top_k=retrieval_meta.get("top_k"),
+            retrieval_reason=retrieval_meta.get("reason"),
+            retrieval_confidence=retrieval_meta.get("confidence"),
+            tools_used=[s.tool for s in plan.steps if s.type == StepType.TOOL and s.tool],
             started_at=datetime.now(timezone.utc),
         )
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
 
-        # Notify frontend of run ID, context, retrieval decision, and tools telemetry immediately
-        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated, 'retrieval_enabled': is_retrieval_required, 'retrieval_strategy': decision_strategy, 'retrieval_scope': decision_scope, 'retrieval_confidence': decision_confidence, 'retrieval_reason': decision_reason, 'retrieved_chunk_count': ret_chunk_count, 'tools_used': tools_used, 'tool_call_count': tool_call_count, 'tool_latency_ms': tool_latency_total})}\n\n"
+        # Emit run_start
+        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'execution_plan': plan_json, 'tools_used': run.tools_used, 'retrieval_enabled': retrieval_required, 'context_item_count': init_pkg.total_items, 'estimated_context_tokens': init_pkg.estimated_tokens, 'context_truncated': init_pkg.truncated, 'context_sources': list(init_pkg.sources)})}\n\n"
 
-        llm_request = LLMGenerateRequest(
-            model=model_name,
-            messages=messages,
-            temperature=request.temperature,
-        )
-
-        start_time = time.perf_counter()
-        accumulated_chunks = []
-        final_usage = None
+        accumulated_output = ""
+        step_records_final = []
+        final_orch_state = None
 
         try:
-            async for chunk in provider.generate_stream(llm_request):
-                accumulated_chunks.append(chunk.content)
-                if chunk.usage:
-                    final_usage = chunk.usage
+            async for event in self.orchestrator.execute_task_stream(
+                task=task,
+                request=request,
+                user=user,
+                session=self.session,
+            ):
+                if event.get("type") == "chunk":
+                    accumulated_output += event.get("content", "")
+                elif event.get("type") == "step_completed" and event.get("step"):
+                    step_records_final.append(event.get("step"))
+                elif event.get("type") == "orchestration_completed" and event.get("state"):
+                    final_orch_state = event["state"]
+                    step_records_final = final_orch_state.get("step_records", step_records_final)
 
-                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk.content, 'is_finished': chunk.is_finished})}\n\n"
+                yield f"data: {json.dumps(event)}\n\n"
 
-            # Completed normally
-            latency_ms = int((time.perf_counter() - start_time) * 1000)
-            full_content = "".join(accumulated_chunks)
-
+            # Finalize run
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
             run.status = RunStatus.COMPLETED.value
-            run.output_content = full_content
-            run.latency_ms = latency_ms
+            run.output_content = accumulated_output
+            run.latency_ms = elapsed_ms
+            run.orchestration_duration_ms = elapsed_ms
+            run.step_count = len(step_records_final)
+            run.execution_steps = step_records_final
+
+            ctx_meta = final_orch_state.get("metadata", {}).get("context_package", {}) if final_orch_state else {}
+            tok_meta = final_orch_state.get("token_usage", {}) if final_orch_state else {}
+            run.estimated_context_tokens = ctx_meta.get("estimated_tokens", init_pkg.estimated_tokens)
+            run.context_truncated = ctx_meta.get("truncated", init_pkg.truncated)
+            run.context_item_count = len(final_orch_state.get("context_items", [])) if final_orch_state else init_pkg.total_items
+            run.context_sources = list(set(it.get("source_type", "task") for it in final_orch_state.get("context_items", []))) if final_orch_state else list(init_pkg.sources)
+            run.retrieved_chunk_count = len(final_orch_state.get("retrieval_results", [])) if final_orch_state else 0
+            run.retrieval_latency_ms = sum(r.get("duration_ms", 0) for r in step_records_final if r.get("step_type") == "retrieve") if run.retrieved_chunk_count else None
+            run.input_tokens = tok_meta.get("input_tokens")
+            run.output_tokens = tok_meta.get("output_tokens")
+            run.total_tokens = tok_meta.get("total_tokens")
+
             run.completed_at = datetime.now(timezone.utc)
-
-            if final_usage:
-                run.input_tokens = final_usage.input_tokens
-                run.output_tokens = final_usage.output_tokens
-                run.total_tokens = final_usage.total_tokens
-
-            if task.status == TaskStatus.DRAFT.value:
-                task.status = TaskStatus.ACTIVE.value
-
-            await self.session.commit()
+            await self.session.flush()
             await self.session.refresh(run)
 
-            # Send final run payload
-            final_payload = {
-                "type": "run_completed",
-                "run": RunResponse.model_validate(run).model_dump(mode="json"),
-            }
-            yield f"data: {json.dumps(final_payload)}\n\n"
+            yield f"data: {json.dumps({'type': 'run_completed', 'run': RunResponse.model_validate(run).model_dump(mode='json')})}\n\n"
             yield "data: [DONE]\n\n"
 
-        except (asyncio.CancelledError, GeneratorExit):
-            latency_ms = int((time.perf_counter() - start_time) * 1000)
-            logger.warning(f"[TaskExecution] Stream cancelled by client for run '{run.id}'")
-            run.status = RunStatus.CANCELLED.value
-            run.output_content = "".join(accumulated_chunks) or None
-            run.error_message = "Stream cancelled or interrupted by client"
-            run.latency_ms = latency_ms
-            run.completed_at = datetime.now(timezone.utc)
-            await self.session.commit()
-            raise
-
-        except Exception as e:
-            latency_ms = int((time.perf_counter() - start_time) * 1000)
-            logger.error(f"[TaskExecution] Stream error for run '{run.id}': {str(e)}")
+        except Exception as stream_err:
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
             run.status = RunStatus.FAILED.value
-            run.output_content = "".join(accumulated_chunks) or None
-            run.error_message = str(e)
-            run.latency_ms = latency_ms
+            run.error_message = str(stream_err)
+            run.latency_ms = elapsed_ms
+            run.orchestration_duration_ms = elapsed_ms
             run.completed_at = datetime.now(timezone.utc)
-            await self.session.commit()
-
-            error_payload = {
-                "type": "error",
-                "error": {
-                    "code": getattr(e, "code", "EXECUTION_ERROR"),
-                    "message": str(e),
-                },
-            }
-            yield f"data: {json.dumps(error_payload)}\n\n"
+            await self.session.flush()
+            yield f"data: {json.dumps({'type': 'error', 'error': {'message': str(stream_err)}})}\n\n"
             yield "data: [DONE]\n\n"

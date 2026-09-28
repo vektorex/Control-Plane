@@ -57,6 +57,10 @@ import {
   ExternalLink,
   Wrench,
   ShieldCheck,
+  ListOrdered,
+  Loader2,
+  XCircle,
+  Workflow,
 } from "lucide-react";
 
 export default function TaskWorkspacePage({ params: paramsProp }) {
@@ -110,10 +114,18 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [webSearchRecencyDays, setWebSearchRecencyDays] = useState("");
   const [availableTools, setAvailableTools] = useState([]);
 
+  // Step 10: Execution Plan Preview & Live Execution Steps state
+  const [executionPlan, setExecutionPlan] = useState(null);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(false);
+  const [planError, setPlanError] = useState(null);
+  const [liveSteps, setLiveSteps] = useState([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(null);
+
   // Retrieval Router Preview / Debug state (Step 8)
   const [previewDecision, setPreviewDecision] = useState(null);
   const [isPreviewingRetrieval, setIsPreviewingRetrieval] = useState(false);
   const [previewError, setPreviewError] = useState(null);
+
 
   // Execution & Run state
   const [activeRun, setActiveRun] = useState(null);
@@ -248,6 +260,61 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
   };
 
+  // Step 10: Preview Deterministic Execution Plan
+  const handlePreviewPlan = async () => {
+    if (!taskId) return;
+    try {
+      setIsLoadingPlan(true);
+      setPlanError(null);
+      // Auto-save updated instructions first
+      try {
+        await taskService.updateTask(taskId, {
+          title: title.trim(),
+          instructions: instructions.trim(),
+          context_text: contextText.trim() || null,
+        });
+      } catch {}
+
+      const payload = {
+        model: selectedModel || undefined,
+        temperature: Number(temperature),
+        max_context_tokens: Number(contextBudget),
+        retrieval_mode: retrievalMode,
+        retrieval_strategy: retrievalStrategy || undefined,
+        retrieval_scope: retrievalScope,
+        retrieval_top_k: Number(retrievalTopK),
+        retrieval_project_scope: retrievalScope === "project",
+        enable_web_search: enableWebSearch,
+        web_search_query: webSearchQuery.trim() || undefined,
+        web_search_limit: Number(webSearchLimit) || 5,
+        web_search_recency_days: webSearchRecencyDays ? Number(webSearchRecencyDays) : undefined,
+        tool_mode: enableWebSearch ? "enabled" : "disabled",
+        tools_enabled: enableWebSearch ? ["web_search"] : [],
+      };
+
+      const plan = await taskService.planTask(taskId, payload);
+      setExecutionPlan(plan);
+      if (plan?.steps) {
+        setLiveSteps(
+          plan.steps.map((st, idx) => ({
+            id: st.id,
+            step_index: idx + 1,
+            step_type: st.type,
+            status: "pending",
+            tool_name: st.tool,
+            retrieval_strategy: st.strategy,
+            model: st.model,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("[TaskWorkspace] Error previewing plan:", err);
+      setPlanError(err.message || "Failed to generate execution plan");
+    } finally {
+      setIsLoadingPlan(false);
+    }
+  };
+
   const loadAvailableTools = async () => {
     try {
       const res = await toolService.listTools();
@@ -368,7 +435,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     setIsRunning(false);
   };
 
-  // Run Task Execution
+  // Run Task Execution (Step 10 Orchestrator Pipeline)
   const handleExecuteTask = async (e) => {
     e?.preventDefault();
     if (!taskId || !selectedModel) return;
@@ -394,6 +461,23 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     setIsRunning(true);
     setElapsedMs(0);
     setActiveRun(null);
+
+    // Initial temporary steps placeholder
+    if (executionPlan?.steps) {
+      setLiveSteps(
+        executionPlan.steps.map((st, idx) => ({
+          id: st.id,
+          step_index: idx + 1,
+          step_type: st.type,
+          status: "pending",
+          tool_name: st.tool,
+          retrieval_strategy: st.strategy,
+          model: st.model,
+        }))
+      );
+    } else {
+      setLiveSteps([]);
+    }
 
     const startTime = Date.now();
     timerRef.current = setInterval(() => {
@@ -447,12 +531,65 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             created_at: new Date().toISOString(),
           });
         },
+        onPlanGenerated: (plan) => {
+          setExecutionPlan(plan);
+          if (plan?.steps) {
+            setLiveSteps(
+              plan.steps.map((st, idx) => ({
+                id: st.id,
+                step_index: idx + 1,
+                step_type: st.type,
+                status: idx === 0 ? "running" : "pending",
+                tool_name: st.tool,
+                retrieval_strategy: st.strategy,
+                model: st.model,
+              }))
+            );
+          }
+        },
+        onStepStart: (stepRecord) => {
+          setLiveSteps((prev) => {
+            const exists = prev.some((s) => s.id === stepRecord.id);
+            if (exists) {
+              return prev.map((s) =>
+                s.id === stepRecord.id
+                  ? { ...s, ...stepRecord, status: "running" }
+                  : s
+              );
+            }
+            return [...prev, { ...stepRecord, status: "running" }];
+          });
+        },
+        onStepCompleted: (stepRecord) => {
+          setLiveSteps((prev) =>
+            prev.map((s) =>
+              s.id === stepRecord.id
+                ? { ...s, ...stepRecord, status: "completed" }
+                : s
+            )
+          );
+        },
+        onStepFailed: (stepRecord) => {
+          setLiveSteps((prev) =>
+            prev.map((s) =>
+              s.id === stepRecord.id
+                ? { ...s, ...stepRecord, status: "failed" }
+                : s
+            )
+          );
+        },
         onChunk: (delta) => {
           accumulated += delta;
           setOutputStream(accumulated);
         },
         onRunCompleted: (completedRun) => {
           setActiveRun(completedRun);
+          if (completedRun.execution_plan) {
+            setExecutionPlan(completedRun.execution_plan);
+          }
+          if (completedRun.execution_steps) {
+            setLiveSteps(completedRun.execution_steps);
+          }
           setOutputStream(completedRun.output_content || accumulated);
           fetchTaskRuns();
         },
@@ -471,6 +608,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       try {
         const completedRun = await taskService.executeTask(taskId, runPayload);
         setActiveRun(completedRun);
+        if (completedRun.execution_plan) {
+          setExecutionPlan(completedRun.execution_plan);
+        }
+        if (completedRun.execution_steps) {
+          setLiveSteps(completedRun.execution_steps);
+        }
         setOutputStream(completedRun.output_content || "");
         await fetchTaskRuns();
       } catch (err) {
@@ -487,6 +630,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     setActiveRun(run);
     setOutputStream(run.output_content || "");
     setExecutionError(run.error_message || null);
+    if (run.execution_plan) {
+      setExecutionPlan(run.execution_plan);
+    }
+    if (run.execution_steps) {
+      setLiveSteps(run.execution_steps);
+    }
   };
 
   const handleCopy = () => {
@@ -495,6 +644,42 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const getStepDisplayName = (step) => {
+    const type = step?.step_type || step?.type;
+    switch (type) {
+      case "retrieve":
+        return `Search Project Knowledge (${step.retrieval_strategy || step.strategy || "Hybrid"})`;
+      case "tool":
+        if (step.tool_name === "web_search" || step.tool === "web_search") {
+          return "Search Web";
+        }
+        return `Tool: ${step.tool_name || step.tool || "External Tool"}`;
+      case "context":
+        return "Assemble Context";
+      case "generate":
+        return `Generate Answer (${step.model || selectedModel || "LLM"})`;
+      default:
+        return type || "Step";
+    }
+  };
+
+  const getStepIcon = (step) => {
+    const type = step?.step_type || step?.type;
+    switch (type) {
+      case "retrieve":
+        return <Search className="w-3.5 h-3.5 text-indigo-400" />;
+      case "tool":
+        return <Globe className="w-3.5 h-3.5 text-emerald-400" />;
+      case "context":
+        return <Layers className="w-3.5 h-3.5 text-purple-400" />;
+      case "generate":
+        return <Sparkles className="w-3.5 h-3.5 text-cyan-400" />;
+      default:
+        return <Workflow className="w-3.5 h-3.5 text-slate-400" />;
+    }
+  };
+
 
   const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
@@ -1024,6 +1209,73 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   </div>
                 </div>
 
+                {/* Step 10: Execution Plan Preview Card */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/25 space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Workflow className="w-4 h-4 text-cyan-400" />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-100 block">
+                          Execution Plan
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Deterministic orchestration pipeline
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={handlePreviewPlan}
+                      disabled={isLoadingPlan}
+                      className="text-[11px] text-cyan-300 hover:text-cyan-100"
+                    >
+                      {isLoadingPlan ? "Planning..." : executionPlan ? "Refresh Plan" : "Preview Plan"}
+                    </Button>
+                  </div>
+
+                  {executionPlan && (
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pb-1 border-b border-slate-800">
+                        <span>
+                          Planned Steps: <strong className="text-white font-mono">{executionPlan.steps?.length || 0}</strong>
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-400">Deterministic • Max 10</span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {executionPlan.steps?.map((step, idx) => (
+                          <div
+                            key={step.id || idx}
+                            className="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2 text-xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono text-cyan-400 font-bold text-[11px]">
+                                {idx + 1}.
+                              </span>
+                              {getStepIcon(step)}
+                              <span className="font-medium text-slate-200 truncate">
+                                {getStepDisplayName(step)}
+                              </span>
+                            </div>
+                            <div className="shrink-0 flex items-center gap-1">
+                              <Badge variant="outline" className="text-[10px] capitalize font-mono">
+                                {step.type}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {planError && (
+                    <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-[11px]">
+                      {planError}
+                    </div>
+                  )}
+                </div>
+
                 {/* SSE Streaming Toggle */}
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
                   <div className="text-xs">
@@ -1060,12 +1312,13 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                     disabled={(!instructions.trim() && !task?.instructions) || !selectedModel}
                     className="w-full shadow-md shadow-indigo-900/30"
                   >
-                    Run Task with Context Engine
+                    Run Task with Orchestrator
                   </Button>
                 )}
               </div>
             </CardContent>
           </Card>
+
 
           {/* Context Management Section (Step 6) */}
           <Card>
@@ -1229,6 +1482,78 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
 
             {/* Live Response Content Viewport */}
             <CardContent className="flex-1 p-4 bg-slate-950/90 font-mono text-xs overflow-y-auto flex flex-col justify-between">
+              {/* Step 10: Orchestration Execution Step Tracker */}
+              {(isRunning || (liveSteps && liveSteps.length > 0)) && (
+                <div className="mb-4 p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-semibold text-slate-200 text-xs">
+                      <Workflow className="w-4 h-4 text-cyan-400" />
+                      <span>Orchestration Execution</span>
+                      {isRunning ? (
+                        <Badge variant="info" dot>Running</Badge>
+                      ) : activeRun?.failed_step ? (
+                        <Badge variant="destructive" dot>Failed at {activeRun.failed_step}</Badge>
+                      ) : (
+                        <Badge variant="success" dot>Completed</Badge>
+                      )}
+                    </div>
+                    {activeRun?.orchestration_duration_ms ? (
+                      <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
+                        Orchestration: {activeRun.orchestration_duration_ms}ms
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
+                    {liveSteps.map((step, idx) => {
+                      const isRunningStep = isRunning && step.status === "running";
+                      const isCompletedStep = step.status === "completed";
+                      const isFailedStep = step.status === "failed";
+
+                      let statusIcon = <Clock className="w-3.5 h-3.5 text-slate-500" />;
+                      let cardBg = "bg-slate-950/80 border-slate-800 text-slate-400";
+
+                      if (isRunningStep) {
+                        statusIcon = <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />;
+                        cardBg = "bg-indigo-950/60 border-indigo-500/60 text-indigo-200 shadow-sm ring-1 ring-indigo-500/20";
+                      } else if (isCompletedStep) {
+                        statusIcon = <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />;
+                        cardBg = "bg-emerald-950/30 border-emerald-800/50 text-emerald-200";
+                      } else if (isFailedStep) {
+                        statusIcon = <XCircle className="w-3.5 h-3.5 text-rose-400" />;
+                        cardBg = "bg-rose-950/40 border-rose-800/60 text-rose-200";
+                      }
+
+                      return (
+                        <div
+                          key={step.id || idx}
+                          className={`p-2.5 rounded-lg border text-xs font-mono flex items-start gap-2.5 transition-all ${cardBg}`}
+                        >
+                          <span className="shrink-0 mt-0.5">{statusIcon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-semibold truncate">
+                                {getStepDisplayName(step)}
+                              </span>
+                              {step.duration_ms !== null && step.duration_ms !== undefined && (
+                                <span className="text-[10px] text-slate-400 shrink-0">
+                                  {step.duration_ms}ms
+                                </span>
+                              )}
+                            </div>
+                            {step.error_message && (
+                              <p className="text-[10px] text-rose-400 mt-1 line-clamp-2">
+                                {step.error_message}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {outputStream ? (
                 <div className="text-slate-100 whitespace-pre-wrap leading-relaxed">
                   {outputStream}
@@ -1244,9 +1569,10 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
               ) : (
                 <div className="flex flex-col items-center justify-center flex-1 py-16 text-slate-500 space-y-2">
                   <Terminal className="w-8 h-8 text-slate-700" />
-                  <span className="text-xs">Click &apos;Run Task with Context Engine&apos; to execute this task</span>
+                  <span className="text-xs">Click &apos;Run Task with Orchestrator&apos; to execute this task</span>
                 </div>
               )}
+
 
               {/* Step 8: Retrieval Decision Observability Panel */}
               {activeRun && (
@@ -1427,6 +1753,16 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         Model: <strong className="text-cyan-400">{activeRun.model_name}</strong>
                       </span>
                     )}
+                    {activeRun.step_count !== null && activeRun.step_count !== undefined && (
+                      <span>
+                        • Steps: <strong className="text-purple-300">{activeRun.step_count}</strong>
+                      </span>
+                    )}
+                    {activeRun.orchestration_duration_ms !== null && activeRun.orchestration_duration_ms !== undefined && (
+                      <span>
+                        • Orchestration: <strong className="text-cyan-300">{activeRun.orchestration_duration_ms}ms</strong>
+                      </span>
+                    )}
                     {activeRun.tools_used && activeRun.tools_used.length > 0 && (
                       <span>
                         • Tools: <strong className="text-emerald-400">{activeRun.tools_used.join(", ")}</strong>
@@ -1442,7 +1778,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                       </span>
                     )}
                     {activeRun.latency_ms !== null && activeRun.latency_ms !== undefined && (
-                      <span>• Latency: <strong className="text-emerald-400">{activeRun.latency_ms}ms</strong></span>
+                      <span>• Total Latency: <strong className="text-emerald-400">{activeRun.latency_ms}ms</strong></span>
                     )}
                     {activeRun.total_tokens !== null && activeRun.total_tokens !== undefined && (
                       <span>• Tokens: <strong className="text-indigo-300">{activeRun.total_tokens}</strong> (in: {activeRun.input_tokens || 0}, out: {activeRun.output_tokens || 0})</span>
@@ -1620,9 +1956,20 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                           {run.tools_used.join(", ")}
                         </Badge>
                       )}
+                      {(run.step_count || run.execution_steps?.length) && (
+                        <Badge variant="outline" className="text-[10px] text-cyan-300 border-cyan-800/40 hidden md:inline-flex">
+                          {run.step_count || run.execution_steps?.length} steps
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400">
+                      {run.orchestration_duration_ms !== null && run.orchestration_duration_ms !== undefined && (
+                        <span className="text-cyan-300 flex items-center gap-1 hidden lg:inline-flex">
+                          <Workflow className="w-3 h-3 text-cyan-400" />
+                          {run.orchestration_duration_ms}ms orch
+                        </span>
+                      )}
                       {run.context_item_count !== null && run.context_item_count !== undefined && (
                         <span className="text-indigo-300 flex items-center gap-1">
                           <Layers className="w-3 h-3 text-indigo-400" />
@@ -1649,6 +1996,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   </div>
                 );
               })}
+
             </div>
           )}
         </CardContent>

@@ -87,7 +87,14 @@ class Settings(BaseSettings):
     WEB_SEARCH_TIMEOUT_SECONDS: float = 10.0
     MAX_TOOL_CALLS_PER_TASK: int = 5
 
+    # Step 10: Orchestration Engine Limits & Settings
+    MAX_PLAN_STEPS: int = 10
+    MAX_TOOL_CALLS_PER_PLAN: int = 5
+    MAX_RETRIEVAL_CALLS_PER_PLAN: int = 3
+    MAX_EXECUTION_TIME_SECONDS: float = 60.0
+
 
 settings = Settings()
+
 
 

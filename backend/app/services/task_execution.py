@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, List, Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +24,7 @@ from backend.app.services.llm.factory import LLMProviderFactory
 class TaskExecutionService:
     """
     Service responsible for turning a Task entity into an AI request via the Context Engine,
-    orchestrating provider invocation, and persisting execution runs with full context telemetry.
+    orchestrating provider invocation, tools, and persisting execution runs with full context telemetry.
     """
 
     def __init__(
@@ -47,7 +47,7 @@ class TaskExecutionService:
     ) -> Run:
         """
         Executes a task synchronously against the LLM abstraction and records the run outcome.
-        Context is gathered, normalized, and budget-enforced by the ContextEngine.
+        Context is gathered, normalized, and budget-enforced by the ContextEngine across all active providers (RAG, Web, Task, Manual).
         """
         task = await self.task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
 
@@ -58,6 +58,7 @@ class TaskExecutionService:
         # 1. Gather & package context via ContextEngine
         max_context_tokens = request.max_context_tokens or 8000
         retrieval_telemetry = {}
+        tool_telemetry_list = []
 
         def _on_retrieval_telemetry(data):
             if isinstance(data, dict):
@@ -65,6 +66,10 @@ class TaskExecutionService:
                 retrieval_telemetry["result"] = data.get("result")
             else:
                 retrieval_telemetry["result"] = data
+
+        def _on_tool_telemetry(data):
+            if data:
+                tool_telemetry_list.append(data)
 
         context_package = await self.context_engine.build_context(
             task=task,
@@ -78,6 +83,14 @@ class TaskExecutionService:
             retrieval_enabled=request.retrieval_enabled,
             retrieval_project_scope=request.retrieval_project_scope,
             retrieval_telemetry_callback=_on_retrieval_telemetry,
+            tool_mode=request.tool_mode,
+            tools_enabled=request.tools_enabled,
+            enable_web_search=request.enable_web_search,
+            web_search_query=request.web_search_query,
+            web_search_limit=request.web_search_limit,
+            web_search_recency_days=request.web_search_recency_days,
+            user=user,
+            tool_telemetry_callback=_on_tool_telemetry,
         )
 
         ret_decision = retrieval_telemetry.get("decision")
@@ -110,13 +123,54 @@ class TaskExecutionService:
         decision_confidence = ret_decision.confidence if ret_decision else None
         decision_mode = request.retrieval_mode or ("always" if request.retrieval_enabled else "auto")
 
+        # Extract tool telemetry (Step 9)
+        tools_used = []
+        tool_call_count = len(tool_telemetry_list)
+        tool_latency_total = 0
+        tool_errors = []
+        tool_executions = []
+
+        for t in tool_telemetry_list:
+            t_name = getattr(t, "tool_name", None) or (t.get("tool_name") if isinstance(t, dict) else "unknown")
+            if t_name not in tools_used:
+                tools_used.append(t_name)
+            t_latency = getattr(t, "latency_ms", 0) or (t.get("latency_ms", 0) if isinstance(t, dict) else 0)
+            tool_latency_total += t_latency
+            t_success = getattr(t, "success", True) if not isinstance(t, dict) else t.get("success", True)
+            t_err = getattr(t, "error", None) or (t.get("error") if isinstance(t, dict) else None)
+
+            if not t_success and t_err:
+                err_dict = t_err.model_dump() if hasattr(t_err, "model_dump") else (t_err if isinstance(t_err, dict) else {"message": str(t_err)})
+                tool_errors.append({"tool": t_name, **err_dict})
+
+            exec_record = {
+                "tool_name": t_name,
+                "success": t_success,
+                "latency_ms": t_latency,
+            }
+            if t_err:
+                exec_record["error"] = t_err.model_dump() if hasattr(t_err, "model_dump") else t_err
+            tool_executions.append(exec_record)
+
         # 2. Build structured messages from context package
         messages = self.context_engine.builder.format_as_messages(context_package, task)
 
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
 
-        # 3. Create Run in 'queued' status with full context and retrieval decision telemetry
+        # 3. Create Run in 'queued' status with full context, retrieval, and tool telemetry
+        web_sources = [
+            {
+                "title": it.title,
+                "url": it.metadata.get("url"),
+                "source": it.metadata.get("source"),
+                "published_at": it.metadata.get("published_at"),
+                "snippet": it.content,
+            }
+            for it in context_package.items
+            if it.source_type == "web"
+        ]
+
         input_snapshot = {
             "model": model_name,
             "temperature": request.temperature,
@@ -130,6 +184,11 @@ class TaskExecutionService:
                 "reason": decision_reason,
                 "confidence": decision_confidence,
             },
+            "tool_config": {
+                "tool_mode": request.tool_mode,
+                "tools_enabled": request.tools_enabled,
+                "enable_web_search": request.enable_web_search,
+            },
             "context_summary": {
                 "item_count": context_package.total_items,
                 "estimated_tokens": context_package.estimated_tokens,
@@ -137,6 +196,7 @@ class TaskExecutionService:
                 "truncated": context_package.truncated,
                 "dropped_items": context_package.dropped_items_count,
             },
+            "web_sources": web_sources,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
 
@@ -161,6 +221,11 @@ class TaskExecutionService:
             retrieval_top_k=decision_top_k,
             retrieval_reason=decision_reason,
             retrieval_confidence=decision_confidence,
+            tools_used=tools_used if tools_used else None,
+            tool_call_count=tool_call_count,
+            tool_latency_ms=tool_latency_total,
+            tool_errors=tool_errors if tool_errors else None,
+            tool_executions=tool_executions if tool_executions else None,
         )
         self.session.add(run)
         await self.session.flush()
@@ -182,7 +247,8 @@ class TaskExecutionService:
             logger.info(
                 f"[TaskExecution] Invoking model '{model_name}' for task '{task.id}' "
                 f"(run '{run.id}', context_items={context_package.total_items}, "
-                f"context_tokens={context_package.estimated_tokens}, retrieval={is_retrieval_required})"
+                f"context_tokens={context_package.estimated_tokens}, retrieval={is_retrieval_required}, "
+                f"tools={tools_used})"
             )
             response = await provider.generate(llm_request)
             latency_ms = int((time.perf_counter() - start_time) * 1000)
@@ -227,7 +293,7 @@ class TaskExecutionService:
     ) -> AsyncIterator[str]:
         """
         Executes a task with Server-Sent Events (SSE) streaming while persisting the Run.
-        Context is gathered, normalized, and budget-enforced by the ContextEngine.
+        Context is gathered, normalized, and budget-enforced by the ContextEngine across all active providers (RAG, Web, Task, Manual).
         """
         task = await self.task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
 
@@ -238,6 +304,7 @@ class TaskExecutionService:
         # 1. Gather & package context via ContextEngine
         max_context_tokens = request.max_context_tokens or 8000
         retrieval_telemetry = {}
+        tool_telemetry_list = []
 
         def _on_retrieval_telemetry(data):
             if isinstance(data, dict):
@@ -245,6 +312,10 @@ class TaskExecutionService:
                 retrieval_telemetry["result"] = data.get("result")
             else:
                 retrieval_telemetry["result"] = data
+
+        def _on_tool_telemetry(data):
+            if data:
+                tool_telemetry_list.append(data)
 
         context_package = await self.context_engine.build_context(
             task=task,
@@ -258,6 +329,14 @@ class TaskExecutionService:
             retrieval_enabled=request.retrieval_enabled,
             retrieval_project_scope=request.retrieval_project_scope,
             retrieval_telemetry_callback=_on_retrieval_telemetry,
+            tool_mode=request.tool_mode,
+            tools_enabled=request.tools_enabled,
+            enable_web_search=request.enable_web_search,
+            web_search_query=request.web_search_query,
+            web_search_limit=request.web_search_limit,
+            web_search_recency_days=request.web_search_recency_days,
+            user=user,
+            tool_telemetry_callback=_on_tool_telemetry,
         )
 
         ret_decision = retrieval_telemetry.get("decision")
@@ -289,11 +368,52 @@ class TaskExecutionService:
         decision_confidence = ret_decision.confidence if ret_decision else None
         decision_mode = request.retrieval_mode or ("always" if request.retrieval_enabled else "auto")
 
+        # Extract tool telemetry (Step 9)
+        tools_used = []
+        tool_call_count = len(tool_telemetry_list)
+        tool_latency_total = 0
+        tool_errors = []
+        tool_executions = []
+
+        for t in tool_telemetry_list:
+            t_name = getattr(t, "tool_name", None) or (t.get("tool_name") if isinstance(t, dict) else "unknown")
+            if t_name not in tools_used:
+                tools_used.append(t_name)
+            t_latency = getattr(t, "latency_ms", 0) or (t.get("latency_ms", 0) if isinstance(t, dict) else 0)
+            tool_latency_total += t_latency
+            t_success = getattr(t, "success", True) if not isinstance(t, dict) else t.get("success", True)
+            t_err = getattr(t, "error", None) or (t.get("error") if isinstance(t, dict) else None)
+
+            if not t_success and t_err:
+                err_dict = t_err.model_dump() if hasattr(t_err, "model_dump") else (t_err if isinstance(t_err, dict) else {"message": str(t_err)})
+                tool_errors.append({"tool": t_name, **err_dict})
+
+            exec_record = {
+                "tool_name": t_name,
+                "success": t_success,
+                "latency_ms": t_latency,
+            }
+            if t_err:
+                exec_record["error"] = t_err.model_dump() if hasattr(t_err, "model_dump") else t_err
+            tool_executions.append(exec_record)
+
         # 2. Build structured messages from context package
         messages = self.context_engine.builder.format_as_messages(context_package, task)
 
         model_name = request.model or "gpt-4o-mini"
         provider = self.factory.get_provider_for_model(model_name)
+
+        web_sources = [
+            {
+                "title": it.title,
+                "url": it.metadata.get("url"),
+                "source": it.metadata.get("source"),
+                "published_at": it.metadata.get("published_at"),
+                "snippet": it.content,
+            }
+            for it in context_package.items
+            if it.source_type == "web"
+        ]
 
         input_snapshot = {
             "model": model_name,
@@ -308,6 +428,11 @@ class TaskExecutionService:
                 "reason": decision_reason,
                 "confidence": decision_confidence,
             },
+            "tool_config": {
+                "tool_mode": request.tool_mode,
+                "tools_enabled": request.tools_enabled,
+                "enable_web_search": request.enable_web_search,
+            },
             "context_summary": {
                 "item_count": context_package.total_items,
                 "estimated_tokens": context_package.estimated_tokens,
@@ -315,10 +440,11 @@ class TaskExecutionService:
                 "truncated": context_package.truncated,
                 "dropped_items": context_package.dropped_items_count,
             },
+            "web_sources": web_sources,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
 
-        # 3. Initialize Run in 'running' status with context and retrieval telemetry
+        # 3. Initialize Run in 'running' status with context, retrieval, and tool telemetry
         run = Run(
             task_id=task.id,
             status=RunStatus.RUNNING.value,
@@ -340,14 +466,19 @@ class TaskExecutionService:
             retrieval_top_k=decision_top_k,
             retrieval_reason=decision_reason,
             retrieval_confidence=decision_confidence,
+            tools_used=tools_used if tools_used else None,
+            tool_call_count=tool_call_count,
+            tool_latency_ms=tool_latency_total,
+            tool_errors=tool_errors if tool_errors else None,
+            tool_executions=tool_executions if tool_executions else None,
             started_at=datetime.now(timezone.utc),
         )
         self.session.add(run)
         await self.session.flush()
         await self.session.refresh(run)
 
-        # Notify frontend of run ID, context, and retrieval decision telemetry immediately
-        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated, 'retrieval_enabled': is_retrieval_required, 'retrieval_strategy': decision_strategy, 'retrieval_scope': decision_scope, 'retrieval_confidence': decision_confidence, 'retrieval_reason': decision_reason, 'retrieved_chunk_count': ret_chunk_count})}\n\n"
+        # Notify frontend of run ID, context, retrieval decision, and tools telemetry immediately
+        yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'status': run.status, 'context_item_count': context_package.total_items, 'estimated_context_tokens': context_package.estimated_tokens, 'context_truncated': context_package.truncated, 'retrieval_enabled': is_retrieval_required, 'retrieval_strategy': decision_strategy, 'retrieval_scope': decision_scope, 'retrieval_confidence': decision_confidence, 'retrieval_reason': decision_reason, 'retrieved_chunk_count': ret_chunk_count, 'tools_used': tools_used, 'tool_call_count': tool_call_count, 'tool_latency_ms': tool_latency_total})}\n\n"
 
         llm_request = LLMGenerateRequest(
             model=model_name,

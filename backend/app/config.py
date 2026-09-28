@@ -79,6 +79,15 @@ class Settings(BaseSettings):
     MAX_RETRIEVAL_TOP_K: int = 25
     MAX_RETRIEVAL_RESULTS: int = 50
 
+    # Step 9: Tool System & Web Search Settings
+    WEB_SEARCH_PROVIDER: str = "duckduckgo"
+    WEB_SEARCH_API_KEY: Optional[str] = None
+    WEB_SEARCH_DEFAULT_LIMIT: int = 5
+    WEB_SEARCH_MAX_LIMIT: int = 10
+    WEB_SEARCH_TIMEOUT_SECONDS: float = 10.0
+    MAX_TOOL_CALLS_PER_TASK: int = 5
+
 
 settings = Settings()
+
 

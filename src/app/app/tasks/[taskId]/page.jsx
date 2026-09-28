@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { taskService } from "@/services/tasks";
 import { orchestratorService } from "@/services/orchestrator";
+import { toolService } from "@/services/tools";
 import { formatDate } from "@/lib/utils";
 import {
   Play,
@@ -52,6 +53,10 @@ import {
   HelpCircle,
   Cpu,
   SlidersHorizontal,
+  Globe,
+  ExternalLink,
+  Wrench,
+  ShieldCheck,
 } from "lucide-react";
 
 export default function TaskWorkspacePage({ params: paramsProp }) {
@@ -97,6 +102,13 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [retrievalScope, setRetrievalScope] = useState("project"); // "project" | "workspace"
   const [retrievalTopK, setRetrievalTopK] = useState(8);
   const [showAdvancedRetrieval, setShowAdvancedRetrieval] = useState(false);
+
+  // Step 9: Tools & Web Search settings
+  const [enableWebSearch, setEnableWebSearch] = useState(false);
+  const [webSearchQuery, setWebSearchQuery] = useState("");
+  const [webSearchLimit, setWebSearchLimit] = useState(5);
+  const [webSearchRecencyDays, setWebSearchRecencyDays] = useState("");
+  const [availableTools, setAvailableTools] = useState([]);
 
   // Retrieval Router Preview / Debug state (Step 8)
   const [previewDecision, setPreviewDecision] = useState(null);
@@ -236,9 +248,19 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
   };
 
+  const loadAvailableTools = async () => {
+    try {
+      const res = await toolService.listTools();
+      setAvailableTools(res?.tools || []);
+    } catch (err) {
+      console.warn("[TaskWorkspace] Error loading tools:", err);
+    }
+  };
+
   useEffect(() => {
     loadModels();
     loadTaskAndContexts();
+    loadAvailableTools();
   }, [taskId]);
 
   // Save task modifications (title, instructions, context_text)
@@ -387,6 +409,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       retrieval_scope: retrievalScope,
       retrieval_top_k: Number(retrievalTopK),
       retrieval_project_scope: retrievalScope === "project",
+      enable_web_search: enableWebSearch,
+      web_search_query: webSearchQuery.trim() || undefined,
+      web_search_limit: Number(webSearchLimit) || 5,
+      web_search_recency_days: webSearchRecencyDays ? Number(webSearchRecencyDays) : undefined,
+      tool_mode: enableWebSearch ? "enabled" : "disabled",
+      tools_enabled: enableWebSearch ? ["web_search"] : [],
     };
 
     if (enableStreaming) {
@@ -413,6 +441,9 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             retrieval_confidence: event.retrieval_confidence,
             retrieval_reason: event.retrieval_reason,
             retrieved_chunk_count: event.retrieved_chunk_count,
+            tools_used: event.tools_used || (enableWebSearch ? ["web_search"] : []),
+            tool_call_count: event.tool_call_count,
+            tool_latency_ms: event.tool_latency_ms,
             created_at: new Date().toISOString(),
           });
         },
@@ -896,6 +927,103 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   )}
                 </div>
 
+                {/* Step 9: Tools & External Grounding */}
+                <div className="space-y-3 p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-semibold text-slate-200">Tools & External Grounding</span>
+                    </div>
+                    {enableWebSearch && (
+                      <Badge variant="success" className="text-[10px]">Active</Badge>
+                    )}
+                  </div>
+
+                  {/* Web Search Tool Toggle */}
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={enableWebSearch}
+                        onChange={(e) => setEnableWebSearch(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-xs font-semibold text-slate-200">Web Search Tool</span>
+                          <span className="text-[10px] px-1.5 py-0.2 bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 rounded font-mono">
+                            live web
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                          Query live internet sources and feed normalized results as untrusted external context.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Collapsible Web Search Settings */}
+                    {enableWebSearch && (
+                      <div className="pt-3 border-t border-slate-800 space-y-3 text-xs animate-in fade-in duration-200">
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-300 block mb-1">
+                            Search Query Override (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={webSearchQuery}
+                            onChange={(e) => setWebSearchQuery(e.target.value)}
+                            placeholder="Defaults to task title & instructions..."
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Result Limit</span>
+                            <div className="flex items-center gap-1 font-mono">
+                              {[3, 5, 8, 10].map((num) => (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => setWebSearchLimit(num)}
+                                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                                    webSearchLimit === num
+                                      ? "bg-emerald-600 text-white"
+                                      : "bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800"
+                                  }`}
+                                >
+                                  {num}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Recency Filter</span>
+                            <select
+                              value={webSearchRecencyDays}
+                              onChange={(e) => setWebSearchRecencyDays(e.target.value)}
+                              className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300 focus:outline-none focus:border-emerald-500 font-mono"
+                            >
+                              <option value="">Any Time</option>
+                              <option value="1">Past 24 Hours</option>
+                              <option value="7">Past 7 Days</option>
+                              <option value="30">Past 30 Days</option>
+                              <option value="365">Past Year</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded bg-slate-950/60 border border-slate-800/80 text-[10px] text-slate-400 font-mono flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>Results marked as untrusted external content for prompt-injection safety.</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* SSE Streaming Toggle */}
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
                   <div className="text-xs">
@@ -1157,6 +1285,85 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                     </div>
                   )}
 
+                  {/* Step 9: Web Search Grounded Sources */}
+                  {(() => {
+                    const webSources = activeRun.input_snapshot?.web_sources || [];
+                    const hasWebTool = activeRun.tools_used?.includes("web_search") || activeRun.context_sources?.includes("web");
+                    if (!hasWebTool && webSources.length === 0) return null;
+
+                    return (
+                      <div className="p-3.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-semibold text-slate-200 text-xs">
+                            <Globe className="w-4 h-4 text-emerald-400" />
+                            <span>Web Search Grounded Sources</span>
+                            <Badge variant="success" className="text-[10px]">
+                              {webSources.length > 0 ? `${webSources.length} sources` : "Active"}
+                            </Badge>
+                          </div>
+                          {activeRun.tool_latency_ms !== null && activeRun.tool_latency_ms !== undefined && (
+                            <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+                              Tool Latency: {activeRun.tool_latency_ms}ms
+                            </span>
+                          )}
+                        </div>
+
+                        {webSources.length > 0 ? (
+                          <div className="space-y-2 pt-1">
+                            {webSources.map((src, idx) => (
+                              <div
+                                key={src.url || idx}
+                                className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 space-y-1.5 text-xs"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="font-mono text-emerald-400 font-bold text-[11px]">
+                                      {idx + 1}.
+                                    </span>
+                                    {src.url ? (
+                                      <a
+                                        href={src.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-medium text-slate-100 hover:text-emerald-300 underline underline-offset-2 flex items-center gap-1 truncate"
+                                      >
+                                        <span className="truncate">{src.title || src.url}</span>
+                                        <ExternalLink className="w-3 h-3 shrink-0 text-slate-400" />
+                                      </a>
+                                    ) : (
+                                      <span className="font-medium text-slate-100 truncate">{src.title}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {src.source && (
+                                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-mono">
+                                        {src.source}
+                                      </span>
+                                    )}
+                                    {src.published_at && (
+                                      <span className="text-[10px] text-slate-400 font-mono">
+                                        {src.published_at}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {src.snippet && (
+                                  <p className="text-slate-400 text-[11px] line-clamp-2 font-mono leading-relaxed pl-4 border-l border-emerald-800/40">
+                                    {src.snippet.replace(/^\[EXTERNAL UNTRUSTED WEB CONTENT[^\]]*\]\s*/i, "").replace(/^Source URL:[^\n]*\n+/i, "").replace(/^Published Date:[^\n]*\n+/i, "")}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 font-mono">
+                            Web search was executed during this run.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Retrieved Sources list */}
                   {activeRun.retrieval_sources && activeRun.retrieval_sources.length > 0 && (
                     <div className="space-y-1.5 pt-1">
@@ -1218,6 +1425,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                     {activeRun.model_name && (
                       <span className="text-slate-300">
                         Model: <strong className="text-cyan-400">{activeRun.model_name}</strong>
+                      </span>
+                    )}
+                    {activeRun.tools_used && activeRun.tools_used.length > 0 && (
+                      <span>
+                        • Tools: <strong className="text-emerald-400">{activeRun.tools_used.join(", ")}</strong>
+                        {activeRun.tool_latency_ms ? ` (${activeRun.tool_latency_ms}ms)` : ""}
                       </span>
                     )}
                     {activeRun.context_item_count !== null && activeRun.context_item_count !== undefined && (
@@ -1400,6 +1613,11 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                       ) : (
                         <Badge variant="outline" className="text-[10px] text-slate-500 hidden sm:inline-flex">
                           No retrieval
+                        </Badge>
+                      )}
+                      {run.tools_used && run.tools_used.length > 0 && (
+                        <Badge variant="success" className="text-[10px] bg-emerald-950/60 text-emerald-300 border-emerald-800/40 hidden sm:inline-flex">
+                          {run.tools_used.join(", ")}
                         </Badge>
                       )}
                     </div>

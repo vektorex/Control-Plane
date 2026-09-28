@@ -1,6 +1,6 @@
 # AI Work Layer — Backend Service
 
-A high-performance Python FastAPI service providing a provider-agnostic Context Engine, Intelligent Retrieval Router, Hybrid RAG with Vector + BM25 + Multi-Query strategies, LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, multi-tenant isolation, Supabase Auth JWT verification, and Alembic database migrations.
+A high-performance Python FastAPI service providing a provider-agnostic Tool System, Web Search Provider Integration, Context Engine, Intelligent Retrieval Router, Hybrid RAG with Vector + BM25 + Multi-Query strategies, LLM abstraction layer, PostgreSQL persistence with SQLAlchemy 2.x, multi-tenant isolation, Supabase Auth JWT verification, and Alembic database migrations.
 
 ---
 
@@ -15,12 +15,19 @@ Request ──► Authentication ──► Authorization / Ownership ──► V
 Next.js Frontend (Port 3000)
        │
        ▼ (HTTP Bearer JWT / SSE Stream)
-FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /api/documents, /api/context, /api/llm, /api/models, /api/health)
+FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /api/tools, /api/documents, /api/context, /api/llm, /api/models, /api/health)
        │
        ├── Core Security & Auth Layer
        │     ├── get_current_user (JWT verification via Supabase secret or JWKS)
        │     ├── verify_workspace_access / verify_project_access / verify_task_access
        │     └── AuthService (Idempotent user & default workspace bootstrap)
+       │
+       ├── Tool System & Web Search Provider (Step 9)
+       │     ├── BaseTool Interface (name, description, input_schema, requires_auth, execute, check_permission)
+       │     ├── ToolRegistry (Centralized registration, lookup, Pydantic input validation)
+       │     ├── ToolExecutor (Permission checks, timeout enforcement, latency measurement, normalized ToolResult)
+       │     ├── WebSearchProvider Interface -> DuckDuckGoSearchProvider, TavilySearchProvider, SerperSearchProvider, MockWebSearchProvider
+       │     └── Tool API Endpoints (GET /api/tools, POST /api/tools/{tool_name}/execute)
        │
        ├── Intelligent Retrieval Router (Step 8)
        │     ├── RetrievalDecisionProvider Interface
@@ -29,10 +36,11 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
        │     ├── Strategy Dispatcher: None, Keyword, Vector, Hybrid, Multi-Query
        │     └── Router Preview Endpoint (/api/tasks/{task_id}/retrieval/preview)
        │
-       ├── Context Engine (Step 6)
-       │     ├── ContextProvider Registry (task_context, manual_context, rag_context)
+       ├── Context Engine (Step 6 & 9)
+       │     ├── ContextProvider Registry (task_context, manual_context, rag_context, web_context)
+       │     ├── WebContextProvider (Transforms normalized search results to untrusted ContextItems with priority 60)
        │     ├── Local Deterministic Token Estimator
-       │     ├── ContextBuilder (Deduplication, Priority Sorting, Budget Enforcement)
+       │     ├── ContextBuilder (Deduplication, Priority Sorting, Budget Enforcement, Prompt Injection Boundaries)
        │     └── ContextPackage Assembly & LLM Message Formatting
        │
        ├── Retrieval Strategies & Ingestion (Step 7 & 8)
@@ -53,10 +61,46 @@ FastAPI Backend Routes (/api/auth, /api/workspaces, /api/projects, /api/tasks, /
              ├── TaskRepository (scoped by project/workspace owner)
              ├── ContextRepository (scoped by task/workspace owner)
              ├── DocumentRepository (scoped by workspace owner)
-             └── RunRepository (scoped by task/workspace owner)
+             └── RunRepository (scoped by task/workspace owner - tracking tools_used, tool_call_count, tool_latency_ms, tool_errors, tool_executions)
                    │
                    ▼
              PostgreSQL Database (AsyncPG + SQLAlchemy 2.x ORM)
+```
+
+---
+
+## 🛠️ Tool System & Web Search Architecture (Step 9)
+
+```
+Task
+ ↓
+Tool Registry
+ ↓
+Tool Executor
+ ↓
+Web Search Provider (DuckDuckGo / Tavily / Serper / Mock)
+ ↓
+Normalized Result ({ title, url, snippet, source, published_at, metadata })
+ ↓
+WebContextProvider
+ ↓
+ContextEngine
+ ↓
+LLM
+```
+
+### Untrusted External Content Boundary
+Web search data is untrusted:
+```
+System Instructions (Highest Trust)
+      ↓
+User Task (Trusted User Intent)
+      ↓
+Trusted Application Context
+      ↓
+[EXTERNAL UNTRUSTED WEB CONTENT - FACTUAL REFERENCE ONLY]
+      ↓
+LLM Execution
 ```
 
 ---
@@ -98,6 +142,16 @@ Copy `.env.example` to `.env`:
 cp backend/.env.example backend/.env
 ```
 
+Key Step 9 Environment Variables:
+```env
+WEB_SEARCH_PROVIDER=duckduckgo # Options: duckduckgo, tavily, serper, mock
+WEB_SEARCH_API_KEY=            # API key for tavily or serper (duckduckgo requires no key)
+WEB_SEARCH_DEFAULT_LIMIT=5
+WEB_SEARCH_MAX_LIMIT=20
+WEB_SEARCH_TIMEOUT_SECONDS=10.0
+MAX_TOOL_CALLS_PER_TASK=5
+```
+
 ### 4. Run Database Migrations
 ```bash
 python -m alembic -c backend/alembic.ini upgrade head
@@ -115,7 +169,7 @@ API Documentation will be available at:
 
 ## 🧪 Running Tests
 
-The test suite validates authentication, cross-tenant isolation, retrieval routing policies, multi-query expansion, hybrid RAG, context assembly, budget enforcement, model completion, streaming, and error handling:
+The test suite validates authentication, cross-tenant isolation, tool registry, tool execution, web search providers, untrusted boundaries, retrieval routing policies, multi-query expansion, hybrid RAG, context assembly, budget enforcement, model completion, streaming, and error handling:
 ```bash
 python -m pytest -v
 ```
@@ -144,14 +198,18 @@ python -m pytest -v
 - `POST   /api/projects/{project_id}/tasks` — Create task under owned project
 - `GET    /api/projects/{project_id}/tasks` — List tasks under owned project
 
-### 4. Documents & Ingestion (Step 7)
+### 4. Tools & Web Search (Step 9)
+- `GET  /api/tools` — List registered tools available to the authenticated user
+- `POST /api/tools/{tool_name}/execute` — Direct testing/execution endpoint returning normalized `ToolResult`
+
+### 5. Documents & Ingestion (Step 7)
 - `POST   /api/workspaces/{workspace_id}/documents` — Multipart document upload with background ingestion
 - `GET    /api/workspaces/{workspace_id}/documents` — List documents in workspace
 - `GET    /api/documents/{document_id}` — Get document metadata & status
 - `GET    /api/documents/{document_id}/chunks` — Inspect indexed vector chunks
 - `DELETE /api/documents/{document_id}` — Delete document and chunks
 
-### 5. Tasks, Retrieval Router & Context
+### 6. Tasks, Retrieval Router & Context
 - `GET    /api/tasks` — List tasks for authenticated user
 - `GET    /api/tasks/{task_id}` — Get task by ID (404 if unowned)
 - `PATCH  /api/tasks/{task_id}` — Update owned task
@@ -163,8 +221,8 @@ python -m pytest -v
 - `PATCH  /api/context/{context_id}` — Update individual context item
 - `DELETE /api/context/{context_id}` — Delete individual context item
 
-### 6. Task AI Execution & Runs (Multi-Tenant Scoped)
-- `POST   /api/tasks/{task_id}/run` — Execute task via Retrieval Router + Context Engine + LLM
-- `POST   /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming + retrieval decision telemetry
+### 7. Task AI Execution & Runs (Multi-Tenant Scoped)
+- `POST   /api/tasks/{task_id}/run` — Execute task via Retrieval Router + Tools + Context Engine + LLM
+- `POST   /api/tasks/{task_id}/run/stream` — Execute task with real-time SSE streaming + tools & retrieval telemetry
 - `GET    /api/tasks/{task_id}/runs` — List runs for owned task
 - `POST   /api/tasks/{task_id}/runs` — Record run telemetry for owned task

@@ -38,6 +38,15 @@ class TaskRunRequest(BaseModel):
     retrieval_enabled: Optional[bool] = Field(default=None, description="Legacy boolean flag: True=always, False=never")
     retrieval_project_scope: Optional[bool] = Field(default=True, description="Scope retrieval to current project vs entire workspace")
 
+    # Step 9: Tool System & Web Search Configuration
+    tool_mode: Optional[str] = Field(default="disabled", description="Tool execution mode: auto, enabled, or disabled")
+    tools_enabled: Optional[List[str]] = Field(default=None, description="Allowed tools list (e.g. ['web_search'])")
+    enable_web_search: Optional[bool] = Field(default=False, description="Convenience toggle to execute web search tool")
+    web_search_query: Optional[str] = Field(default=None, description="Explicit search query override for web search tool")
+    web_search_limit: Optional[int] = Field(default=5, ge=1, le=20, description="Max web search result items to retrieve")
+    web_search_recency_days: Optional[int] = Field(default=None, ge=1, le=365, description="Optional recency window in days")
+
+
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

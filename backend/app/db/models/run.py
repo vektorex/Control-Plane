@@ -66,7 +66,15 @@ class Run(Base):
     retrieval_top_k: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     retrieval_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     retrieval_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Step 9: Tool System & Web Search Execution Metadata
+    tools_used: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    tool_call_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    tool_latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    tool_errors: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
+    tool_executions: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,

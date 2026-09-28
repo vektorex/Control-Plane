@@ -32,6 +32,11 @@ class RunBase(BaseModel):
     retrieval_top_k: Optional[int] = Field(default=None, description="Top-K limit determined by router")
     retrieval_reason: Optional[str] = Field(default=None, description="Explanation for routing decision")
     retrieval_confidence: Optional[float] = Field(default=None, description="Confidence score of the routing decision (0.0 - 1.0)")
+    tools_used: Optional[List[str]] = Field(default=None, description="List of external tools executed during run")
+    tool_call_count: Optional[int] = Field(default=0, ge=0, description="Total count of tool executions")
+    tool_latency_ms: Optional[int] = Field(default=0, ge=0, description="Total time spent in tool execution")
+    tool_errors: Optional[List[Dict[str, Any]]] = Field(default=None, description="Errors encountered during tool calls")
+    tool_executions: Optional[List[Dict[str, Any]]] = Field(default=None, description="Detailed records of tool executions")
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -70,6 +75,11 @@ class RunResponse(BaseModel):
     retrieval_top_k: Optional[int] = None
     retrieval_reason: Optional[str] = None
     retrieval_confidence: Optional[float] = None
+    tools_used: Optional[List[str]] = None
+    tool_call_count: Optional[int] = 0
+    tool_latency_ms: Optional[int] = 0
+    tool_errors: Optional[List[Dict[str, Any]]] = None
+    tool_executions: Optional[List[Dict[str, Any]]] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -78,3 +88,4 @@ class RunResponse(BaseModel):
 class RunListResponse(BaseModel):
     runs: List[RunResponse]
     total: int
+

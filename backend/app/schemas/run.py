@@ -60,6 +60,14 @@ class RunBase(BaseModel):
     model_routing_policy: Optional[str] = Field(default=None, description="Routing policy applied (e.g. balanced, manual)")
     fallback_attempts: Optional[int] = Field(default=0, ge=0, description="Number of model fallback attempts during execution")
 
+    # Step 13: Evaluation & Verification Engine Metadata
+    evaluation_status: Optional[str] = Field(default=None, description="Overall verification outcome status (passed, warning, failed, skipped)")
+    evaluation_mode: Optional[str] = Field(default=None, description="Evaluation policy mode (off, basic, standard, strict)")
+    evaluation_duration_ms: Optional[int] = Field(default=0, ge=0, description="Time spent in evaluation checks")
+    evaluation_attempts: Optional[int] = Field(default=0, ge=0, description="Total evaluation executions performed")
+    revision_attempts: Optional[int] = Field(default=0, ge=0, description="Total revision loop iterations performed")
+    evaluation_result: Optional[Dict[str, Any]] = Field(default=None, description="Structured evaluation result snapshot")
+
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -119,6 +127,12 @@ class RunResponse(BaseModel):
     model_selection_reason: Optional[str] = None
     model_routing_policy: Optional[str] = None
     fallback_attempts: Optional[int] = 0
+    evaluation_status: Optional[str] = None
+    evaluation_mode: Optional[str] = None
+    evaluation_duration_ms: Optional[int] = 0
+    evaluation_attempts: Optional[int] = 0
+    revision_attempts: Optional[int] = 0
+    evaluation_result: Optional[Dict[str, Any]] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

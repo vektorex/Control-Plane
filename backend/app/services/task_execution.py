@@ -15,6 +15,8 @@ from backend.app.db.models.task import Task
 from backend.app.db.models.user import User
 from backend.app.repositories.run import RunRepository
 from backend.app.repositories.task import TaskRepository
+from backend.app.repositories.evaluation import EvaluationRepository
+from backend.app.services.evaluation.schemas import EvaluationResult
 from backend.app.schemas.llm import ChatMessage, LLMGenerateRequest
 from backend.app.schemas.run import RunResponse
 from backend.app.schemas.task import TaskRunRequest
@@ -57,7 +59,7 @@ class TaskExecutionService:
     """
     Service responsible for turning a Task entity into an orchestrated AI workflow
     via the Orchestration Engine, coordinating planning, retrieval, tools, context,
-    intelligent model routing, and persisting execution runs with complete observability.
+    intelligent model routing, verification engine, and persisting execution runs with complete observability.
     """
 
     def __init__(
@@ -76,6 +78,7 @@ class TaskExecutionService:
         )
         self.task_repo = TaskRepository(session)
         self.run_repo = RunRepository(session)
+        self.eval_repo = EvaluationRepository(session)
 
     async def plan_task(
         self,
@@ -317,6 +320,26 @@ class TaskExecutionService:
             if state.validated_plan:
                 run.execution_plan = state.validated_plan.model_dump(mode="json")
 
+            # Step 13: Evaluation & Verification Telemetry & Records
+            final_eval = state.metadata.get("evaluation_result")
+            if final_eval:
+                run.evaluation_status = final_eval.get("status")
+                run.evaluation_mode = final_eval.get("mode")
+                run.evaluation_duration_ms = final_eval.get("duration_ms", 0)
+                run.evaluation_attempts = final_eval.get("attempt", 1)
+                run.revision_attempts = state.metadata.get("revision_attempts", 0)
+                run.evaluation_result = final_eval
+
+                try:
+                    eval_obj = EvaluationResult.model_validate(final_eval)
+                    await self.eval_repo.record_evaluation_result(
+                        run_id=run.id,
+                        result=eval_obj,
+                        evaluator_type="engine",
+                    )
+                except Exception as eval_persist_err:
+                    logger.warning(f"Failed to record evaluation result in DB: {eval_persist_err}")
+
             # Input snapshot update with web sources and context summary
             snap = dict(run.input_snapshot) if run.input_snapshot else {}
             snap["web_sources"] = web_sources
@@ -546,6 +569,26 @@ class TaskExecutionService:
                 run.repair_count = final_orch_state.get("repair_count", repair_count)
                 run.iteration_count = final_orch_state.get("iteration", 1)
                 run.completion_evaluation = final_orch_state.get("completion_evaluation")
+
+                # Step 13: Evaluation & Verification metadata from streaming state
+                final_eval = final_orch_state.get("metadata", {}).get("evaluation_result")
+                if final_eval:
+                    run.evaluation_status = final_eval.get("status")
+                    run.evaluation_mode = final_eval.get("mode")
+                    run.evaluation_duration_ms = final_eval.get("duration_ms", 0)
+                    run.evaluation_attempts = final_eval.get("attempt", 1)
+                    run.revision_attempts = final_orch_state.get("metadata", {}).get("revision_attempts", 0)
+                    run.evaluation_result = final_eval
+
+                    try:
+                        eval_obj = EvaluationResult.model_validate(final_eval)
+                        await self.eval_repo.record_evaluation_result(
+                            run_id=run.id,
+                            result=eval_obj,
+                            evaluator_type="engine",
+                        )
+                    except Exception as eval_persist_err:
+                        logger.warning(f"Failed to record evaluation result in DB: {eval_persist_err}")
 
             # Harvest tool results from stream
             if final_orch_state and final_orch_state.get("tool_results"):

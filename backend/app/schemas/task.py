@@ -15,6 +15,10 @@ class TaskBase(BaseModel):
     # Step 12: Model Preferences
     model_mode: Optional[str] = Field(default="auto", description="Model selection mode: 'auto' | 'manual'")
     preferred_model: Optional[str] = Field(default=None, description="Preferred model identifier")
+    # Step 13: Evaluation Preferences
+    evaluation_mode: Optional[str] = Field(default="standard", description="Evaluation mode: off | basic | standard | strict")
+    strict_evaluation: Optional[bool] = Field(default=False, description="Strict evaluation mode flag")
+    expected_format: Optional[str] = Field(default=None, description="Expected format constraint (json, table, list, code)")
 
 
 class TaskCreate(TaskBase):
@@ -29,6 +33,9 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = Field(default=None)
     model_mode: Optional[str] = Field(default=None)
     preferred_model: Optional[str] = Field(default=None)
+    evaluation_mode: Optional[str] = Field(default=None)
+    strict_evaluation: Optional[bool] = Field(default=None)
+    expected_format: Optional[str] = Field(default=None)
 
 
 class TaskRunRequest(BaseModel):
@@ -60,6 +67,12 @@ class TaskRunRequest(BaseModel):
     latency_preference: Optional[str] = Field(default="balanced", description="Latency preference: low | balanced | high_quality")
     cost_preference: Optional[str] = Field(default="balanced", description="Cost preference: low | balanced | quality")
 
+    # Step 13: Evaluation & Verification Configuration
+    evaluation_mode: Optional[str] = Field(default=None, description="Evaluation policy override: off | basic | standard | strict")
+    strict_evaluation: Optional[bool] = Field(default=None, description="Strict verification mode override")
+    expected_format: Optional[str] = Field(default=None, description="Expected format override: json | table | list | code")
+    max_revision_attempts: Optional[int] = Field(default=2, ge=0, le=3, description="Max revision attempts on verification failure")
+
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -73,6 +86,9 @@ class TaskResponse(BaseModel):
     status: TaskStatus
     model_mode: Optional[str] = "auto"
     preferred_model: Optional[str] = None
+    evaluation_mode: Optional[str] = "standard"
+    strict_evaluation: Optional[bool] = False
+    expected_format: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     run_count: Optional[int] = 0

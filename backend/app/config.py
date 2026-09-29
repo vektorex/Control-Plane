@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     PLANNER_TIMEOUT_SECONDS: float = 30.0
     MAX_PLAN_REPAIR_ATTEMPTS: int = 1
     MAX_AGENT_ITERATIONS: int = 3
+    EVALUATOR_MODEL_PROVIDER: str = "openai"
     EVALUATOR_MODEL: str = "gpt-4o-mini"
 
     # Step 12: Model Intelligence & Model Router Settings
@@ -110,6 +111,11 @@ class Settings(BaseSettings):
     GENERATION_MODEL_MODE: str = "auto"
     MAX_MODEL_FALLBACK_ATTEMPTS: int = 2
     ALLOWED_MODEL_PROVIDERS: List[str] = ["openai", "mock", "anthropic", "gemini"]
+
+    # Step 13: Evaluation & Verification Engine Settings
+    EVALUATION_DEFAULT_MODE: str = "standard"  # off | basic | standard | strict
+    MAX_REVISION_ATTEMPTS: int = 2
+    EVALUATION_TIMEOUT_SECONDS: float = 30.0
 
 
 

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.base import Base
@@ -45,6 +45,11 @@ class Task(Base):
     # Step 12: Model Router & Preference settings
     model_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="auto")
     preferred_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Step 13: Evaluation & Verification Preferences
+    evaluation_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="standard")
+    strict_evaluation: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    expected_format: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

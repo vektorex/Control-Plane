@@ -10,6 +10,7 @@ from backend.app.api.routes.runs import router as runs_router
 from backend.app.api.routes.tasks import router as tasks_router
 from backend.app.api.routes.tools import router as tools_router
 from backend.app.api.routes.workspaces import router as workspaces_router
+from backend.app.api.routes.evaluation import router as evaluation_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -23,6 +24,7 @@ api_router.include_router(runs_router)
 api_router.include_router(context_router)
 api_router.include_router(documents_router)
 api_router.include_router(tools_router)
+api_router.include_router(evaluation_router)
 
 __all__ = ["api_router"]
 

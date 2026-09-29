@@ -455,4 +455,105 @@ Provider Adapter (with Multi-Provider Fallback & Failover)
 - [x] 199/199 passing backend tests (100% pass rate).
 - [x] Next.js production build passing with pure JavaScript.
 
+---
+
+## 🔍 Step 13: Evaluation & Verification Engine
+
+Step 13 introduces an enterprise-grade **Evaluation & Verification Engine** that evaluates task output quality, grounding, completeness, citation validity, format compliance, and policy safety through observable, structured verification checks.
+
+```
+Task
+ ↓
+Orchestrator
+ ↓
+Execution
+ ↓
+Draft Output
+ ↓
+Evaluation Engine
+ ├── Grounding Check (Factual claims vs contextual evidence)
+ ├── Completeness Check (Explicit task requirement coverage)
+ ├── Citation / Evidence Check (Source verification & URL validation)
+ ├── Format Check (JSON schema, markdown tables, sections, code)
+ └── Safety / Policy Check (Secret redaction & dangerous command guards)
+ ↓
+Evaluation Result ({ status: passed | warning | failed, checks: [...], recommendation: accept | revise | fail })
+ ↓
+Orchestrator
+ ├── Accept (Final output accepted and persisted)
+ ├── Revise (Bounded revision prompt up to MAX_REVISION_ATTEMPTS=2)
+ └── Fail safely (Partial output with clear audit diagnostics)
+ ↓
+Final Output
+```
+
+### Key Components
+
+1. **Evaluation Engine Architecture (`EvaluationEngine`)**:
+   - Accepts task definition, draft output, and trusted context items with stable evidence IDs.
+   - Coordinates deterministic checks and pluggable structured LLM evaluators.
+   - Computes overall status (`passed`, `warning`, `failed`) and actionable recommendation (`accept`, `revise`, `fail`) without generating arbitrary single numeric quality scores.
+   - Evaluator engine never modifies output directly and never executes arbitrary external tools.
+
+2. **Evaluator Suite**:
+   - **`GroundingEvaluator`**: Compares factual assertions against retrieved project documents and web sources. Flags unsupported claims with stable evidence citations (`[doc:...]`, `[web:...]`). Does not assert probabilistic claims as absolute certainty.
+   - **`CompletenessEvaluator`**: Evaluates observable requirement adherence against task instructions (e.g. multi-dimensional comparisons) and catches empty or truncated outputs.
+   - **`CitationEvaluator`**: Validates that all cited sources in markdown link references correspond to actual retrieved context, verifies URL syntax, and detects hallucinated sources. Does not falsely require citations if no external retrieval was performed.
+   - **`FormatEvaluator`**: Deterministically verifies structural constraints including valid JSON syntax, markdown tables, bullet lists, code fences, and required headers/sections.
+   - **`SafetyEvaluator`**: Detects sensitive credentials, exposed API keys, private tokens, and hazardous shell patterns (`rm -rf`, raw DROP statements) before persistence.
+
+3. **Hybrid Evaluation Abstraction (`Evaluator` -> `DeterministicEvaluator` / `LLMEvaluator`)**:
+   - High-throughput deterministic checks run instantly with zero LLM overhead.
+   - Semantic evaluators utilize structured Pydantic schemas (`PydanticOutputParser`) via configurable evaluator models (`EVALUATOR_MODEL_PROVIDER`, `EVALUATOR_MODEL`).
+   - Private chain-of-thought and internal evaluator prompts are strictly prevented from leaking to user responses.
+
+4. **Configurable Evaluation Policies (`EvaluationPolicy`)**:
+   - **`off`**: Bypasses evaluation for high-throughput batch operations.
+   - **`basic`**: Runs fast deterministic format, completeness, and safety checks.
+   - **`standard`** (Default): Full evaluation suite with warnings allowing completion if critical requirements are met.
+   - **`strict`**: Strict compliance mode where warnings trigger automated revision or failure.
+
+5. **Controlled Bounded Revision Loop (`ControlledReviser`)**:
+   - When evaluation recommends `revise`, the orchestrator invokes a revision cycle passing the original task, draft output, observable evaluator findings, and trusted context.
+   - Hard bounded limit (`MAX_REVISION_ATTEMPTS = 2`) prevents runaway loops.
+   - Revised outputs are re-evaluated through the verification engine.
+
+6. **Strict Trust Boundaries & External Injection Defense**:
+   - External retrieved documents and web pages are treated strictly as **UNTRUSTED EXTERNAL DATA**.
+   - External content cannot modify evaluation policy, disable evaluators, grant tool access, or elevate model permissions.
+
+7. **Data Model & Telemetry Records**:
+   - **`EvaluationRun`**: Records `run_id`, `status`, `evaluator_type`, `started_at`, `completed_at`, and `duration_ms`.
+   - **`EvaluationFinding`**: Records `check_type`, `status`, `confidence`, `description`, and `evidence_ids`.
+   - **`Run`**: Extended with `evaluation_status`, `evaluation_mode`, `evaluation_duration_ms`, `evaluation_attempts`, and `revision_attempts`.
+
+8. **Next.js Verification UI & APIs**:
+   - Verification checklist card displaying individual check badges (Grounding, Completeness, Citation coverage, Format, Safety).
+   - Observable findings and evidence references without exposing raw prompts or CoT.
+   - Revision banner with `[ Improve Answer ]` manual action and live SSE "AI revision in progress..." status indicators.
+   - API endpoints: `POST /api/tasks/{task_id}/evaluate` and `GET /api/runs/{run_id}/evaluation`.
+
+---
+
+## ✅ Step 13 Verification Checklist
+
+- [x] Independent `EvaluationEngine` coordinating Grounding, Completeness, Citation, Format, and Safety evaluators.
+- [x] Structured `EvaluationResult` with deterministic aggregation (`passed`, `warning`, `failed`) and recommendation (`accept`, `revise`, `fail`).
+- [x] Zero exposure of chain-of-thought or raw internal evaluator prompts.
+- [x] Grounding evaluator verifying claims against stable evidence IDs.
+- [x] Completeness evaluator verifying observable task requirements.
+- [x] Citation evaluator verifying retrieved sources and valid URLs without hallucinating citations.
+- [x] Format evaluator deterministically validating JSON, tables, bullet lists, code fences, and sections.
+- [x] Safety evaluator detecting credential leaks and dangerous shell patterns.
+- [x] Structured LLM evaluators using Pydantic output validation.
+- [x] Configurable evaluation policies (`off`, `basic`, `standard`, `strict`).
+- [x] Bounded revision loop in Orchestrator (`MAX_REVISION_ATTEMPTS = 2`) with re-evaluation.
+- [x] Strict trust boundary preventing external content from modifying policies or executing tools.
+- [x] Extended `Run` database model with `EvaluationRun` and `EvaluationFinding` persistence and Alembic migrations.
+- [x] Authenticated APIs: `POST /api/tasks/{task_id}/evaluate` and `GET /api/runs/{run_id}/evaluation`.
+- [x] Next.js task UI (`/app/tasks/[taskId]`) with Verification Findings card, policy selector, and `[ Improve Answer ]` revision action.
+- [x] 221/221 passing backend tests across all project modules.
+- [x] Next.js production build passing with 100% pure JavaScript.
+
+
 

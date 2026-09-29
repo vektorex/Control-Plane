@@ -143,6 +143,16 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [modelPreviewError, setModelPreviewError] = useState(null);
   const [fallbackEvent, setFallbackEvent] = useState(null);
 
+  // Step 13: Evaluation & Verification Engine state
+  const [evaluationMode, setEvaluationMode] = useState("standard"); // "standard" | "strict" | "basic" | "off"
+  const [strictEvaluation, setStrictEvaluation] = useState(false);
+  const [expectedFormat, setExpectedFormat] = useState(""); // "" | "json" | "markdown" | "bullet_list" | "table" | "code"
+  const [evaluationResult, setEvaluationResult] = useState(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [isRevising, setIsRevising] = useState(false);
+  const [revisionAttempts, setRevisionAttempts] = useState(0);
+  const [evaluationError, setEvaluationError] = useState(null);
+
   // Execution & Run state
   const [activeRun, setActiveRun] = useState(null);
   const [runs, setRuns] = useState([]);
@@ -193,6 +203,15 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       if (taskData.preferred_model) {
         setSelectedModel(taskData.preferred_model);
       }
+      if (taskData.evaluation_mode) {
+        setEvaluationMode(taskData.evaluation_mode);
+      }
+      if (taskData.strict_evaluation !== undefined) {
+        setStrictEvaluation(taskData.strict_evaluation);
+      }
+      if (taskData.expected_format) {
+        setExpectedFormat(taskData.expected_format);
+      }
 
       // Fetch contexts and runs in parallel
       await Promise.all([fetchTaskContexts(), fetchTaskRuns()]);
@@ -227,6 +246,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       if (runsList.length > 0 && !activeRun) {
         setActiveRun(runsList[0]);
         setOutputStream(runsList[0].output_content || "");
+        if (runsList[0].evaluation_result) {
+          setEvaluationResult(runsList[0].evaluation_result);
+        }
+        if (runsList[0].revision_attempts !== undefined) {
+          setRevisionAttempts(runsList[0].revision_attempts);
+        }
       }
     } catch (err) {
       console.error("[TaskWorkspace] Error loading runs:", err);
@@ -405,6 +430,9 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         status: taskStatus,
         model_mode: modelMode,
         preferred_model: modelMode === "manual" ? selectedModel : null,
+        evaluation_mode: evaluationMode,
+        strict_evaluation: strictEvaluation,
+        expected_format: expectedFormat || null,
       });
 
       setTask(updated);
@@ -414,6 +442,29 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       setExecutionError(`Failed to save task: ${err.message}`);
     } finally {
       setIsSavingTask(false);
+    }
+  };
+
+  // Step 13: Manual Output Verification Trigger
+  const handleManualEvaluate = async () => {
+    if (!taskId) return;
+    try {
+      setIsEvaluating(true);
+      setEvaluationError(null);
+      const res = await taskService.evaluateTask(taskId, {
+        mode: evaluationMode,
+        strict: strictEvaluation,
+        expected_format: expectedFormat || undefined,
+      });
+      if (res?.result) {
+        setEvaluationResult(res.result);
+      }
+      await fetchTaskRuns();
+    } catch (err) {
+      console.error("[TaskWorkspace] Evaluation failed:", err);
+      setEvaluationError(err.message || "Failed to evaluate task output");
+    } finally {
+      setIsEvaluating(false);
     }
   };
 
@@ -577,6 +628,9 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       web_search_recency_days: webSearchRecencyDays ? Number(webSearchRecencyDays) : undefined,
       tool_mode: enableWebSearch ? "enabled" : "disabled",
       tools_enabled: enableWebSearch ? ["web_search"] : [],
+      evaluation_mode: evaluationMode,
+      strict_evaluation: strictEvaluation,
+      expected_format: expectedFormat || undefined,
     };
 
     if (enableStreaming) {
@@ -598,6 +652,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             estimated_cost: event.estimated_cost,
             fallback_attempts: event.fallback_attempts,
             planner_mode: plannerMode,
+            evaluation_mode: evaluationMode,
+            evaluation_status: "running",
             context_item_count: event.context_item_count,
             estimated_context_tokens: event.estimated_context_tokens,
             context_truncated: event.context_truncated,
@@ -708,6 +764,25 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
             );
           }
         },
+        onEvaluationStart: () => {
+          setIsEvaluating(true);
+          setEvaluationResult(null);
+        },
+        onEvaluationCheck: () => {},
+        onEvaluationCompletedEvent: (evalData) => {
+          setIsEvaluating(false);
+          const res = evalData?.result || evalData;
+          if (res?.checks || res?.status) {
+            setEvaluationResult(res);
+          }
+        },
+        onRevisionStart: (event) => {
+          setIsRevising(true);
+          if (event.attempt) setRevisionAttempts(event.attempt);
+        },
+        onRevisionCompleted: () => {
+          setIsRevising(false);
+        },
         onChunk: (delta) => {
           setPlanningState(null);
           accumulated += delta;
@@ -715,7 +790,15 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         },
         onRunCompleted: (completedRun) => {
           setPlanningState(null);
+          setIsEvaluating(false);
+          setIsRevising(false);
           setActiveRun(completedRun);
+          if (completedRun.evaluation_result) {
+            setEvaluationResult(completedRun.evaluation_result);
+          }
+          if (completedRun.revision_attempts !== undefined) {
+            setRevisionAttempts(completedRun.revision_attempts);
+          }
           if (completedRun.completion_evaluation) {
             setCompletionEvaluation(completedRun.completion_evaluation);
           }
@@ -736,6 +819,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         },
         onError: (err) => {
           setPlanningState(null);
+          setIsEvaluating(false);
+          setIsRevising(false);
           clearInterval(timerRef.current);
           setIsRunning(false);
           setExecutionError(err.message || "Execution error encountered during task run.");
@@ -743,6 +828,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         },
         onComplete: () => {
           setPlanningState(null);
+          setIsEvaluating(false);
+          setIsRevising(false);
           clearInterval(timerRef.current);
           setIsRunning(false);
         },
@@ -751,7 +838,15 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       try {
         const completedRun = await taskService.executeTask(taskId, runPayload);
         setPlanningState(null);
+        setIsEvaluating(false);
+        setIsRevising(false);
         setActiveRun(completedRun);
+        if (completedRun.evaluation_result) {
+          setEvaluationResult(completedRun.evaluation_result);
+        }
+        if (completedRun.revision_attempts !== undefined) {
+          setRevisionAttempts(completedRun.revision_attempts);
+        }
         if (completedRun.completion_evaluation) {
           setCompletionEvaluation(completedRun.completion_evaluation);
         }
@@ -771,6 +866,8 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         await fetchTaskRuns();
       } catch (err) {
         setPlanningState(null);
+        setIsEvaluating(false);
+        setIsRevising(false);
         setExecutionError(err.message || "Failed to execute task.");
         await fetchTaskRuns();
       } finally {
@@ -785,6 +882,18 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     setOutputStream(run.output_content || "");
     setExecutionError(run.error_message || null);
     setPlanningState(null);
+    setIsEvaluating(false);
+    setIsRevising(false);
+    if (run.evaluation_result) {
+      setEvaluationResult(run.evaluation_result);
+    } else {
+      setEvaluationResult(null);
+    }
+    if (run.revision_attempts !== undefined) {
+      setRevisionAttempts(run.revision_attempts);
+    } else {
+      setRevisionAttempts(0);
+    }
     if (run.completion_evaluation) {
       setCompletionEvaluation(run.completion_evaluation);
     } else {
@@ -1683,6 +1792,103 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                     className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
                   />
                 </div>
+
+                {/* Step 13: Evaluation & Verification Policy Panel */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-emerald-500/25 space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-100 block">
+                          Verification & Evaluation
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Quality, grounding, completeness & format checks
+                        </span>
+                      </div>
+                    </div>
+                    {outputStream && !isRunning && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={handleManualEvaluate}
+                        disabled={isEvaluating}
+                        className="text-[11px] text-emerald-300 hover:text-emerald-100"
+                      >
+                        {isEvaluating ? "Verifying..." : "Evaluate Output"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Evaluation Policy Mode */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-medium text-slate-300 block">
+                      Verification Policy:
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { id: "standard", label: "Standard", desc: "Balanced" },
+                        { id: "strict", label: "Strict", desc: "No warnings" },
+                        { id: "basic", label: "Basic", desc: "Fast checks" },
+                        { id: "off", label: "Off", desc: "Disabled" },
+                      ].map((mode) => (
+                        <label
+                          key={mode.id}
+                          className={`flex flex-col p-1.5 rounded-lg border cursor-pointer transition-all text-center ${
+                            evaluationMode === mode.id
+                              ? "bg-emerald-950/70 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500/30"
+                              : "bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="evaluation_mode_selector"
+                            value={mode.id}
+                            checked={evaluationMode === mode.id}
+                            onChange={() => setEvaluationMode(mode.id)}
+                            className="sr-only"
+                          />
+                          <span className="text-[11px] font-semibold">{mode.label}</span>
+                          <span className="text-[9px] text-slate-400 mt-0.5">{mode.desc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Expected Output Format Dropdown */}
+                  {evaluationMode !== "off" && (
+                    <div className="space-y-2 pt-1 border-t border-slate-800/80">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1">Expected Format</label>
+                          <select
+                            value={expectedFormat}
+                            onChange={(e) => setExpectedFormat(e.target.value)}
+                            className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+                          >
+                            <option value="">Auto / Unspecified</option>
+                            <option value="json">JSON Object/Array</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="bullet_list">Bullet List</option>
+                            <option value="table">Table Format</option>
+                            <option value="code">Code Block</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col justify-end">
+                          <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none pb-1">
+                            <input
+                              type="checkbox"
+                              checked={strictEvaluation}
+                              onChange={(e) => setStrictEvaluation(e.target.checked)}
+                              className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer"
+                            />
+                            <span>Strict Verification</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Execution Action Button */}
@@ -2225,6 +2431,157 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                 </div>
               )}
 
+              {/* Step 13: Verification & Quality Assessment Card */}
+              {(isEvaluating || isRevising || evaluationResult) && (
+                <div className="mt-4 p-4 rounded-xl bg-slate-900/95 border border-emerald-500/30 space-y-3.5 shadow-lg">
+                  {/* Header */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-semibold text-slate-200">Verification</span>
+                      {isEvaluating ? (
+                        <Badge variant="info" dot>Evaluating Output...</Badge>
+                      ) : isRevising ? (
+                        <Badge variant="warning" dot>AI Revision in Progress (Attempt {revisionAttempts})...</Badge>
+                      ) : evaluationResult?.status === "passed" ? (
+                        <Badge variant="success" dot>Verification Passed</Badge>
+                      ) : evaluationResult?.status === "warning" ? (
+                        <Badge variant="warning" dot>Verification Warning</Badge>
+                      ) : (
+                        <Badge variant="destructive" dot>Verification Failed</Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 font-mono text-[11px]">
+                      {evaluationResult?.duration_ms !== undefined && (
+                        <span className="text-slate-400">
+                          Latency: <strong className="text-emerald-400">{evaluationResult.duration_ms}ms</strong>
+                        </span>
+                      )}
+                      {evaluationResult?.recommendation && (
+                        <span className="text-slate-400">
+                          • Recommendation:{" "}
+                          <strong className={
+                            evaluationResult.recommendation === "accept"
+                              ? "text-emerald-300"
+                              : evaluationResult.recommendation === "revise"
+                              ? "text-amber-300"
+                              : "text-rose-300"
+                          }>
+                            {evaluationResult.recommendation}
+                          </strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Revision Banner if recommended */}
+                  {evaluationResult?.recommendation === "revise" && !isRevising && (
+                    <div className="p-3 rounded-lg bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>The result needs improvement based on verification findings.</span>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="xs"
+                        icon={RefreshCw}
+                        onClick={handleExecuteTask}
+                        disabled={isRunning || isRevising}
+                        className="bg-amber-600 hover:bg-amber-500 text-white font-semibold shrink-0"
+                      >
+                        Improve Answer
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* AI Revision in Progress indicator */}
+                  {isRevising && (
+                    <div className="p-3 rounded-lg bg-indigo-950/80 border border-indigo-500/50 text-indigo-200 text-xs flex items-center gap-2.5 animate-pulse">
+                      <Sparkles className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+                      <span className="font-semibold">AI revision in progress... (Attempt {revisionAttempts} of 2)</span>
+                    </div>
+                  )}
+
+                  {/* Checks Grid / Observable Findings */}
+                  {evaluationResult?.checks && evaluationResult.checks.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {evaluationResult.checks.map((check, idx) => {
+                          const isPassed = check.status === "passed";
+                          const isWarning = check.status === "warning";
+
+                          return (
+                            <div
+                              key={check.type || idx}
+                              className={`p-2.5 rounded-lg border text-xs font-mono space-y-1.5 transition-all ${
+                                isPassed
+                                  ? "bg-emerald-950/20 border-emerald-800/40 text-emerald-300"
+                                  : isWarning
+                                  ? "bg-amber-950/30 border-amber-800/50 text-amber-300"
+                                  : "bg-rose-950/30 border-rose-800/50 text-rose-300"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5 font-semibold capitalize">
+                                  {isPassed ? (
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  ) : isWarning ? (
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                                  ) : (
+                                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                                  )}
+                                  <span>{check.type}</span>
+                                </div>
+                                {check.confidence !== undefined && check.confidence !== null && (
+                                  <span className="text-[10px] text-slate-400">
+                                    {(check.confidence * 100).toFixed(0)}% conf
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Issues or findings list */}
+                              {check.issues && check.issues.length > 0 ? (
+                                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                                  {check.issues.map((issue, iIdx) => {
+                                    const desc = typeof issue === "string" ? issue : issue.description || issue.reason || issue.claim;
+                                    const evidenceIds = issue.evidence_ids || [];
+                                    return (
+                                      <div key={iIdx} className="text-[11px] leading-relaxed text-slate-300">
+                                        <span>• {desc}</span>
+                                        {evidenceIds.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-0.5">
+                                            {evidenceIds.map((eid) => (
+                                              <span key={eid} className="px-1 py-0.2 rounded bg-slate-950 text-[9px] text-indigo-300 border border-slate-800">
+                                                {eid}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-slate-400">
+                                  {isPassed ? "✓ Verified & adheres to policy" : "No issues reported"}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {evaluationError && (
+                    <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-[11px]">
+                      {evaluationError}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Execution Run Telemetry Footer Bar */}
               {activeRun && (
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-400">
@@ -2495,6 +2852,25 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                       {(run.step_count || run.execution_steps?.length) && (
                         <Badge variant="outline" className="text-[10px] text-cyan-300 border-cyan-800/40 hidden md:inline-flex">
                           {run.step_count || run.execution_steps?.length} steps
+                        </Badge>
+                      )}
+                      {run.evaluation_status && run.evaluation_status !== "not_run" && (
+                        <Badge
+                          variant={
+                            run.evaluation_status === "passed"
+                              ? "success"
+                              : run.evaluation_status === "warning"
+                              ? "warning"
+                              : "destructive"
+                          }
+                          className="text-[10px] font-mono hidden sm:inline-flex"
+                        >
+                          eval: {run.evaluation_status}
+                        </Badge>
+                      )}
+                      {run.revision_attempts > 0 && (
+                        <Badge variant="warning" className="text-[10px] font-mono hidden md:inline-flex">
+                          {run.revision_attempts} rev
                         </Badge>
                       )}
                     </div>

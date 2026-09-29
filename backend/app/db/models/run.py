@@ -10,6 +10,7 @@ from backend.app.db.models.guid import GUID
 
 if TYPE_CHECKING:
     from backend.app.db.models.task import Task
+    from backend.app.db.models.evaluation import EvaluationRun
 
 
 class Run(Base):
@@ -96,9 +97,15 @@ class Run(Base):
     model_routing_policy: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     fallback_attempts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
 
+    # Step 13: Evaluation & Verification Engine Metadata
+    evaluation_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    evaluation_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    evaluation_duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    evaluation_attempts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    revision_attempts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    evaluation_result: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
@@ -117,6 +124,12 @@ class Run(Base):
     task: Mapped["Task"] = relationship(
         "Task",
         back_populates="runs",
+    )
+    evaluation_runs: Mapped[List["EvaluationRun"]] = relationship(
+        "EvaluationRun",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="EvaluationRun.created_at",
     )
 
     def __repr__(self) -> str:

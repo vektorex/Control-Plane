@@ -34,13 +34,21 @@ from backend.app.services.orchestration.validator import PlanValidator
 from backend.app.services.retrieval.router import RetrievalRouter, get_retrieval_router
 from backend.app.services.tools.executor import ToolExecutor, get_tool_executor
 from backend.app.services.tools.registry import ToolRegistry, get_tool_registry
+from backend.app.services.evaluation.engine import EvaluationEngine, get_evaluation_engine
+from backend.app.services.evaluation.policies import EvaluationPolicy
+from backend.app.services.evaluation.schemas import (
+    EvaluationMode,
+    EvaluationRecommendation,
+    EvaluationResult,
+    EvaluationStatus,
+)
 
 
 class Orchestrator:
     """
     Main Orchestration Engine coordinating LLM-assisted / deterministic planning,
     plan validation, sequential execution, bounded agentic loop, completion evaluation,
-    and observable SSE streaming.
+    post-generation verification engine with controlled revision, and observable SSE streaming.
     """
 
     def __init__(
@@ -49,6 +57,7 @@ class Orchestrator:
         validator: Optional[PlanValidator] = None,
         executor: Optional[OrchestrationExecutor] = None,
         evaluator: Optional[CompletionEvaluator] = None,
+        evaluation_engine: Optional[EvaluationEngine] = None,
         context_engine: Optional[ContextEngine] = None,
         llm_factory: Optional[LLMProviderFactory] = None,
     ) -> None:
@@ -61,6 +70,7 @@ class Orchestrator:
             llm_factory=self.llm_factory,
         )
         self.evaluator = evaluator or CompletionEvaluator(llm_factory=self.llm_factory)
+        self.evaluation_engine = evaluation_engine or get_evaluation_engine()
 
     async def plan_task(
         self,
@@ -221,6 +231,63 @@ class Orchestrator:
                     session=session,
                     context=replan_context,
                 )
+
+        # Step 13: Evaluation & Verification Engine Pipeline
+        eval_policy = EvaluationPolicy.from_mode(
+            mode=req.evaluation_mode or getattr(task, "evaluation_mode", None) or settings.EVALUATION_DEFAULT_MODE,
+            strict=req.strict_evaluation if req.strict_evaluation is not None else (getattr(task, "strict_evaluation", False) or False),
+            max_revisions=req.max_revision_attempts,
+        )
+
+        if eval_policy.mode != EvaluationMode.OFF:
+            ctx_items_dict = [
+                it.model_dump(mode="json") if hasattr(it, "model_dump") else it
+                for it in accumulated_context_items
+            ]
+            web_sources = [
+                {
+                    "title": it.title if hasattr(it, "title") else it.get("title"),
+                    "url": (it.metadata if hasattr(it, "metadata") else it.get("metadata", {})).get("url"),
+                    "snippet": it.content if hasattr(it, "content") else it.get("content"),
+                }
+                for it in accumulated_context_items
+                if (it.source_type if hasattr(it, "source_type") else it.get("source_type")) == "web"
+            ]
+
+            eval_res = await self.evaluation_engine.evaluate(
+                task=task,
+                output_text=state.generated_output,
+                context_items=ctx_items_dict,
+                retrieval_sources=retrieval_sources_meta,
+                web_sources=web_sources,
+                expected_format=req.expected_format or getattr(task, "expected_format", None),
+                policy=eval_policy,
+                attempt=1,
+            )
+
+            state.metadata["initial_evaluation"] = eval_res.model_dump(mode="json")
+            final_eval = eval_res
+            revision_count = 0
+
+            # Revision loop if recommended and allowed
+            if eval_res.recommendation == EvaluationRecommendation.REVISE and eval_policy.auto_revise_on_fail:
+                revised_text, final_eval, revision_count = await self.evaluation_engine.revise_and_re_evaluate(
+                    task=task,
+                    draft_output=state.generated_output,
+                    initial_evaluation=eval_res,
+                    context_items=ctx_items_dict,
+                    retrieval_sources=retrieval_sources_meta,
+                    web_sources=web_sources,
+                    policy=eval_policy,
+                    model_override=req.model or settings.OPENAI_DEFAULT_MODEL,
+                    max_attempts=eval_policy.max_revision_attempts,
+                )
+                state.generated_output = revised_text
+
+            state.metadata["evaluation_result"] = final_eval.model_dump(mode="json")
+            state.metadata["revision_attempts"] = revision_count
+            state.metadata["evaluation_status"] = final_eval.status.value
+            state.metadata["evaluation_mode"] = final_eval.mode.value
 
         state.complete()
         return state
@@ -559,7 +626,6 @@ class Orchestrator:
                 raise last_err or RuntimeError("Streaming LLM generation failed across all candidates.")
 
             gen_record.mark_completed({"output_length": len(state.generated_output), "model": active_model, "provider": active_provider_id})
-            state.complete()
 
             yield {
                 "type": "step_completed",
@@ -575,6 +641,106 @@ class Orchestrator:
                 "model_provider": active_provider_id,
                 "fallback_attempts": fallback_count,
             }
+
+            # Step 13: Streaming Evaluation & Verification Engine
+            eval_policy = EvaluationPolicy.from_mode(
+                mode=req.evaluation_mode or getattr(task, "evaluation_mode", None) or settings.EVALUATION_DEFAULT_MODE,
+                strict=req.strict_evaluation if req.strict_evaluation is not None else (getattr(task, "strict_evaluation", False) or False),
+                max_revisions=req.max_revision_attempts,
+            )
+
+            if eval_policy.mode != EvaluationMode.OFF:
+                yield {
+                    "type": "evaluation_start",
+                    "mode": eval_policy.mode.value,
+                    "attempt": 1,
+                }
+
+                ctx_items_dict = [
+                    it.model_dump(mode="json") if hasattr(it, "model_dump") else it
+                    for it in accumulated_context_items
+                ]
+                web_sources = [
+                    {
+                        "title": it.title if hasattr(it, "title") else it.get("title"),
+                        "url": (it.metadata if hasattr(it, "metadata") else it.get("metadata", {})).get("url"),
+                        "snippet": it.content if hasattr(it, "content") else it.get("content"),
+                    }
+                    for it in accumulated_context_items
+                    if (it.source_type if hasattr(it, "source_type") else it.get("source_type")) == "web"
+                ]
+
+                eval_res = await self.evaluation_engine.evaluate(
+                    task=task,
+                    output_text=state.generated_output,
+                    context_items=ctx_items_dict,
+                    retrieval_sources=retrieval_sources_meta,
+                    web_sources=web_sources,
+                    expected_format=req.expected_format or getattr(task, "expected_format", None),
+                    policy=eval_policy,
+                    attempt=1,
+                )
+
+                for chk in eval_res.checks:
+                    yield {
+                        "type": "evaluation_check",
+                        "check": chk.model_dump(mode="json"),
+                    }
+
+                yield {
+                    "type": "evaluation_completed",
+                    "result": eval_res.model_dump(mode="json"),
+                    "attempt": 1,
+                }
+
+                state.metadata["initial_evaluation"] = eval_res.model_dump(mode="json")
+                final_eval = eval_res
+                revision_count = 0
+
+                if eval_res.recommendation == EvaluationRecommendation.REVISE and eval_policy.auto_revise_on_fail:
+                    yield {
+                        "type": "revision_start",
+                        "attempt": 1,
+                        "reasons": eval_res.revision_reasons,
+                    }
+
+                    revised_text, final_eval, revision_count = await self.evaluation_engine.revise_and_re_evaluate(
+                        task=task,
+                        draft_output=state.generated_output,
+                        initial_evaluation=eval_res,
+                        context_items=ctx_items_dict,
+                        retrieval_sources=retrieval_sources_meta,
+                        web_sources=web_sources,
+                        policy=eval_policy,
+                        model_override=active_model,
+                        max_attempts=eval_policy.max_revision_attempts,
+                    )
+                    state.generated_output = revised_text
+
+                    yield {
+                        "type": "revision_completed",
+                        "attempt": revision_count,
+                        "content": state.generated_output,
+                    }
+
+                    for chk in final_eval.checks:
+                        yield {
+                            "type": "evaluation_check",
+                            "check": chk.model_dump(mode="json"),
+                        }
+
+                    yield {
+                        "type": "evaluation_completed",
+                        "result": final_eval.model_dump(mode="json"),
+                        "attempt": revision_count + 1,
+                    }
+
+                state.metadata["evaluation_result"] = final_eval.model_dump(mode="json")
+                state.metadata["revision_attempts"] = revision_count
+                state.metadata["evaluation_status"] = final_eval.status.value
+                state.metadata["evaluation_mode"] = final_eval.mode.value
+
+            state.complete()
 
             yield {
                 "type": "orchestration_completed",

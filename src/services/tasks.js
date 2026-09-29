@@ -81,6 +81,12 @@ export const taskService = {
       onStepFailed,
       onEvaluating,
       onEvaluationCompleted,
+      onEvaluationStart,
+      onEvaluationCheck,
+      onRevisionStart,
+      onRevisionCompleted,
+      onModelSelected,
+      onModelFallback,
       onReplanGenerated,
       signal,
     }
@@ -158,8 +164,16 @@ export const taskService = {
               onStepFailed?.(parsed.step);
             } else if (parsed.type === "evaluating") {
               onEvaluating?.(parsed);
+            } else if (parsed.type === "evaluation_start") {
+              onEvaluationStart?.(parsed);
+            } else if (parsed.type === "evaluation_check") {
+              onEvaluationCheck?.(parsed.check);
             } else if (parsed.type === "evaluation_completed") {
-              onEvaluationCompleted?.(parsed.evaluation);
+              onEvaluationCompleted?.(parsed.result || parsed.evaluation);
+            } else if (parsed.type === "revision_start") {
+              onRevisionStart?.(parsed);
+            } else if (parsed.type === "revision_completed") {
+              onRevisionCompleted?.(parsed);
             } else if (parsed.type === "replan_generated") {
               onReplanGenerated?.(parsed.plan, parsed.iteration);
             } else if (parsed.type === "chunk" || parsed.type === "content_delta") {
@@ -259,6 +273,23 @@ export const taskService = {
     return apiClient(`/context/${contextId}`, {
       method: "DELETE",
     });
+  },
+
+  /**
+   * Evaluate task execution output (Step 13 Evaluation & Verification)
+   */
+  async evaluateTask(taskId, payload = {}) {
+    return apiClient(`/tasks/${taskId}/evaluate`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
+   * Get evaluation history and verification findings for a run (Step 13)
+   */
+  async getRunEvaluation(runId) {
+    return apiClient(`/runs/${runId}/evaluation`);
   },
 };
 

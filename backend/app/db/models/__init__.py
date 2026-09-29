@@ -10,6 +10,7 @@ from backend.app.db.models.run import Run
 from backend.app.db.models.context import TaskContext
 from backend.app.db.models.document import Document
 from backend.app.db.models.document_chunk import DocumentChunk
+from backend.app.db.models.evaluation import EvaluationRun, EvaluationFinding
 
 __all__ = [
     "Base",
@@ -26,6 +27,8 @@ __all__ = [
     "TaskContext",
     "Document",
     "DocumentChunk",
+    "EvaluationRun",
+    "EvaluationFinding",
 ]
 
 

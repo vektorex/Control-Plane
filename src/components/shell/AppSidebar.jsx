@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ListTodo,
+  Workflow,
   FolderKanban,
   Files,
   Settings,
@@ -22,6 +23,7 @@ import { WorkspaceSelector } from "./WorkspaceSelector";
 const iconMap = {
   LayoutDashboard,
   ListTodo,
+  Workflow,
   FolderKanban,
   Files,
   BarChart3,

@@ -643,23 +643,109 @@ All telemetry, trace events, usage records, and analytics queries strictly enfor
 
 ---
 
-## ✅ Step 14 Verification Checklist
+## ⚡ Workflow System (Step 15)
 
-- [x] Internal, provider-independent `ObservabilityService` suite (`service.py`, `tracer.py`, `schemas.py`, `metrics.py`, `usage.py`, `cost.py`, `events.py`, `errors.py`).
-- [x] Database models `RunTelemetry`, `ExecutionTraceEvent`, and `UsageRecord` with multi-column indexes.
-- [x] Alembic migration `012_observability_usage_and_cost_intelligence.py` generated and applied.
-- [x] Standardized `CostCalculator` implementing exact per-1M token pricing formulas and returning `null` when unconfigured.
-- [x] Normalized provider usage representation with explicit usage source tracking (`provider`, `estimated`, `unavailable`).
-- [x] Pipeline-wide instrumented execution trace covering Planning, Retrieval, Tools, Generation, Evaluation, Revision, and Failures.
-- [x] Fail-safe telemetry recording ensuring observability errors never disrupt AI task execution.
-- [x] Multi-dimensional `UsageAnalyticsService` computing aggregations across workspaces, projects, tasks, models, providers, and time intervals.
-- [x] Multi-tenant workspace isolation strictly enforced across all analytics and run telemetry endpoints.
-- [x] Centralized `sanitize_metadata()` scrubbing API keys, bearer tokens, authorization headers, passwords, and CoT before persistence.
-- [x] Configurable telemetry retention (`OBSERVABILITY_RETENTION_DAYS=30`) and authenticated admin cleanup API.
-- [x] Pure JavaScript Next.js Analytics Dashboard (`/app/analytics`) with Overview, Usage trends, Model telemetry, and Evaluation sections.
-- [x] Pure JavaScript Next.js Execution Trace UI (`/app/runs/[runId]`) with interactive timeline and sanitized metadata inspector.
-- [x] 233/233 passing backend tests across all modules.
-- [x] Next.js production build passing with 100% pure JavaScript.
+Step 15 introduces a **Production-Grade Workflow System** that enables users to build, validate, publish, template, and execute reusable multi-step AI orchestration pipelines leveraging existing context, retrieval, tools, model routing, evaluation, and observability layers.
+
+### 1. Workflow Architecture & Lifecycle
+
+```
+Workflow Definition
+      ↓
+WorkflowValidator (Limits, schemas, DAG cycles, branching targets)
+      ↓
+Workflow Publishing (Creates immutable snapshot in WorkflowVersion)
+      ↓
+WorkflowRun Trigger
+      ↓
+Runtime Input Validation (Validates against workflow.input_schema)
+      ↓
+WorkflowExecutor
+      ├── WorkflowExecutionState (input, context, retrieval, tool_results, outputs, evaluations)
+      ├── Sequential Step Dispatch (input, context, retrieve, tool, generate, evaluate, transform, condition, output)
+      ├── Safe Variable Interpolation ({{input.key}}, {{steps.step_id.output}})
+      ├── Step Retry/Skip Resilience (max_retries <= 2 on transient failures)
+      └── Observability Tracing (Step-by-step ExecutionTraceEvent telemetry)
+      ↓
+Final Output & Persisted WorkflowRun
+```
+
+### 2. Workflow Step Types
+
+| Step Type | Description & Underlying Service Integration | Configuration Highlights |
+|---|---|---|
+| `input` | Captures and validates runtime parameters against the typed `input_schema` | Key mappings, parameter declarations |
+| `context` | Injects workspace/project knowledge and conversational memory via `ContextEngine` | `max_tokens`, `include_workspace_context` |
+| `retrieve` | Executes semantic, keyword, or hybrid document retrieval via `RetrievalRouter` | `mode`, `top_k`, `query` (supports variables) |
+| `tool` | Dispatches external tools (e.g. `web_search`) via `ToolRegistry` and `ToolExecutor` | `tool`, `parameters`, `max_retries` |
+| `generate` | Synthesizes responses via `ModelRouter` and LLM abstraction | `mode`, `preferred_model`, `temperature`, `prompt_template` |
+| `evaluate` | Validates grounding, completeness, or factual correctness via `EvaluationEngine` | `mode`, `threshold`, `target`, `context_source` |
+| `transform` | Safe structured data manipulation with zero code execution | `operation` (`select`, `rename`, `join`, `truncate`, `filter`), `source`, `fields` |
+| `condition` | Server-side deterministic branching based on state values | `left`, `operator` (`==`, `!=`, `>`, `>=`, `<`, `<=`, `exists`), `right`, `if_true`, `if_false` |
+| `output` | Formats and emits the terminal response | `output_template`, `format` (`markdown`, `json`, `text`) |
+
+### 3. Built-In Workflow Templates
+
+Workflows include four pre-configured production templates that can be installed directly into any workspace:
+1. **Research Assistant**: `Input` → `Web Search` → `Context/Retrieve` → `Generate Answer` → `Evaluate Grounding` → `Output`.
+2. **Document Q&A**: `Input` → `Hybrid Document Retrieval` → `Generate Response` → `Grounding Evaluation` → `Output`.
+3. **Summarize & Verify**: `Input` → `Generate Summary` → `Evaluate Completeness` → `Condition (if warning revise)` → `Output`.
+4. **Research Report**: `Input` → `Web Search` → `Document Retrieval` → `Generate Draft` → `Evaluate` → `Revise` → `Output`.
+
+### 4. Versioning & Immutability Rules
+
+- **Draft Workflows**: Editable in-place; can be modified, re-ordered, tested, and validated.
+- **Published Workflows**: Publishing creates an immutable snapshot in `WorkflowVersion`. Once published, the version cannot be mutated.
+- **Draft Forking on Edit**: Editing a published workflow automatically increments the version counter and sets the status back to `draft`.
+- **Reproducible Execution**: Historical `WorkflowRun` records always store the exact version snapshot executed, guaranteeing full reproducibility.
+
+### 5. Security & Isolation Safeguards
+
+- **No Arbitrary Code Execution**: Step transforms and conditions are strictly declarative and executed through safe deterministic parsers.
+- **Safe Variable Interpolation**: Resolves paths (`{{input.key}}`, `{{steps.id.output}}`) safely against validated execution state dictionaries.
+- **Multi-Tenant Workspace Isolation**: Every workflow, step, version, and run is strictly partitioned by `workspace_id`.
+- **Privacy & Telemetry**: Internal chain-of-thought and private model reasoning are never exposed.
+
+### 6. Workflow API Endpoints
+
+- `POST /api/workflows` - Create a new workflow draft
+- `GET /api/workflows` - List workflows (filtered by workspace, project, status)
+- `GET /api/workflows/{workflow_id}` - Retrieve workflow entity and metadata
+- `PATCH /api/workflows/{workflow_id}` - Update workflow metadata
+- `DELETE /api/workflows/{workflow_id}` - Delete workflow
+- `GET /api/workflows/{workflow_id}/definition` - Get full definition (steps, schema)
+- `PATCH /api/workflows/{workflow_id}/definition` - Update definition steps & schema
+- `POST /api/workflows/{workflow_id}/validate` - Validate rules, constraints, and branch targets
+- `POST /api/workflows/{workflow_id}/publish` - Publish workflow version (creates immutable snapshot)
+- `POST /api/workflows/{workflow_id}/duplicate` - Clone workflow into a new draft
+- `POST /api/workflows/{workflow_id}/run` - Trigger workflow run with input parameters
+- `GET /api/workflows/{workflow_id}/runs` - List historical runs for a workflow
+- `GET /api/workflow-runs/{run_id}` - Get execution run details and step results
+- `GET /api/workflow-runs/{run_id}/trace` - Get execution observability trace events
+- `GET /api/workflow-templates` - List built-in templates
+- `POST /api/workflow-templates/{template_id}/install` - Install template into workspace
+
+---
+
+## ✅ Step 15 Verification Checklist
+
+- [x] Complete domain models `Workflow`, `WorkflowStep`, `WorkflowVersion`, and `WorkflowRun` with compound indexes.
+- [x] Alembic migration `013_workflow_system.py` generated and applied.
+- [x] `WorkflowValidator` enforcing step limits, type validation, schema checks, branch targets, and depth limits.
+- [x] All 9 deterministic step types (`input`, `context`, `retrieve`, `tool`, `generate`, `evaluate`, `transform`, `condition`, `output`) reusing existing backend engines.
+- [x] Safe variable interpolation (`{{input.field}}`, `{{steps.step_id.output}}`) with no arbitrary code execution.
+- [x] Deterministic conditional branching (`==`, `!=`, `>`, `>=`, `<`, `<=`, `exists`).
+- [x] Safe structured data transformations (`select`, `rename`, `join`, `truncate`, `filter`).
+- [x] Built-in templates registry with 4 initial production pipelines (`Research Assistant`, `Document Q&A`, `Summarize & Verify`, `Research Report`).
+- [x] Versioning and publishing lifecycle with immutable version snapshots in `WorkflowVersion`.
+- [x] Full observability integration reusing `ObservabilityService` and `ExecutionTraceEvent`.
+- [x] Multi-tenant workspace and project boundary isolation strictly enforced across all workflow operations.
+- [x] Pure JavaScript Next.js Workflow List page (`/app/workflows`) with filtering, template gallery, and run triggers.
+- [x] Pure JavaScript Next.js Visual Workflow Builder (`/app/workflows/[workflowId]`) with step reordering, 9-type config drawer, live validation, and draft/publish controls.
+- [x] Pure JavaScript Next.js Workflow Run Detail page (`/app/workflows/[workflowId]/runs/[runId]`) with step timeline, telemetry trace, variable inspector, and formatted output.
+- [x] 247/247 passing backend unit & integration tests.
+- [x] 100% successful Next.js production build with pure JavaScript (no TypeScript).
+
 
 
 

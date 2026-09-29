@@ -12,6 +12,7 @@ from backend.app.db.models.document import Document
 from backend.app.db.models.document_chunk import DocumentChunk
 from backend.app.db.models.evaluation import EvaluationRun, EvaluationFinding
 from backend.app.db.models.observability import RunTelemetry, ExecutionTraceEvent, UsageRecord
+from backend.app.db.models.workflow import Workflow, WorkflowStep, WorkflowVersion, WorkflowRun
 
 __all__ = [
     "Base",
@@ -33,6 +34,10 @@ __all__ = [
     "RunTelemetry",
     "ExecutionTraceEvent",
     "UsageRecord",
+    "Workflow",
+    "WorkflowStep",
+    "WorkflowVersion",
+    "WorkflowRun",
 ]
 
 

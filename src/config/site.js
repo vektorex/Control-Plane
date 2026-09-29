@@ -25,6 +25,12 @@ export const siteConfig = {
       description: "Manage, dispatch, and monitor orchestrated task executions",
     },
     {
+      label: "Workflows",
+      href: "/app/workflows",
+      icon: "Workflow",
+      description: "Build, validate, publish, and execute multi-step AI orchestration pipelines",
+    },
+    {
       label: "Projects",
       href: "/app/projects",
       icon: "FolderKanban",

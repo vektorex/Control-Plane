@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from backend.app.db.models.user import User
     from backend.app.db.models.project import Project
     from backend.app.db.models.document import Document
+    from backend.app.db.models.workflow import Workflow, WorkflowRun
 
 
 class Workspace(Base):
@@ -66,6 +67,20 @@ class Workspace(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="desc(Document.created_at)",
+    )
+    workflows: Mapped[List["Workflow"]] = relationship(
+        "Workflow",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="desc(Workflow.created_at)",
+    )
+    workflow_runs: Mapped[List["WorkflowRun"]] = relationship(
+        "WorkflowRun",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="desc(WorkflowRun.created_at)",
     )
 
     def __repr__(self) -> str:

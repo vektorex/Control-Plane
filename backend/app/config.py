@@ -121,6 +121,14 @@ class Settings(BaseSettings):
     OBSERVABILITY_RETENTION_DAYS: int = 30
     MAX_TRACE_METADATA_BYTES: int = 10240
 
+    # Step 15: Workflow System Settings
+    MAX_WORKFLOW_STEPS: int = 20
+    MAX_WORKFLOW_DEPTH: int = 5
+    MAX_WORKFLOW_TOOL_CALLS: int = 10
+    MAX_WORKFLOW_RETRIEVAL_CALLS: int = 10
+    MAX_WORKFLOW_EXECUTION_SECONDS: float = 300.0
+    MAX_WORKFLOW_OUTPUT_BYTES: int = 1048576  # 1MB output limit
+
 
 settings = Settings()
 

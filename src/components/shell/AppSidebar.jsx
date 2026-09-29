@@ -13,6 +13,7 @@ import {
   Terminal,
   Activity,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -23,6 +24,7 @@ const iconMap = {
   ListTodo,
   FolderKanban,
   Files,
+  BarChart3,
   Terminal,
   Settings,
 };

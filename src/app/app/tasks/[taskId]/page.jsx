@@ -2644,12 +2644,17 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         )}
                       </span>
                     )}
-                    {activeRun.latency_ms !== null && activeRun.latency_ms !== undefined && (
-                      <span>• Latency: <strong className="text-emerald-400">{activeRun.latency_ms}ms</strong></span>
-                    )}
                     {activeRun.total_tokens !== null && activeRun.total_tokens !== undefined && (
                       <span>• Tokens: <strong className="text-indigo-300">{activeRun.total_tokens}</strong> (in: {activeRun.input_tokens || 0}, out: {activeRun.output_tokens || 0})</span>
                     )}
+                    <Link
+                      href={`/app/runs/${activeRun.id}`}
+                      className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-indigo-950/80 hover:bg-indigo-900/90 text-indigo-300 border border-indigo-700/50 text-[11px] font-medium transition-colors"
+                    >
+                      <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Execution Trace</span>
+                      <ExternalLink className="w-3 h-3 text-indigo-400" />
+                    </Link>
                   </div>
                 </div>
               )}
@@ -2904,6 +2909,15 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         <Calendar className="w-3 h-3" />
                         {formatDate(run.created_at)}
                       </span>
+                      <Link
+                        href={`/app/runs/${run.id}`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/40 text-[10px] font-medium transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Activity className="w-3 h-3 text-indigo-400" />
+                        <span>Trace</span>
+                        <ExternalLink className="w-2.5 h-2.5 text-indigo-400" />
+                      </Link>
                     </div>
                   </div>
                 );

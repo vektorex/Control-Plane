@@ -555,5 +555,112 @@ Final Output
 - [x] 221/221 passing backend tests across all project modules.
 - [x] Next.js production build passing with 100% pure JavaScript.
 
+---
+
+## 📊 Observability, Usage & Cost Intelligence (Step 14)
+
+Step 14 introduces a production-grade, internal **Observability, Usage & Cost Intelligence Layer** that captures structured execution telemetry, granular token accounting, multi-stage latency distributions, model operational data, and end-to-end execution traces across planning, retrieval, tools, generation, evaluation, and revision.
+
+### 1. Telemetry & Observability Architecture
+
+```
+Task Execution / Streaming Run
+ ├── Stage 1: Planning   ──> TraceEvent [planning_started, planning_completed]
+ ├── Stage 2: Retrieval  ──> TraceEvent [retrieval_started, retrieval_completed]
+ ├── Stage 3: Tools      ──> TraceEvent [tool_started, tool_completed]
+ ├── Stage 4: Generation ──> TraceEvent [generation_started, generation_completed]
+ ├── Stage 5: Evaluation ──> TraceEvent [evaluation_started, evaluation_completed]
+ └── Stage 6: Revision   ──> TraceEvent [revision_started, revision_completed]
+       ↓
+ ExecutionTracer (Buffered sequential events with auto-sequence numbering)
+       ↓
+ ObservabilityService (Fail-Safe Telemetry Engine)
+       ├── ExecutionTraceEvent (Ordered, sanitized event stream)
+       ├── UsageRecord         (Granular operation token usage & cost)
+       └── RunTelemetry        (Consolidated execution summary & metrics)
+       ↓
+ UsageAnalyticsService (Multi-dimensional tenant-isolated aggregations)
+       ├── Overview Analytics   (Runs, tokens, cost, latency, eval passes)
+       ├── Usage Analytics      (Time-series token and cost trends)
+       ├── Model Analytics      (Factual operational metrics per model)
+       ├── Provider Analytics   (Usage share and performance by provider)
+       └── Latency Analytics    (End-to-end & per-stage p50/p95 distributions)
+```
+
+### 2. Execution Trace Event Lifecycle
+
+Every AI task execution records an ordered trace stream with zero risk to pipeline execution:
+1. `run_started`: Run initialization, routed model preferences, task metadata
+2. `planning_started` / `planning_completed`: Decomposition, strategy selection, plan validation
+3. `retrieval_started` / `retrieval_completed`: Query expansion, vector/BM25 retrieval, reranked chunks
+4. `tool_started` / `tool_completed`: Tool invocation, input validation, execution latency
+5. `generation_started` / `generation_completed`: Prompt rendering, LLM invocation, token output
+6. `evaluation_started` / `evaluation_completed`: Verification check results and findings
+7. `revision_started` / `revision_completed`: Bounded revision loops and corrective improvements
+8. `run_completed` / `run_failed`: Terminal execution status with elapsed latency and safe error codes
+
+### 3. Usage & Cost Intelligence Formulas
+
+Cost calculations adhere to standardized per-1M token pricing formulas configured in the model catalog:
+
+$$\text{Input Cost} = \frac{\text{Input Tokens}}{1,000,000} \times \text{Input Price per 1M Tokens}$$
+
+$$\text{Output Cost} = \frac{\text{Output Tokens}}{1,000,000} \times \text{Output Price per 1M Tokens}$$
+
+$$\text{Total Run Cost} = \text{Input Cost} + \text{Output Cost}$$
+
+- **Unconfigured Pricing**: If a model has no pricing metadata configured, `estimated_cost` returns `null` (never invented pricing).
+- **Provider Usage Normalization**: Provider usage is normalized into `{ input_tokens, output_tokens, total_tokens, cached_input_tokens, estimated_cost }` with source flags (`provider`, `estimated`, `unavailable`).
+
+### 4. Security, Sanitization & Privacy Safeguards
+
+- **Telemetry Sanitizer (`sanitize_metadata`)**: Centralized sanitization scrubs API keys, bearer tokens, authorization headers, cookies, passwords, and secrets before persistence.
+- **No Chain-of-Thought**: Private model reasoning and internal prompts are strictly excluded from persisted telemetry.
+- **Bounded Payloads**: Metadata sizes are strictly capped (`MAX_TRACE_METADATA_BYTES=10240`) to prevent oversized database writes.
+- **Fail-Safe Observability**: All telemetry recording operations run within fail-safe handlers so observability errors never cause AI task execution to fail.
+
+### 5. Multi-Tenant Workspace Isolation
+
+All telemetry, trace events, usage records, and analytics queries strictly enforce workspace boundary ownership. No workspace can ever inspect, aggregate, or delete another workspace's telemetry data.
+
+### 6. Observability Retention & Cleanup
+
+- System configuration: `OBSERVABILITY_RETENTION_DAYS=30` (configurable).
+- Admin endpoint: `POST /api/admin/observability/cleanup?retention_days=30` safely purges old `ExecutionTraceEvent`, `UsageRecord`, and `RunTelemetry` rows without ever deleting `Task`, `Run`, `Document`, or `Evaluation` records.
+
+### 7. Authenticated Analytics & Trace Endpoints
+
+- `GET /api/analytics/overview` - Executive overview (runs, tokens, cost, latency, eval passes)
+- `GET /api/analytics/usage` - Time-series token and cost trends by day/week/month
+- `GET /api/analytics/models` - Factual operational telemetry per model
+- `GET /api/analytics/providers` - Provider distribution and market share
+- `GET /api/analytics/latency` - End-to-end and per-stage latency distributions
+- `GET /api/analytics/evaluations` - Verification pass/fail rates and policy compliance
+- `GET /api/runs/{run_id}/trace` - Sequential execution trace event timeline
+- `GET /api/runs/{run_id}/usage` - Granular usage records for an execution run
+- `GET /api/runs/{run_id}/telemetry` - Consolidated RunTelemetry record
+- `POST /api/admin/observability/cleanup` - Retention cleanup execution
+
+---
+
+## ✅ Step 14 Verification Checklist
+
+- [x] Internal, provider-independent `ObservabilityService` suite (`service.py`, `tracer.py`, `schemas.py`, `metrics.py`, `usage.py`, `cost.py`, `events.py`, `errors.py`).
+- [x] Database models `RunTelemetry`, `ExecutionTraceEvent`, and `UsageRecord` with multi-column indexes.
+- [x] Alembic migration `012_observability_usage_and_cost_intelligence.py` generated and applied.
+- [x] Standardized `CostCalculator` implementing exact per-1M token pricing formulas and returning `null` when unconfigured.
+- [x] Normalized provider usage representation with explicit usage source tracking (`provider`, `estimated`, `unavailable`).
+- [x] Pipeline-wide instrumented execution trace covering Planning, Retrieval, Tools, Generation, Evaluation, Revision, and Failures.
+- [x] Fail-safe telemetry recording ensuring observability errors never disrupt AI task execution.
+- [x] Multi-dimensional `UsageAnalyticsService` computing aggregations across workspaces, projects, tasks, models, providers, and time intervals.
+- [x] Multi-tenant workspace isolation strictly enforced across all analytics and run telemetry endpoints.
+- [x] Centralized `sanitize_metadata()` scrubbing API keys, bearer tokens, authorization headers, passwords, and CoT before persistence.
+- [x] Configurable telemetry retention (`OBSERVABILITY_RETENTION_DAYS=30`) and authenticated admin cleanup API.
+- [x] Pure JavaScript Next.js Analytics Dashboard (`/app/analytics`) with Overview, Usage trends, Model telemetry, and Evaluation sections.
+- [x] Pure JavaScript Next.js Execution Trace UI (`/app/runs/[runId]`) with interactive timeline and sanitized metadata inspector.
+- [x] 233/233 passing backend tests across all modules.
+- [x] Next.js production build passing with 100% pure JavaScript.
+
+
 
 

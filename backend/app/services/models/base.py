@@ -29,10 +29,34 @@ class CostClass(str, Enum):
 
 
 class CostMetadata(BaseModel):
-    """Token pricing configuration per 1,000 tokens."""
-    input_cost_per_1k_tokens: Optional[float] = Field(default=None, description="Input token cost per 1k in USD")
-    output_cost_per_1k_tokens: Optional[float] = Field(default=None, description="Output token cost per 1k in USD")
+    """Token pricing configuration per 1M tokens (and legacy per 1k tokens)."""
+    input_cost_per_1m_tokens: Optional[float] = Field(default=None, description="Input token cost per 1M tokens in USD")
+    output_cost_per_1m_tokens: Optional[float] = Field(default=None, description="Output token cost per 1M tokens in USD")
+    cached_input_cost_per_1m_tokens: Optional[float] = Field(default=None, description="Cached input token cost per 1M tokens in USD")
+    input_cost_per_1k_tokens: Optional[float] = Field(default=None, description="Legacy input token cost per 1k in USD")
+    output_cost_per_1k_tokens: Optional[float] = Field(default=None, description="Legacy output token cost per 1k in USD")
     currency: str = Field(default="USD", description="Currency ISO code")
+
+    @property
+    def effective_input_cost_per_1m(self) -> Optional[float]:
+        if self.input_cost_per_1m_tokens is not None:
+            return self.input_cost_per_1m_tokens
+        if self.input_cost_per_1k_tokens is not None:
+            return round(self.input_cost_per_1k_tokens * 1000.0, 6)
+        return None
+
+    @property
+    def effective_output_cost_per_1m(self) -> Optional[float]:
+        if self.output_cost_per_1m_tokens is not None:
+            return self.output_cost_per_1m_tokens
+        if self.output_cost_per_1k_tokens is not None:
+            return round(self.output_cost_per_1k_tokens * 1000.0, 6)
+        return None
+
+    @property
+    def effective_cached_input_cost_per_1m(self) -> Optional[float]:
+        return self.cached_input_cost_per_1m_tokens
+
 
 
 class ModelDefinition(BaseModel):

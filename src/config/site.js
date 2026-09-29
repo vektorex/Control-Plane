@@ -37,6 +37,12 @@ export const siteConfig = {
       description: "Manage uploaded knowledge base, chunking, and vector index",
     },
     {
+      label: "Analytics",
+      href: "/app/analytics",
+      icon: "BarChart3",
+      description: "Observability, token usage, cost tracking, and execution metrics",
+    },
+    {
       label: "Playground",
       href: "/app/playground",
       icon: "Terminal",

@@ -11,6 +11,7 @@ from backend.app.db.models.context import TaskContext
 from backend.app.db.models.document import Document
 from backend.app.db.models.document_chunk import DocumentChunk
 from backend.app.db.models.evaluation import EvaluationRun, EvaluationFinding
+from backend.app.db.models.observability import RunTelemetry, ExecutionTraceEvent, UsageRecord
 
 __all__ = [
     "Base",
@@ -29,6 +30,10 @@ __all__ = [
     "DocumentChunk",
     "EvaluationRun",
     "EvaluationFinding",
+    "RunTelemetry",
+    "ExecutionTraceEvent",
+    "UsageRecord",
 ]
+
 
 

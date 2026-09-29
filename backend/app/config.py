@@ -117,9 +117,13 @@ class Settings(BaseSettings):
     MAX_REVISION_ATTEMPTS: int = 2
     EVALUATION_TIMEOUT_SECONDS: float = 30.0
 
+    # Step 14: Observability, Usage & Cost Intelligence Settings
+    OBSERVABILITY_RETENTION_DAYS: int = 30
+    MAX_TRACE_METADATA_BYTES: int = 10240
 
 
 settings = Settings()
+
 
 
 

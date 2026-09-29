@@ -25,6 +25,14 @@ from backend.app.services.context.models import ContextBudget
 from backend.app.services.llm.factory import LLMProviderFactory, get_llm_factory
 from backend.app.services.models.registry import default_model_registry
 from backend.app.services.models.router import ModelRequirementAnalyzer, default_model_router
+from backend.app.services.observability import (
+    ExecutionTracer,
+    ObservabilityService,
+    TraceEventStatus,
+    TraceEventType,
+    default_cost_calculator,
+    extract_error_code,
+)
 from backend.app.services.orchestration.orchestrator import Orchestrator, get_orchestrator
 from backend.app.services.orchestration.plan import ExecutionPlan, StepType
 
@@ -39,20 +47,13 @@ def calculate_estimated_cost(
     Calculates estimated run cost based on configured ModelRegistry cost metadata.
     Returns None if pricing configuration is unavailable without guessing.
     """
-    if not model_id or (input_tokens is None and output_tokens is None):
-        return None
-    model_def = default_model_registry.get_model(model_id, provider=provider_id)
-    if not model_def or not model_def.cost_metadata:
-        return None
-    in_rate = model_def.cost_metadata.input_cost_per_1k_tokens
-    out_rate = model_def.cost_metadata.output_cost_per_1k_tokens
-    if in_rate is None and out_rate is None:
-        return None
+    return default_cost_calculator.calculate_generation_cost(
+        model_id=model_id,
+        provider=provider_id,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
 
-    in_tok = input_tokens or 0
-    out_tok = output_tokens or 0
-    total = ((in_tok / 1000.0) * (in_rate or 0.0)) + ((out_tok / 1000.0) * (out_rate or 0.0))
-    return round(total, 6)
 
 
 class TaskExecutionService:
@@ -79,6 +80,7 @@ class TaskExecutionService:
         self.task_repo = TaskRepository(session)
         self.run_repo = RunRepository(session)
         self.eval_repo = EvaluationRepository(session)
+        self.obs_service = ObservabilityService(session)
 
     async def plan_task(
         self,
@@ -114,6 +116,9 @@ class TaskExecutionService:
         prompt_check = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
         if not prompt_check:
             raise InvalidStateError("Task has no instructions, description, or title to execute.")
+
+        # Resolve workspace context
+        workspace_id = task.project.workspace_id if (task.project and task.project.workspace_id) else None
 
         # 1. Generate & Validate Plan
         plan = await self.orchestrator.plan_task(
@@ -224,6 +229,18 @@ class TaskExecutionService:
         await self.session.flush()
         await self.session.refresh(run)
 
+        # Initialize tracer for Step 14 Observability
+        tracer = ExecutionTracer(run_id=run.id, workspace_id=workspace_id) if workspace_id else None
+        if tracer:
+            tracer.record_event(
+                TraceEventType.RUN_STARTED,
+                status=TraceEventStatus.STARTED,
+                started_at=run.started_at,
+                model=model_selection.model_id,
+                provider=model_selection.provider,
+                metadata={"task_title": task.title, "model_mode": model_mode},
+            )
+
         # 5. Execute Orchestration Plan with bounded agentic loop
         try:
             state = await self.orchestrator.execute_task(
@@ -231,6 +248,7 @@ class TaskExecutionService:
                 request=request,
                 user=user,
                 session=self.session,
+                tracer=tracer,
             )
 
             # 6. Harvest execution state telemetry
@@ -360,6 +378,68 @@ class TaskExecutionService:
             await self.session.flush()
             await self.session.refresh(run)
 
+            # Step 14 Observability: Record trace completion, usage records, and RunTelemetry (fail-safe)
+            if workspace_id:
+                try:
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.RUN_COMPLETED,
+                            status=TraceEventStatus.COMPLETED,
+                            completed_at=run.completed_at,
+                            duration_ms=run.latency_ms,
+                            model=run.final_model,
+                            provider=run.model_provider,
+                            metadata={"total_tokens": run.total_tokens, "status": run.status},
+                        )
+                        await tracer.flush_to_db(self.session)
+
+                    # Record generation usage
+                    await self.obs_service.record_usage(
+                        workspace_id=workspace_id,
+                        run_id=run.id,
+                        provider=run.model_provider or "openai",
+                        model=run.final_model or "gpt-4o-mini",
+                        operation="generation",
+                        input_tokens=run.input_tokens or 0,
+                        output_tokens=run.output_tokens or 0,
+                        estimated_cost=run.estimated_cost,
+                    )
+
+                    # Record consolidated RunTelemetry
+                    gen_dur = sum(r.duration_ms for r in state.step_records if r.step_type == "generate") if state.step_records else (run.latency_ms or 0)
+                    await self.obs_service.record_run_telemetry(
+                        run_id=run.id,
+                        workspace_id=workspace_id,
+                        task_id=task.id,
+                        project_id=task.project_id,
+                        started_at=run.started_at,
+                        completed_at=run.completed_at,
+                        duration_ms=run.latency_ms,
+                        status=run.status,
+                        provider=run.model_provider,
+                        planner_model=run.planner_model,
+                        generation_model=run.final_model,
+                        evaluator_model=settings.EVALUATOR_MODEL if final_eval else None,
+                        input_tokens=run.input_tokens or 0,
+                        output_tokens=run.output_tokens or 0,
+                        total_tokens=run.total_tokens or 0,
+                        estimated_cost=run.estimated_cost,
+                        retrieval_calls=1 if run.retrieved_chunk_count else 0,
+                        retrieval_results=run.retrieved_chunk_count or 0,
+                        tool_calls=run.tool_call_count or 0,
+                        tools_used=run.tools_used,
+                        execution_steps=run.step_count or 0,
+                        planner_duration_ms=0,
+                        retrieval_duration_ms=run.retrieval_latency_ms or 0,
+                        tool_duration_ms=run.tool_latency_ms or 0,
+                        generation_duration_ms=gen_dur,
+                        evaluation_duration_ms=run.evaluation_duration_ms or 0,
+                        revision_attempts=run.revision_attempts or 0,
+                        evaluation_status=run.evaluation_status,
+                    )
+                except Exception as obs_err:
+                    logger.warning(f"[Observability] Failed to record run observability telemetry: {obs_err}")
+
             return run
 
         except Exception as exc:
@@ -369,8 +449,42 @@ class TaskExecutionService:
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
             run.latency_ms = elapsed_ms
             run.orchestration_duration_ms = elapsed_ms
+
+            # Record failure telemetry in fail-safe manner
+            if workspace_id:
+                try:
+                    err_code = extract_error_code(exc)
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.RUN_FAILED,
+                            status=TraceEventStatus.FAILED,
+                            completed_at=run.completed_at,
+                            duration_ms=run.latency_ms,
+                            error_code=err_code,
+                            metadata={"error": str(exc)},
+                        )
+                        await tracer.flush_to_db(self.session)
+
+                    await self.obs_service.record_run_telemetry(
+                        run_id=run.id,
+                        workspace_id=workspace_id,
+                        task_id=task.id,
+                        project_id=task.project_id,
+                        started_at=run.started_at,
+                        completed_at=run.completed_at,
+                        duration_ms=run.latency_ms,
+                        status="failed",
+                        provider=run.model_provider,
+                        generation_model=run.final_model,
+                        error_code=err_code,
+                        error_message=str(exc),
+                    )
+                except Exception as obs_err:
+                    logger.warning(f"[Observability] Failed to record failed run telemetry: {obs_err}")
+
             await self.session.commit()
             raise exc
+
 
     async def execute_task_stream(
         self,
@@ -498,6 +612,19 @@ class TaskExecutionService:
         await self.session.flush()
         await self.session.refresh(run)
 
+        # Resolve workspace context
+        workspace_id = task.project.workspace_id if (task.project and task.project.workspace_id) else None
+        tracer = ExecutionTracer(run_id=run.id, workspace_id=workspace_id) if workspace_id else None
+        if tracer:
+            tracer.record_event(
+                TraceEventType.RUN_STARTED,
+                status=TraceEventStatus.STARTED,
+                started_at=run.started_at,
+                model=model_selection.model_id,
+                provider=model_selection.provider,
+                metadata={"task_title": task.title, "model_mode": model_mode},
+            )
+
         # Emit run_start and model_selected events
         yield f"data: {json.dumps({'type': 'run_start', 'run_id': str(run.id), 'execution_plan': plan_json, 'orchestration_plan': plan_json, 'tools_used': run.tools_used, 'retrieval_enabled': retrieval_required, 'context_item_count': init_pkg.total_items, 'estimated_context_tokens': init_pkg.estimated_tokens, 'context_truncated': init_pkg.truncated, 'context_sources': list(init_pkg.sources)})}\n\n"
         yield f"data: {json.dumps({'type': 'model_selected', 'model': model_selection.model_id, 'provider': model_selection.provider, 'display_name': model_selection.display_name, 'reason': model_selection.reason, 'policy': model_selection.policy, 'satisfied_requirements': model_selection.satisfied_requirements})}\n\n"
@@ -607,6 +734,64 @@ class TaskExecutionService:
             await self.session.flush()
             await self.session.refresh(run)
 
+            # Step 14 Observability: Record trace completion, usage, and RunTelemetry (fail-safe)
+            if workspace_id:
+                try:
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.RUN_COMPLETED,
+                            status=TraceEventStatus.COMPLETED,
+                            completed_at=run.completed_at,
+                            duration_ms=run.latency_ms,
+                            model=run.final_model,
+                            provider=run.model_provider,
+                            metadata={"total_tokens": run.total_tokens, "status": run.status},
+                        )
+                        await tracer.flush_to_db(self.session)
+
+                    await self.obs_service.record_usage(
+                        workspace_id=workspace_id,
+                        run_id=run.id,
+                        provider=run.model_provider or "openai",
+                        model=run.final_model or "gpt-4o-mini",
+                        operation="generation",
+                        input_tokens=run.input_tokens or 0,
+                        output_tokens=run.output_tokens or 0,
+                        estimated_cost=run.estimated_cost,
+                    )
+
+                    await self.obs_service.record_run_telemetry(
+                        run_id=run.id,
+                        workspace_id=workspace_id,
+                        task_id=task.id,
+                        project_id=task.project_id,
+                        started_at=run.started_at,
+                        completed_at=run.completed_at,
+                        duration_ms=run.latency_ms,
+                        status=run.status,
+                        provider=run.model_provider,
+                        planner_model=run.planner_model,
+                        generation_model=run.final_model,
+                        evaluator_model=settings.EVALUATOR_MODEL if (final_orch_state and final_orch_state.get("metadata", {}).get("evaluation_result")) else None,
+                        input_tokens=run.input_tokens or 0,
+                        output_tokens=run.output_tokens or 0,
+                        total_tokens=run.total_tokens or 0,
+                        estimated_cost=run.estimated_cost,
+                        retrieval_calls=1 if run.retrieved_chunk_count else 0,
+                        retrieval_results=run.retrieved_chunk_count or 0,
+                        tool_calls=run.tool_call_count or 0,
+                        tools_used=run.tools_used,
+                        execution_steps=run.step_count or 0,
+                        retrieval_duration_ms=run.retrieval_latency_ms or 0,
+                        tool_duration_ms=run.tool_latency_ms or 0,
+                        generation_duration_ms=run.latency_ms or 0,
+                        evaluation_duration_ms=run.evaluation_duration_ms or 0,
+                        revision_attempts=run.revision_attempts or 0,
+                        evaluation_status=run.evaluation_status,
+                    )
+                except Exception as obs_err:
+                    logger.warning(f"[Observability] Failed to record stream observability telemetry: {obs_err}")
+
             yield f"data: {json.dumps({'type': 'run_completed', 'run': RunResponse.model_validate(run).model_dump(mode='json')})}\n\n"
             yield "data: [DONE]\n\n"
 
@@ -618,5 +803,38 @@ class TaskExecutionService:
             run.orchestration_duration_ms = elapsed_ms
             run.completed_at = datetime.now(timezone.utc)
             await self.session.flush()
+
+            if workspace_id:
+                try:
+                    err_code = extract_error_code(stream_err)
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.RUN_FAILED,
+                            status=TraceEventStatus.FAILED,
+                            completed_at=run.completed_at,
+                            duration_ms=run.latency_ms,
+                            error_code=err_code,
+                            metadata={"error": str(stream_err)},
+                        )
+                        await tracer.flush_to_db(self.session)
+
+                    await self.obs_service.record_run_telemetry(
+                        run_id=run.id,
+                        workspace_id=workspace_id,
+                        task_id=task.id,
+                        project_id=task.project_id,
+                        started_at=run.started_at,
+                        completed_at=run.completed_at,
+                        duration_ms=run.latency_ms,
+                        status="failed",
+                        provider=run.model_provider,
+                        generation_model=run.final_model,
+                        error_code=err_code,
+                        error_message=str(stream_err),
+                    )
+                except Exception as obs_err:
+                    logger.warning(f"[Observability] Failed to record failed stream telemetry: {obs_err}")
+
             yield f"data: {json.dumps({'type': 'error', 'error': {'message': str(stream_err)}})}\n\n"
             yield "data: [DONE]\n\n"
+

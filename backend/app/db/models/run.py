@@ -11,6 +11,8 @@ from backend.app.db.models.guid import GUID
 if TYPE_CHECKING:
     from backend.app.db.models.task import Task
     from backend.app.db.models.evaluation import EvaluationRun
+    from backend.app.db.models.observability import RunTelemetry, ExecutionTraceEvent, UsageRecord
+
 
 
 class Run(Base):
@@ -131,6 +133,25 @@ class Run(Base):
         cascade="all, delete-orphan",
         order_by="EvaluationRun.created_at",
     )
+    telemetry: Mapped[Optional["RunTelemetry"]] = relationship(
+        "RunTelemetry",
+        back_populates="run",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    trace_events: Mapped[List["ExecutionTraceEvent"]] = relationship(
+        "ExecutionTraceEvent",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="ExecutionTraceEvent.sequence_number",
+    )
+    usage_records: Mapped[List["UsageRecord"]] = relationship(
+        "UsageRecord",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="UsageRecord.created_at",
+    )
 
     def __repr__(self) -> str:
+
         return f"<Run(id={self.id}, task_id={self.task_id}, status='{self.status}', model='{self.model_name}')>"

@@ -42,6 +42,8 @@ from backend.app.services.evaluation.schemas import (
     EvaluationResult,
     EvaluationStatus,
 )
+from backend.app.services.observability.events import TraceEventStatus, TraceEventType
+
 
 
 class Orchestrator:
@@ -103,6 +105,7 @@ class Orchestrator:
         on_step_start: Optional[Callable[[ExecutionStepRecord], Any]] = None,
         on_step_complete: Optional[Callable[[ExecutionStepRecord], Any]] = None,
         on_step_failed: Optional[Callable[[ExecutionStepRecord], Any]] = None,
+        tracer: Optional[Any] = None,
     ) -> ExecutionState:
         """
         Plans, validates, and executes a task through the orchestration pipeline
@@ -112,6 +115,13 @@ class Orchestrator:
         active_policy = policy or FailurePolicy()
         max_iterations = min(req.max_agent_iterations or settings.MAX_AGENT_ITERATIONS, 5)
 
+        if tracer:
+            tracer.record_event(
+                TraceEventType.PLANNING_STARTED,
+                status=TraceEventStatus.STARTED,
+                metadata={"planner_mode": req.planner_mode or "hybrid"},
+            )
+
         # 1. Generate initial plan
         initial_plan = await self.plan_task(
             task=task,
@@ -120,11 +130,24 @@ class Orchestrator:
             session=session,
         )
 
+        planner_mod = initial_plan.metadata.get("planner_model", settings.PLANNER_MODEL)
+        if tracer:
+            tracer.record_event(
+                TraceEventType.PLANNING_COMPLETED,
+                status=TraceEventStatus.COMPLETED,
+                model=planner_mod,
+                metadata={
+                    "steps_count": len(initial_plan.steps),
+                    "planner_mode": req.planner_mode or "hybrid",
+                    "repair_count": initial_plan.metadata.get("repair_count", 0),
+                },
+            )
+
         state = ExecutionState(
             task_id=str(task.id),
             plan=initial_plan,
             planning_mode=req.planner_mode or "hybrid",
-            planner_model=initial_plan.metadata.get("planner_model", settings.PLANNER_MODEL),
+            planner_model=planner_mod,
             repair_count=initial_plan.metadata.get("repair_count", 0),
         )
 
@@ -150,6 +173,22 @@ class Orchestrator:
                     logger.warning(f"[Orchestrator] Anti-loop detected repeated step '{step.id}' ({step.type}). Skipping.")
                     continue
 
+                if tracer:
+                    if step.type == StepType.RETRIEVE:
+                        tracer.record_event(
+                            TraceEventType.RETRIEVAL_STARTED,
+                            step_type="retrieve",
+                            status=TraceEventStatus.STARTED,
+                            metadata={"strategy": getattr(step, "strategy", None), "scope": getattr(step, "scope", None)},
+                        )
+                    elif step.type == StepType.TOOL:
+                        tracer.record_event(
+                            TraceEventType.TOOL_STARTED,
+                            step_type="tool",
+                            status=TraceEventStatus.STARTED,
+                            metadata={"tool": getattr(step, "tool", None)},
+                        )
+
                 await self.executor.execute_single_step(
                     step=step,
                     step_index=step_global_index,
@@ -164,6 +203,23 @@ class Orchestrator:
                     on_step_complete=on_step_complete,
                     on_step_failed=on_step_failed,
                 )
+
+                if tracer:
+                    if step.type == StepType.RETRIEVE:
+                        tracer.record_event(
+                            TraceEventType.RETRIEVAL_COMPLETED,
+                            step_type="retrieve",
+                            status=TraceEventStatus.COMPLETED,
+                            metadata={"chunks_count": len(state.retrieval_results)},
+                        )
+                    elif step.type == StepType.TOOL:
+                        tracer.record_event(
+                            TraceEventType.TOOL_COMPLETED,
+                            step_type="tool",
+                            status=TraceEventStatus.COMPLETED,
+                            metadata={"tool": getattr(step, "tool", None)},
+                        )
+
                 step_global_index += 1
 
             # Step 15: Evaluate completion sufficiency
@@ -184,6 +240,15 @@ class Orchestrator:
                     temperature=req.temperature or 0.2,
                 )
 
+                if tracer:
+                    tracer.record_event(
+                        TraceEventType.GENERATION_STARTED,
+                        step_type="generate",
+                        status=TraceEventStatus.STARTED,
+                        model=final_gen_step.model,
+                        metadata={"temperature": final_gen_step.temperature},
+                    )
+
                 await self.executor.execute_single_step(
                     step=final_gen_step,
                     step_index=step_global_index,
@@ -198,6 +263,19 @@ class Orchestrator:
                     on_step_complete=on_step_complete,
                     on_step_failed=on_step_failed,
                 )
+
+                if tracer:
+                    tracer.record_event(
+                        TraceEventType.GENERATION_COMPLETED,
+                        step_type="generate",
+                        status=TraceEventStatus.COMPLETED,
+                        model=final_gen_step.model,
+                        metadata={
+                            "output_length": len(state.generated_output or ""),
+                            "input_tokens": state.token_usage.get("input_tokens", 0),
+                            "output_tokens": state.token_usage.get("output_tokens", 0),
+                        },
+                    )
                 break
 
             else:
@@ -240,6 +318,13 @@ class Orchestrator:
         )
 
         if eval_policy.mode != EvaluationMode.OFF:
+            if tracer:
+                tracer.record_event(
+                    TraceEventType.EVALUATION_STARTED,
+                    status=TraceEventStatus.STARTED,
+                    metadata={"mode": eval_policy.mode.value},
+                )
+
             ctx_items_dict = [
                 it.model_dump(mode="json") if hasattr(it, "model_dump") else it
                 for it in accumulated_context_items
@@ -271,6 +356,13 @@ class Orchestrator:
 
             # Revision loop if recommended and allowed
             if eval_res.recommendation == EvaluationRecommendation.REVISE and eval_policy.auto_revise_on_fail:
+                if tracer:
+                    tracer.record_event(
+                        TraceEventType.REVISION_STARTED,
+                        status=TraceEventStatus.STARTED,
+                        metadata={"attempt": 1},
+                    )
+
                 revised_text, final_eval, revision_count = await self.evaluation_engine.revise_and_re_evaluate(
                     task=task,
                     draft_output=state.generated_output,
@@ -284,6 +376,24 @@ class Orchestrator:
                 )
                 state.generated_output = revised_text
 
+                if tracer:
+                    tracer.record_event(
+                        TraceEventType.REVISION_COMPLETED,
+                        status=TraceEventStatus.COMPLETED,
+                        metadata={"revision_attempts": revision_count, "final_status": final_eval.status.value},
+                    )
+
+            if tracer:
+                tracer.record_event(
+                    TraceEventType.EVALUATION_COMPLETED,
+                    status=TraceEventStatus.COMPLETED,
+                    metadata={
+                        "status": final_eval.status.value,
+                        "recommendation": final_eval.recommendation.value,
+                        "checks_count": len(final_eval.checks),
+                    },
+                )
+
             state.metadata["evaluation_result"] = final_eval.model_dump(mode="json")
             state.metadata["revision_attempts"] = revision_count
             state.metadata["evaluation_status"] = final_eval.status.value
@@ -291,6 +401,7 @@ class Orchestrator:
 
         state.complete()
         return state
+
 
     async def execute_task_stream(
         self,

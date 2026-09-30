@@ -358,9 +358,39 @@ class TaskExecutionService:
                 except Exception as eval_persist_err:
                     logger.warning(f"Failed to record evaluation result in DB: {eval_persist_err}")
 
-            # Input snapshot update with web sources and context summary
+            # Harvest memory items used in context for citations & telemetry
+            memory_items = [it for it in state.context_items if it.get("source_type") == "memory"]
+            memories_used = []
+            memory_ids = []
+            for m_item in memory_items:
+                m_meta = m_item.get("metadata", {})
+                m_id = m_meta.get("memory_id")
+                if m_id:
+                    memory_ids.append(m_id)
+                memories_used.append({
+                    "memory_id": m_id,
+                    "title": m_item.get("title"),
+                    "scope": m_meta.get("scope", "user"),
+                    "memory_type": m_meta.get("memory_type", "preference"),
+                    "source": "memory",
+                    "citation": "Used from memory",
+                })
+
+            # Touch last used on persistent memories
+            if workspace_id and memory_ids:
+                from backend.app.services.memory.service import MemoryService
+                mem_svc = MemoryService(self.session)
+                for mid in memory_ids:
+                    try:
+                        await mem_svc.touch_memory_used(UUID(mid), workspace_id)
+                    except Exception:
+                        pass
+
+            # Input snapshot update with web sources, memory citations, and context summary
             snap = dict(run.input_snapshot) if run.input_snapshot else {}
             snap["web_sources"] = web_sources
+            snap["memories_used"] = memories_used
+            snap["memory_count"] = len(memories_used)
             snap["context_summary"] = {
                 "item_count": run.context_item_count,
                 "estimated_tokens": run.estimated_context_tokens,
@@ -382,6 +412,12 @@ class TaskExecutionService:
             if workspace_id:
                 try:
                     if tracer:
+                        if memory_items:
+                            tracer.record_event(
+                                TraceEventType.MEMORY_RETRIEVAL_COMPLETED,
+                                status=TraceEventStatus.COMPLETED,
+                                metadata={"count": len(memory_items), "memory_ids": memory_ids},
+                            )
                         tracer.record_event(
                             TraceEventType.RUN_COMPLETED,
                             status=TraceEventStatus.COMPLETED,
@@ -426,6 +462,10 @@ class TaskExecutionService:
                         estimated_cost=run.estimated_cost,
                         retrieval_calls=1 if run.retrieved_chunk_count else 0,
                         retrieval_results=run.retrieved_chunk_count or 0,
+                        memory_retrieval_calls=1 if memory_items else 0,
+                        memory_results=len(memory_items),
+                        memory_ids_used=memory_ids if memory_ids else None,
+                        memory_duration_ms=0,
                         tool_calls=run.tool_call_count or 0,
                         tools_used=run.tools_used,
                         execution_steps=run.step_count or 0,

@@ -39,6 +39,7 @@ import {
   Loader2,
   Code2,
   Plug,
+  Brain,
 } from "lucide-react";
 
 const stepIcons = {
@@ -52,6 +53,7 @@ const stepIcons = {
   condition: GitFork,
   output: FileCheck,
   connector: Plug,
+  memory: Brain,
 };
 
 const stepColors = {
@@ -65,6 +67,7 @@ const stepColors = {
   condition: "text-pink-400 bg-pink-500/10 border-pink-500/20",
   output: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
   connector: "text-violet-400 bg-violet-500/10 border-violet-500/20",
+  memory: "text-purple-400 bg-purple-500/10 border-purple-500/20",
 };
 
 export default function WorkflowBuilderPage({ params }) {
@@ -231,6 +234,12 @@ export default function WorkflowBuilderPage({ params }) {
         connector: "github",
         operation: "search_issues",
         arguments: { query: "{{input.query}}" },
+      },
+      memory: {
+        operation: "retrieve",
+        query: "{{input.topic}}",
+        top_k: 5,
+        scope: "workspace",
       },
       output: { output_template: "{{steps.generate.output}}", format: "markdown" },
     };
@@ -722,6 +731,7 @@ function AddStepModal({ isOpen, onClose, onSelectType }) {
     { type: "retrieve", name: "Retrieve", desc: "Hybrid / semantic retrieval from document vector index" },
     { type: "tool", name: "Tool", desc: "Execute web search or specialized backend tools" },
     { type: "connector", name: "Connector", desc: "Execute authorized external connector operations (GitHub, APIs)" },
+    { type: "memory", name: "Memory", desc: "Retrieve persistent memories, save candidate suggestions, or create facts" },
     { type: "generate", name: "Generate", desc: "Synthesize content using LLM model routing" },
     { type: "evaluate", name: "Evaluate", desc: "Verify grounding, completeness, or factual accuracy" },
     { type: "transform", name: "Transform", desc: "Safe structured data selection, filtering, and joining" },

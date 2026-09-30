@@ -65,6 +65,7 @@ import {
   Shield,
   Activity,
   CheckSquare,
+  Brain,
 } from "lucide-react";
 
 export default function TaskWorkspacePage({ params: paramsProp }) {
@@ -110,6 +111,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [retrievalScope, setRetrievalScope] = useState("project"); // "project" | "workspace"
   const [retrievalTopK, setRetrievalTopK] = useState(8);
   const [showAdvancedRetrieval, setShowAdvancedRetrieval] = useState(false);
+  const [memoryMode, setMemoryMode] = useState("auto"); // "auto" | "enabled" | "disabled"
 
   // Step 9: Tools & Web Search settings
   const [enableWebSearch, setEnableWebSearch] = useState(false);
@@ -622,6 +624,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       retrieval_scope: retrievalScope,
       retrieval_top_k: Number(retrievalTopK),
       retrieval_project_scope: retrievalScope === "project",
+      memory_mode: memoryMode,
       enable_web_search: enableWebSearch,
       web_search_query: webSearchQuery.trim() || undefined,
       web_search_limit: Number(webSearchLimit) || 5,
@@ -1564,6 +1567,79 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   {previewError && (
                     <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-[11px]">
                       {previewError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 17: Persistent Memory Intelligence Control */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-purple-500/25 space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-4 h-4 text-purple-400" />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-100 block">
+                          Persistent Memory
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Retain user preferences, technical facts, and decisions
+                        </span>
+                      </div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-purple-500/30 text-purple-300 font-mono capitalize"
+                    >
+                      {memoryMode}
+                    </Badge>
+                  </div>
+
+                  {/* Memory Mode Radio Group */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-medium text-slate-300 block">
+                      Memory Mode:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "auto", label: "Auto", desc: "Retrieve if relevant" },
+                        { id: "enabled", label: "Enabled", desc: "Always retrieve" },
+                        { id: "disabled", label: "Disabled", desc: "No memory used" },
+                      ].map((mode) => (
+                        <label
+                          key={mode.id}
+                          className={`flex flex-col p-2 rounded-lg border cursor-pointer transition-all ${
+                            memoryMode === mode.id
+                              ? "bg-purple-950/70 border-purple-500 text-white shadow-sm ring-1 ring-purple-500/30"
+                              : "bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="radio"
+                              name="memory_mode_selector"
+                              value={mode.id}
+                              checked={memoryMode === mode.id}
+                              onChange={() => setMemoryMode(mode.id)}
+                              className="accent-purple-500"
+                            />
+                            <span className="text-xs font-semibold">{mode.label}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 pl-4 mt-0.5">{mode.desc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {memoryMode !== "disabled" && activeRun?.memory_results !== undefined && activeRun?.memory_results > 0 && (
+                    <div className="p-2.5 rounded-lg bg-purple-950/40 border border-purple-800/40 text-[11px] text-purple-300 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                        <span>
+                          Used from memory: <strong>{activeRun.memory_results} items</strong>
+                        </span>
+                      </div>
+                      <Link href="/app/memory" className="text-purple-400 hover:text-purple-200 underline text-[10px]">
+                        Manage Memories &rarr;
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -2642,6 +2718,12 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                         {activeRun.context_truncated && (
                           <span className="text-amber-400 ml-1">(Truncated)</span>
                         )}
+                      </span>
+                    )}
+                    {activeRun.memory_results !== null && activeRun.memory_results !== undefined && activeRun.memory_results > 0 && (
+                      <span className="text-purple-300 flex items-center gap-1 font-medium">
+                        <Brain className="w-3 h-3 text-purple-400" />
+                        Memory: <strong className="text-purple-200">{activeRun.memory_results} used</strong>
                       </span>
                     )}
                     {activeRun.total_tokens !== null && activeRun.total_tokens !== undefined && (

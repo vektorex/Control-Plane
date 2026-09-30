@@ -150,6 +150,24 @@ class WorkflowValidator:
                     message="Connector step requires a valid 'operation' string in config (e.g. 'search_issues')."
                 ))
 
+        elif stype == StepType.MEMORY:
+            op = cfg.get("operation")
+            allowed_ops = ["retrieve", "save_candidate", "create_explicit"]
+            if not op or op not in allowed_ops:
+                issues.append(WorkflowValidationIssue(
+                    level="error",
+                    step_id=step.id,
+                    field="config.operation",
+                    message=f"Memory step 'operation' must be one of {allowed_ops}."
+                ))
+            top_k = cfg.get("top_k")
+            if top_k is not None and (not isinstance(top_k, int) or top_k < 1 or top_k > 50):
+                issues.append(WorkflowValidationIssue(
+                    level="error",
+                    step_id=step.id,
+                    field="config.top_k",
+                    message="Memory step 'top_k' must be an integer between 1 and 50."
+                ))
 
         elif stype == StepType.GENERATE:
             temp = cfg.get("temperature")

@@ -148,7 +148,58 @@ class RetrievalRouter:
                 top_k=decision.top_k,
             )
 
-        # 4. Strategy: Connector / GitHub
+        # 4. Strategy: Memory
+        elif decision.strategy == RetrievalStrategy.MEMORY:
+            start_time = time.perf_counter()
+            from backend.app.services.memory.retriever import MemoryRetriever, MAX_MEMORY_RESULTS, MAX_MEMORY_CONTEXT_TOKENS
+            from backend.app.services.retrieval.models import RetrievalCandidate
+
+            user_id = kwargs.get("user_id")
+            mem_retriever = MemoryRetriever(embedding_provider=self.vector_retriever.embedding_provider)
+            bounded_k = min(decision.top_k, MAX_MEMORY_RESULTS)
+            scored = await mem_retriever.retrieve(
+                query=decision.query,
+                workspace_id=workspace_id,
+                session=session,
+                user_id=user_id,
+                project_id=effective_project_id,
+                top_k=bounded_k,
+                max_tokens=MAX_MEMORY_CONTEXT_TOKENS,
+                strategy="hybrid",
+            )
+            candidates = []
+            for mem, score, exp in scored:
+                candidates.append(
+                    RetrievalCandidate(
+                        chunk_id=mem.id,
+                        document_id=mem.id,
+                        workspace_id=workspace_id,
+                        project_id=mem.project_id,
+                        filename=f"memory:{mem.scope}",
+                        content=f"[{mem.type.upper()}] {mem.title}\n{mem.content}",
+                        metadata={
+                            "memory_id": str(mem.id),
+                            "scope": mem.scope,
+                            "type": mem.type,
+                            "importance": mem.importance,
+                            "trust_level": "trusted_user_context",
+                            "explanation": exp,
+                        },
+                        fusion_score=score,
+                        rerank_score=score,
+                    )
+                )
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            return RetrievalResult(
+                candidates=candidates,
+                query=decision.query,
+                total_found=len(candidates),
+                vector_count=len(candidates),
+                keyword_count=len(candidates),
+                retrieval_latency_ms=latency_ms,
+            )
+
+        # 5. Strategy: Connector / GitHub
         elif decision.strategy in (RetrievalStrategy.CONNECTOR, RetrievalStrategy.GITHUB):
             start_time = time.perf_counter()
             import uuid as uuid_pkg
@@ -202,7 +253,7 @@ class RetrievalRouter:
                 retrieval_latency_ms=latency_ms,
             )
 
-        # 5. Strategy: Hybrid (default)
+        # 6. Strategy: Document / Hybrid (default)
         else:
             return await self.hybrid_retriever.retrieve(
                 query=decision.query,

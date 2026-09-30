@@ -14,6 +14,7 @@ class StepType(str, Enum):
     RETRIEVE = "retrieve"
     TOOL = "tool"
     CONNECTOR = "connector"
+    MEMORY = "memory"
     GENERATE = "generate"
     EVALUATE = "evaluate"
     TRANSFORM = "transform"

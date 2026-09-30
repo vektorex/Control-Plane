@@ -967,6 +967,63 @@ The new connector is **automatically** available in:
 - [x] Comprehensive backend unit and API integration tests (26/26 connector tests passing, 273/273 total backend tests passing).
 - [x] Pure JavaScript frontend lint passed with zero errors or warnings.
 
+---
+
+## 🧠 STEP 17: Production-Grade Memory & Persistent Context Intelligence System
+
+A production-grade persistent memory and intelligence system allowing the platform to retain useful, user-approved knowledge, technical facts, preferences, and architectural decisions across tasks and workflows, with strict scope isolation, deterministic conflict detection, centralized secret rejection, and complete privacy controls.
+
+### ⚠️ Memory is Not Conversation History
+- **Memory is NOT conversation history.**
+- **Memory is NOT raw prompt storage.**
+- **The platform NEVER automatically stores everything users say.**
+- **The platform NEVER silently converts external connector or document content into permanent memory.**
+- **Internal chain-of-thought is never exposed or persisted.**
+
+### Key Components Added:
+1. **Memory Architecture & Policies (`backend/app/services/memory/`)**:
+   - `schemas.py`: Memory types (`preference`, `technical_fact`, `instruction`, `project_context`, `workflow_context`, `reference`, `decision`), scopes (`user`, `workspace`, `project`), statuses (`active`, `archived`, `expired`), importance levels (`low`, `medium`, `high`).
+   - `policies.py`: Enforces trust hierarchy (`System Policy > App Policy > Security Policy > Workflow Policy > Explicit User Context > Persistent Memory > Retrieved External Data`).
+   - `sanitizer.py`: Centralized `SecretDetector` scanning for API keys, Bearer tokens, JWTs, private keys, database connection URIs, and cloud credentials. Content truncation (`MAX_MEMORY_CONTENT_CHARS=10000`) and metadata limiting (`MAX_MEMORY_METADATA_BYTES=50000`).
+   - `classifier.py`: Deterministic rejection of secrets, PII, and prompt injection attempts.
+   - `extractor.py`: Identifies candidate memories with user-safe explanations only; hides internal reasoning.
+   - `lifecycle.py`: Deduplication (SequenceMatcher similarity ≥ 0.90), conflict detection & resolution (`keep_winner`, `merge`, `dismiss`), and expiration handling.
+   - `retriever.py`: Bounded hybrid, semantic, and keyword retrieval (`MAX_MEMORY_RESULTS=10`, `MAX_MEMORY_CONTEXT_TOKENS=3000`).
+   - `service.py`: CRUD operations, AI suggestion review, conflict resolution, privacy bulk purge, and user settings.
+2. **Database Models & Alembic Migration**:
+   - `backend/app/db/models/memory.py`: `Memory`, `MemoryEmbedding`, `MemoryConflict`, `MemorySuggestion`, `UserMemorySettings`.
+   - Migration `015_memory_system.py` with indexes on workspace, user, project, type, and status.
+3. **Context Engine & Router Integration**:
+   - `MemoryContextProvider` registered in `ContextEngine` (`priority: 75`, `trust_level: "trusted_user_context"`).
+   - `RetrievalRouter` with `RetrievalStrategy.MEMORY = "memory"` and auto-bounded execution.
+4. **Task Execution & Workflow Engine Integration**:
+   - Task execution collects memory context and tracks `memory_results`, `memory_ids_used`, and `memory_duration_ms` in telemetry without echoing private content.
+   - Workflow step `StepType.MEMORY` supporting `retrieve`, `create_explicit`, and `save_candidate` operations.
+5. **REST API (`backend/app/api/routes/memory.py`)**:
+   - Full CRUD, archive, restore, use, suggestions, conflicts, settings, and privacy bulk delete endpoints.
+6. **Pure JavaScript Frontend UI**:
+   - `/app/memory`: Persistent Memory Center with 5 sections (My Memories, Project Memories, Workspace Memories, Suggestions, Conflicts), modals, and filter controls.
+   - `/app/settings/memory`: Memory intelligence preferences, default scopes, retention, and bulk purge controls.
+   - `/app/tasks/[taskId]`: Memory mode selector (`Auto`, `Enabled`, `Disabled`) and execution citation indicators.
+   - `/app/workflows/[workflowId]`: Native Memory workflow step with operation configuration.
+   - `/app/runs/[runId]`: Memory telemetry metrics and duration display.
+
+### ✅ Step 17 Verification Checklist:
+- [x] Memory models and Alembic migration `015_memory_system.py` created and validated.
+- [x] Strict user, workspace, and project isolation enforced.
+- [x] Centralized secret detection prevents storage or echoing of raw credentials.
+- [x] Deterministic sanitization and whitespace normalization implemented.
+- [x] Candidate suggestions require explicit confirmation; rejected memories are never re-suggested.
+- [x] Deduplication and conflict tracking with resolution flows (`keep_winner`, `merge`, `dismiss`).
+- [x] ContextEngine memory provider and RetrievalRouter memory strategy integrated.
+- [x] Bounded retrieval limits enforced (`MAX_MEMORY_RESULTS=10`, `MAX_MEMORY_CONTEXT_TOKENS=3000`).
+- [x] Workflow memory step validator and execution engine integrated.
+- [x] Connector and document content never automatically persisted.
+- [x] Safe telemetry tracking without sensitive content logging.
+- [x] Pure JavaScript Next.js frontend pages and components built with zero ESLint warnings and successful production build.
+- [x] 15/15 memory tests passing, 241/241 total backend regression tests passing.
+
+
 
 
 

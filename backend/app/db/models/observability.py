@@ -78,12 +78,16 @@ class RunTelemetry(Base):
 
     retrieval_calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     retrieval_results: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    memory_retrieval_calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    memory_results: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    memory_ids_used: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     tool_calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     tools_used: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     execution_steps: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     planner_duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     retrieval_duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    memory_duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     tool_duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     generation_duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     evaluation_duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

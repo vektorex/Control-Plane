@@ -335,6 +335,16 @@ class OrchestrationExecutor:
             accumulated_items.extend(norm_m)
             count += len(norm_m)
 
+        memory_provider = self.context_engine.get_provider("memory_context")
+        if memory_provider and session:
+            try:
+                mem_items = await memory_provider.collect(task, session=session)
+                norm_mem = memory_provider.normalize(mem_items)
+                accumulated_items.extend(norm_mem)
+                count += len(norm_mem)
+            except Exception as e:
+                logger.warning(f"[OrchestrationExecutor] Memory context collection skipped: {e}")
+
         return {"context_items_loaded": count}
 
     async def _execute_generate_step(
@@ -360,6 +370,16 @@ class OrchestrationExecutor:
             if manual_provider:
                 m_items = await manual_provider.collect(task, session=session)
                 accumulated_items.extend(manual_provider.normalize(m_items))
+
+        has_memory_ctx = any(it.source_type == "memory" for it in accumulated_items)
+        if not has_memory_ctx and session:
+            memory_provider = self.context_engine.get_provider("memory_context")
+            if memory_provider:
+                try:
+                    mem_items = await memory_provider.collect(task, session=session)
+                    accumulated_items.extend(memory_provider.normalize(mem_items))
+                except Exception as e:
+                    logger.warning(f"[OrchestrationExecutor] Memory context collection skipped in generate: {e}")
 
         max_context_tokens = step.metadata.get("max_context_tokens", 8000) if step.metadata else 8000
         budget = ContextBudget(max_context_tokens=max_context_tokens)

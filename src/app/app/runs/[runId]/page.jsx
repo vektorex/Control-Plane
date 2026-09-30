@@ -32,6 +32,7 @@ import {
   Wrench,
   XCircle,
   Zap,
+  Brain,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -215,7 +216,7 @@ export default function RunExecutionTracePage({ params: paramsProp }) {
       ) : (
         <div className="space-y-6">
           {/* Telemetry Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
               <span className="text-[10px] text-slate-400 block uppercase tracking-wider font-semibold">
                 Total Duration
@@ -276,6 +277,24 @@ export default function RunExecutionTracePage({ params: paramsProp }) {
               {telemetry?.tools_used && telemetry.tools_used.length > 0 && (
                 <span className="text-[10px] text-emerald-400 block truncate">
                   {telemetry.tools_used.join(", ")}
+                </span>
+              )}
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span className="text-[10px] text-slate-400 block uppercase tracking-wider font-semibold">
+                Persistent Memory
+              </span>
+              <span className="text-xs font-semibold text-purple-300 font-mono mt-1 block">
+                {telemetry?.memory_results || 0} memories used
+              </span>
+              {telemetry?.memory_duration_ms ? (
+                <span className="text-[10px] text-purple-400 block truncate">
+                  {telemetry.memory_duration_ms}ms retrieval
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-500 block truncate">
+                  ContextEngine
                 </span>
               )}
             </div>

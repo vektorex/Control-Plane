@@ -37,6 +37,12 @@ export const siteConfig = {
       description: "Secure external integrations with GitHub, APIs, and data sources",
     },
     {
+      label: "Memory",
+      href: "/app/memory",
+      icon: "Brain",
+      description: "Persistent knowledge, user preferences, suggestions, and conflicts",
+    },
+    {
       label: "Projects",
       href: "/app/projects",
       icon: "FolderKanban",

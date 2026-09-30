@@ -22,6 +22,7 @@ class ContextSourceType(str, Enum):
     API = "api"
     TOOL = "tool"
     CONNECTOR = "connector"
+    MEMORY = "memory"
 
 
 class ContextItem(BaseModel):
@@ -36,6 +37,7 @@ class ContextItem(BaseModel):
     relevance_score: Optional[float] = Field(default=None, description="Optional relevance metric [0.0 - 1.0]")
     priority: int = Field(default=1, description="Priority weight (higher values denote higher priority)")
     token_estimate: int = Field(default=0, description="Estimated token count for this item")
+    trust_level: Optional[str] = Field(default="trusted_user_context", description="Security and provenance trust classification")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:

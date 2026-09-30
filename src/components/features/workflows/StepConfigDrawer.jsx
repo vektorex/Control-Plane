@@ -22,6 +22,7 @@ import {
   Trash2,
   Lock,
   ExternalLink,
+  Brain,
 } from "lucide-react";
 
 const stepTypeIcons = {
@@ -35,6 +36,7 @@ const stepTypeIcons = {
   condition: GitFork,
   output: FileCheck,
   connector: Plug,
+  memory: Brain,
 };
 
 export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [] }) {
@@ -705,6 +707,169 @@ export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [
                   prompt injection vulnerabilities.
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* MEMORY STEP CONFIG (Step 17) */}
+          {step.type === "memory" && (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-purple-950/20 border border-purple-500/30 p-3 space-y-1">
+                <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+                  <Brain className="w-4 h-4 text-purple-400" />
+                  Persistent Memory Intelligence
+                </span>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Retrieve persistent knowledge or record decisions into the workspace memory layer. Workflow creation
+                  strictly obeys trust hierarchy and confirmation policies.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Memory Operation
+                </label>
+                <select
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                  value={config.operation ?? "retrieve"}
+                  onChange={(e) => handleFieldChange("operation", e.target.value)}
+                >
+                  <option value="retrieve">retrieve (Query persistent memories)</option>
+                  <option value="save_candidate">save_candidate (Suggest candidate for user confirmation)</option>
+                  <option value="create_explicit">create_explicit (Persist explicit workspace memory)</option>
+                </select>
+              </div>
+
+              {/* Retrieval Mode Configuration */}
+              {(config.operation === "retrieve" || !config.operation) && (
+                <div className="space-y-3 pt-1 border-t border-slate-800">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Query Expression (supports variable templates)
+                    </label>
+                    <Input
+                      placeholder="{{input.topic}}"
+                      value={config.query ?? "{{input.topic}}"}
+                      onChange={(e) => handleFieldChange("query", e.target.value)}
+                      className="text-xs font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Top K Results
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={config.top_k ?? 5}
+                        onChange={(e) => handleFieldChange("top_k", parseInt(e.target.value) || 5)}
+                        className="text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Scope
+                      </label>
+                      <select
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                        value={config.scope ?? "workspace"}
+                        onChange={(e) => handleFieldChange("scope", e.target.value)}
+                      >
+                        <option value="workspace">Workspace</option>
+                        <option value="project">Project</option>
+                        <option value="user">User</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Creation Mode Configuration (save_candidate or create_explicit) */}
+              {(config.operation === "create_explicit" || config.operation === "save_candidate") && (
+                <div className="space-y-3 pt-1 border-t border-slate-800">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Memory Title
+                    </label>
+                    <Input
+                      placeholder="e.g. {{input.topic}} Standard"
+                      value={config.title ?? ""}
+                      onChange={(e) => handleFieldChange("title", e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Memory Content (variable or static text)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="e.g. {{steps.generate.output}}"
+                      value={config.content ?? ""}
+                      onChange={(e) => handleFieldChange("content", e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Type
+                      </label>
+                      <select
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 font-mono"
+                        value={config.type ?? "technical_fact"}
+                        onChange={(e) => handleFieldChange("type", e.target.value)}
+                      >
+                        <option value="technical_fact">Technical Fact</option>
+                        <option value="preference">Preference</option>
+                        <option value="instruction">Instruction</option>
+                        <option value="decision">Decision</option>
+                        <option value="workflow_context">Workflow Context</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Scope
+                      </label>
+                      <select
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 font-mono"
+                        value={config.scope ?? "workspace"}
+                        onChange={(e) => handleFieldChange("scope", e.target.value)}
+                      >
+                        <option value="workspace">Workspace</option>
+                        <option value="project">Project</option>
+                        <option value="user">User</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Expiration
+                      </label>
+                      <select
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 font-mono"
+                        value={config.expiration ?? "never"}
+                        onChange={(e) => handleFieldChange("expiration", e.target.value)}
+                      >
+                        <option value="never">Never</option>
+                        <option value="7_days">7 Days</option>
+                        <option value="30_days">30 Days</option>
+                        <option value="90_days">90 Days</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {config.operation === "save_candidate" && (
+                    <div className="p-2.5 rounded bg-amber-950/30 border border-amber-900/40 text-[11px] text-amber-300">
+                      Candidate memories will be queued in the Memory Center for explicit user confirmation. They will
+                      never become persistent without approval.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

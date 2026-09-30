@@ -21,7 +21,9 @@ class RetrievalStrategy(str, Enum):
     HYBRID = "hybrid"
     MULTI_QUERY = "multi_query"
 
-    # Extensibility hooks for future steps
+    # Extensibility hooks for sources
+    MEMORY = "memory"
+    DOCUMENT = "document"
     WEB = "web"
     GRAPH = "graph"
     DATABASE = "database"

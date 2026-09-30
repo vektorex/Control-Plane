@@ -495,7 +495,95 @@ class WorkflowExecutor:
                     f"Connector step '{step.id}' ({connector_name}.{operation}) failed: {conn_res.error_message}"
                 )
 
-        # 5. GENERATE STEP
+        # 5. MEMORY STEP
+        elif stype == StepType.MEMORY:
+            op = cfg.get("operation", "retrieve")
+            top_k = cfg.get("top_k", 5)
+            scope = cfg.get("scope", "workspace")
+
+            if op == "retrieve":
+                raw_query = cfg.get("query") or state.input.get("query") or state.input.get("topic") or ""
+                query = state.resolve_value(raw_query)
+                from backend.app.services.memory.retriever import MemoryRetriever
+                mem_retriever = MemoryRetriever()
+                scored_results = await mem_retriever.retrieve(
+                    query=query,
+                    workspace_id=workspace_id,
+                    session=self.session,
+                    user_id=user.id,
+                    project_id=project_id,
+                    top_k=top_k,
+                )
+                items = [
+                    {
+                        "id": str(m.id),
+                        "title": m.title,
+                        "content": m.content,
+                        "type": m.type,
+                        "scope": m.scope,
+                        "score": score,
+                    }
+                    for m, score, _ in scored_results
+                ]
+                output_data = {"operation": "retrieve", "query": query, "items": items, "count": len(items)}
+                metadata = {"count": len(items), "operation": "retrieve"}
+
+            elif op == "save_candidate":
+                raw_title = cfg.get("title") or "Candidate Memory from Workflow"
+                raw_content = cfg.get("content") or state.resolve_value(cfg.get("content_template") or "")
+                title = state.resolve_value(raw_title)
+                content = state.resolve_value(raw_content)
+
+                from backend.app.services.memory.schemas import CandidateMemory, MemoryType, MemoryScope, MemorySourceType
+                from backend.app.services.memory.service import MemoryService
+                mem_service = MemoryService(self.session)
+                cand = CandidateMemory(
+                    type=MemoryType(cfg.get("type", "workflow_context")),
+                    scope=MemoryScope(scope) if scope in [s.value for s in MemoryScope] else MemoryScope.WORKSPACE,
+                    title=str(title)[:255],
+                    content=str(content),
+                    reason=f"Candidate identified from workflow step '{step.name}'.",
+                    source_type=MemorySourceType.WORKFLOW,
+                    source_id=step.id,
+                    project_id=project_id,
+                )
+                suggestion = await mem_service.create_suggestion(workspace_id=workspace_id, candidate=cand, user_id=user.id)
+                output_data = {
+                    "operation": "save_candidate",
+                    "suggestion_id": str(suggestion.id),
+                    "status": "pending_confirmation",
+                    "title": suggestion.title,
+                }
+                metadata = {"suggestion_id": str(suggestion.id), "status": "pending"}
+
+            elif op == "create_explicit":
+                raw_title = cfg.get("title") or "Workflow Memory"
+                raw_content = cfg.get("content") or state.resolve_value(cfg.get("content_template") or "")
+                title = state.resolve_value(raw_title)
+                content = state.resolve_value(raw_content)
+
+                from backend.app.services.memory.schemas import MemoryCreateRequest, MemoryType, MemoryScope, MemorySourceType
+                from backend.app.services.memory.service import MemoryService
+                mem_service = MemoryService(self.session)
+                req = MemoryCreateRequest(
+                    type=MemoryType(cfg.get("type", "workflow_context")),
+                    scope=MemoryScope(scope) if scope in [s.value for s in MemoryScope] else MemoryScope.WORKSPACE,
+                    title=str(title)[:255],
+                    content=str(content),
+                    source_type=MemorySourceType.WORKFLOW,
+                    source_id=step.id,
+                    project_id=project_id,
+                )
+                mem = await mem_service.create_memory(workspace_id=workspace_id, user=user, request=req)
+                output_data = {
+                    "operation": "create_explicit",
+                    "memory_id": str(mem.id),
+                    "status": mem.status,
+                    "title": mem.title,
+                }
+                metadata = {"memory_id": str(mem.id), "status": mem.status}
+
+        # 6. GENERATE STEP
         elif stype == StepType.GENERATE:
 
             prompt_template = cfg.get("prompt_template") or cfg.get("instructions") or "Generate a response."

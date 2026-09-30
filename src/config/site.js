@@ -31,6 +31,12 @@ export const siteConfig = {
       description: "Build, validate, publish, and execute multi-step AI orchestration pipelines",
     },
     {
+      label: "Approvals",
+      href: "/app/approvals",
+      icon: "ShieldCheck",
+      description: "Human-in-the-Loop review, authorization, edit-before-execute, and policies",
+    },
+    {
       label: "Connectors",
       href: "/app/connectors",
       icon: "Plug",

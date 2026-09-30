@@ -33,6 +33,8 @@ import {
   FileCheck,
   Activity,
   Loader2,
+  ShieldAlert,
+  ExternalLink,
 } from "lucide-react";
 
 const stepIcons = {
@@ -126,6 +128,7 @@ export default function WorkflowRunDetailPage({ params }) {
 
   const isCompleted = run.status === "completed";
   const isFailed = run.status === "failed";
+  const isWaitingApproval = run.status === "waiting_for_approval";
   const durationMs = run.duration_ms || 0;
   const executionState = run.execution_state || {};
   const stepResults = run.step_results || [];
@@ -146,10 +149,22 @@ export default function WorkflowRunDetailPage({ params }) {
                 {run.workflow_name || "Workflow"} Run
               </h1>
               <Badge
-                variant={isCompleted ? "success" : isFailed ? "destructive" : "default"}
-                className="text-[10px] uppercase font-mono"
+                variant={
+                  isWaitingApproval
+                    ? "default"
+                    : isCompleted
+                    ? "success"
+                    : isFailed
+                    ? "destructive"
+                    : "default"
+                }
+                className={`text-[10px] uppercase font-mono ${
+                  isWaitingApproval
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse"
+                    : ""
+                }`}
               >
-                {run.status}
+                {run.status.replace("_", " ")}
               </Badge>
               <Badge variant="outline" className="text-[10px] font-mono">
                 v{run.workflow_version}
@@ -180,6 +195,63 @@ export default function WorkflowRunDetailPage({ params }) {
           </Link>
         </div>
       </div>
+
+      {/* Human Approval Waiting Banner */}
+      {isWaitingApproval && (
+        <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-amber-950/20">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+              <ShieldAlert className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-amber-300">Waiting for human approval</h4>
+                <Badge className="bg-amber-500/25 text-amber-300 border-amber-500/40 text-[10px] font-mono">
+                  PAUSED
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-300">
+                Execution paused at step{" "}
+                <span className="font-mono text-amber-300 font-semibold">
+                  {executionState.pending_step_id || "approval_step"}
+                </span>{" "}
+                until authorization is submitted.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400 pt-0.5">
+                <span>Intervention ID: <span className="font-mono text-slate-300">{executionState.intervention_id || "N/A"}</span></span>
+                <span>Paused: <span className="font-mono text-slate-300">{executionState.paused_at ? new Date(executionState.paused_at).toLocaleTimeString() : "Just now"}</span></span>
+              </div>
+            </div>
+          </div>
+
+          {executionState.intervention_id && (
+            <Link href={`/app/approvals/${executionState.intervention_id}`}>
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs gap-1.5 shrink-0 shadow-md">
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Approval</span>
+              </Button>
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Human Rejection Notice */}
+      {isFailed && run.error_code?.startsWith("human_intervention_") && (
+        <div className="p-3.5 bg-red-950/30 border border-red-500/30 rounded-xl text-red-300 text-xs flex items-center gap-2.5">
+          <XCircle className="w-4 h-4 shrink-0 text-red-400" />
+          <span>Workflow execution was halted because human intervention was rejected.</span>
+        </div>
+      )}
+
+      {/* Approved Execution Notice */}
+      {executionState.variables?.__approved_steps__ && Object.keys(executionState.variables.__approved_steps__).length > 0 && (
+        <div className="p-3 bg-emerald-950/25 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs flex items-center gap-2.5">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+          <span>
+            Human approval was granted for steps: {Object.keys(executionState.variables.__approved_steps__).join(", ")}.
+          </span>
+        </div>
+      )}
 
       {error && (
         <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-xs flex items-center gap-2">

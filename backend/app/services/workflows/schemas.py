@@ -32,6 +32,7 @@ class WorkflowStatus(str, Enum):
 class WorkflowRunStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
+    WAITING_FOR_APPROVAL = "waiting_for_approval"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -53,6 +54,15 @@ class InputFieldDefinition(BaseModel):
     default: Optional[Any] = None
 
 
+class StepApprovalConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    required: bool = True
+    policy: Optional[str] = "before_external_action"
+    timeout_seconds: Optional[int] = 3600
+    assigned_role: Optional[str] = None
+    assigned_to: Optional[UUID] = None
+
+
 class WorkflowStepDefinition(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(..., description="Unique step identifier within the workflow definition")
@@ -60,6 +70,7 @@ class WorkflowStepDefinition(BaseModel):
     type: StepType = Field(..., description="Step type")
     description: Optional[str] = None
     config: Dict[str, Any] = Field(default_factory=dict, description="Step configuration payload")
+    approval: Optional[StepApprovalConfig] = Field(default=None, description="Human approval requirements")
     enabled: bool = True
     on_failure: str = Field(default="fail", description="Action on failure: 'fail' | 'skip' | 'retry'")
     max_retries: int = Field(default=0, ge=0, le=2, description="Maximum retry attempts (0-2)")

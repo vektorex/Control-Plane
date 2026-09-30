@@ -1023,6 +1023,59 @@ A production-grade persistent memory and intelligence system allowing the platfo
 - [x] Pure JavaScript Next.js frontend pages and components built with zero ESLint warnings and successful production build.
 - [x] 15/15 memory tests passing, 241/241 total backend regression tests passing.
 
+---
+
+## 🛡️ Step 18: Production-Grade Human-in-the-Loop (HITL) Control Center
+
+Step 18 establishes a production-grade Human-in-the-Loop (HITL) architecture and governance system ensuring that no AI agent or workflow can execute destructive, write, external, or unauthorized actions autonomously.
+
+> **Fundamental Invariant:**  
+> **"The model can propose an action, but it can never authorize its own action."**
+
+### 🧩 Core Architecture & Components:
+1. **HITL Service Suite (`backend/app/services/hitl/`)**:
+   - `schemas.py`: Pydantic data contracts, risk levels (`low`, `medium`, `high`, `critical`), and intervention states.
+   - `policies.py`: `ApprovalPolicyEngine` with deterministic risk evaluation, mandatory destructive action protection, evaluation failure triggers, cost bounds, and connector write rules.
+   - `requests.py`: `InterventionRequestManager` providing automatic credential redaction, safe preview generation, and audit logging.
+   - `approvals.py`: `ApprovalDecisionProcessor` enforcing atomic row locking (`with_for_update`), authorization checks, expiration verification, and double-approval prevention.
+   - `executor.py`: `HITLExecutionCoordinator` safely pausing and resuming workflow runs without client state reliance.
+   - `notifications.py`: `NotificationService` for in-app alerts and read state tracking.
+   - `service.py`: Central facade coordinating requests, decisions, policies, and lifecycle.
+2. **Database Models & Alembic Migration**:
+   - `backend/app/db/models/hitl.py`: `HumanInterventionRequest`, `ApprovalDecision`, `HumanAction` (immutable audit trail), `WorkspaceApprovalPolicy`, and `Notification`.
+   - Migration `016_hitl_system.py` with indexes on workspace, assignee, status, workflow run, and expiration.
+3. **Workflow Engine Integration**:
+   - Checkpoints workflow state on pause and transitions `WorkflowRun.status` to `waiting_for_approval`.
+   - Step configuration supports `approval: { required: true, policy: "...", timeout_seconds: 3600 }`.
+   - `WorkflowExecutor.resume_execution` atomically resumes from checkpoint, consumes approved/edited inputs, and dispatches remaining steps.
+4. **Tool & Connector Gatekeeping**:
+   - Destructive operations strictly require server-side human approval tokens before tool or connector actions can execute.
+5. **Observability & Immutable Audit Trail**:
+   - Records trace events: `human_approval_requested`, `human_approval_granted`, `human_approval_rejected`, `human_approval_edited`, `workflow_paused`, `workflow_resumed`.
+   - `HumanAction` table maintains a permanent, non-editable audit log of every human intervention.
+6. **Pure JavaScript Frontend Control Center**:
+   - `/app/approvals`: Real-time dashboard with 4 tabs (Pending Approvals, Recent Decisions, Expired Requests, My Assigned Requests), policy settings drawer, and quick review/approve/reject/edit modal.
+   - `/app/approvals/[requestId]`: Detail page with safe payload inspection, edit-before-execute editor, and audit timeline.
+   - `/app/workflows/[workflowId]/runs/[runId]`: Real-time "Waiting for human approval" banner with direct navigation to the approval drawer.
+   - Navigation: Live pending approvals badge with automatic, non-invasive polling.
+
+### ✅ Step 18 Verification Checklist:
+- [x] HITL database models and Alembic migration `016_hitl_system.py` created and indexed.
+- [x] Strict server-side authorization enforcement; frontend buttons are non-authoritative.
+- [x] Deterministic risk classification (`low`, `medium`, `high`, `critical`) without LLM dependency.
+- [x] Non-bypassable destructive-action approval enforcement.
+- [x] Zero-secrets guarantee: credentials redacted before persistence and display.
+- [x] No chain-of-thought stored or exposed.
+- [x] Workflow execution safely pauses (`waiting_for_approval`) and resumes cleanly.
+- [x] Edit-before-execute ensures edited payload is the sole authoritative input.
+- [x] Expiration handling prevents executing expired approvals.
+- [x] Transactional concurrency prevents duplicate or race-condition approvals.
+- [x] In-app notifications system with user and workspace isolation.
+- [x] Immutable audit trail via `HumanAction` model.
+- [x] Next.js frontend compiled and optimized with 0 build errors and 0 ESLint warnings.
+- [x] 16/16 HITL tests passing, 304/304 total backend tests passing.
+
+
 
 
 

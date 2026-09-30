@@ -71,6 +71,22 @@ class ToolExecutor:
                 latency_ms=latency_ms,
             )
 
+        # 2b. HITL Approval Check (Step 18)
+        from backend.app.services.hitl.policies import ApprovalPolicyEngine
+        is_destr = any(k in tool_name.lower() for k in ApprovalPolicyEngine.DESTRUCTIVE_KEYWORDS)
+        if is_destr and not kwargs.get("approval_granted", False):
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            return ToolResult(
+                tool_name=tool_name,
+                success=False,
+                data=None,
+                error=ToolErrorDetail(
+                    code="APPROVAL_REQUIRED",
+                    message=f"Tool '{tool_name}' is DESTRUCTIVE and strictly requires human approval.",
+                ),
+                latency_ms=latency_ms,
+            )
+
         # 3. Input Validation
         try:
             validated_input = self.registry.validate_input(tool_name, raw_input or {})

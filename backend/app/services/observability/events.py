@@ -25,6 +25,13 @@ class TraceEventType(str, Enum):
     EVALUATION_COMPLETED = "evaluation_completed"
     REVISION_STARTED = "revision_started"
     REVISION_COMPLETED = "revision_completed"
+    HUMAN_APPROVAL_REQUESTED = "human_approval_requested"
+    HUMAN_APPROVAL_GRANTED = "human_approval_granted"
+    HUMAN_APPROVAL_REJECTED = "human_approval_rejected"
+    HUMAN_APPROVAL_EDITED = "human_approval_edited"
+    HUMAN_APPROVAL_EXPIRED = "human_approval_expired"
+    WORKFLOW_PAUSED = "workflow_paused"
+    WORKFLOW_RESUMED = "workflow_resumed"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
 

@@ -15,6 +15,8 @@ from backend.app.api.routes.analytics import router as analytics_router, admin_r
 from backend.app.api.routes.workflows import router as workflows_router
 from backend.app.api.routes.connectors import router as connectors_router
 from backend.app.api.routes.memory import router as memory_router
+from backend.app.api.routes.hitl import router as hitl_router
+from backend.app.api.routes.notifications import router as notifications_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -34,6 +36,8 @@ api_router.include_router(observability_admin_router)
 api_router.include_router(workflows_router)
 api_router.include_router(connectors_router)
 api_router.include_router(memory_router)
+api_router.include_router(hitl_router)
+api_router.include_router(notifications_router)
 
 __all__ = ["api_router"]
 

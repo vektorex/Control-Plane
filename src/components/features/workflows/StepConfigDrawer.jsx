@@ -23,6 +23,7 @@ import {
   Lock,
   ExternalLink,
   Brain,
+  ShieldAlert,
 } from "lucide-react";
 
 const stepTypeIcons = {
@@ -47,11 +48,19 @@ export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [
   const [operationsList, setOperationsList] = useState([]);
   const [loadingOps, setLoadingOps] = useState(false);
 
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  const [approvalPolicy, setApprovalPolicy] = useState("before_external_action");
+  const [approvalTimeout, setApprovalTimeout] = useState(3600);
+
   useEffect(() => {
     if (step) {
       setConfig({ ...(step.config || {}) });
       setName(step.name || "");
       setDescription(step.description || "");
+      const app = step.approval || step.config?.approval || {};
+      setApprovalRequired(!!app.required);
+      setApprovalPolicy(app.policy || "before_external_action");
+      setApprovalTimeout(app.timeout_seconds || 3600);
     }
   }, [step]);
 
@@ -100,11 +109,23 @@ export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [
   };
 
   const handleSave = () => {
+    const approvalObj = approvalRequired
+      ? {
+          required: true,
+          policy: approvalPolicy,
+          timeout_seconds: Number(approvalTimeout) || 3600,
+        }
+      : null;
+
     onSave({
       ...step,
       name: name.trim() || step.name,
       description: description.trim() || null,
-      config,
+      config: {
+        ...config,
+        ...(approvalObj ? { approval: approvalObj } : {}),
+      },
+      approval: approvalObj,
     });
     onClose();
   };
@@ -870,6 +891,51 @@ export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [
                   )}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+        {/* Human-in-the-Loop Approval Configuration */}
+        <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-lg space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              <div>
+                <span className="text-xs font-semibold text-slate-200">Require Human Approval</span>
+                <p className="text-[10px] text-slate-400">Pause workflow execution before running this step</p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={approvalRequired}
+              onChange={(e) => setApprovalRequired(e.target.checked)}
+              className="w-4 h-4 accent-amber-500 rounded"
+            />
+          </div>
+
+          {approvalRequired && (
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-850 text-xs">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Policy</label>
+                <select
+                  value={approvalPolicy}
+                  onChange={(e) => setApprovalPolicy(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                >
+                  <option value="before_external_action">Before External Action</option>
+                  <option value="always_require_approval">Always Require Approval</option>
+                  <option value="require_approval_for_write">Require for Writes</option>
+                  <option value="require_approval_for_destructive">Require for Destructive</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Timeout (seconds)</label>
+                <input
+                  type="number"
+                  value={approvalTimeout}
+                  onChange={(e) => setApprovalTimeout(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                />
+              </div>
             </div>
           )}
         </div>

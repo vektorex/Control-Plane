@@ -138,13 +138,19 @@ class WorkflowRepository:
         # Add new steps in order
         new_steps: List[WorkflowStep] = []
         for order, step_def in enumerate(step_definitions, start=1):
+            cfg = dict(step_def.get("config", {}) or {})
+            if step_def.get("approval"):
+                cfg["approval"] = step_def.get("approval")
+            if step_def.get("id"):
+                cfg["id"] = step_def.get("id")
+
             st = WorkflowStep(
                 workflow_id=workflow_id,
                 step_order=order,
                 name=step_def.get("name", f"Step {order}"),
                 description=step_def.get("description"),
                 step_type=step_def.get("type", "generate") if isinstance(step_def.get("type"), str) else step_def.get("type").value,
-                configuration=step_def.get("config", {}),
+                configuration=cfg,
                 enabled=step_def.get("enabled", True),
             )
             self.session.add(st)

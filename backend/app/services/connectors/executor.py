@@ -101,6 +101,27 @@ class ConnectorExecutor:
                         f"Workspace '{workspace_id}' is not authorized to execute '{connector_name}.{operation}'."
                     )
 
+                # 2b. HITL Approval Check (Step 18)
+                from backend.app.services.hitl.policies import ApprovalPolicyEngine
+                op_capability = op_meta.permission_level.value if hasattr(op_meta, "permission_level") else "read"
+                if any(k in operation.lower() for k in ApprovalPolicyEngine.DESTRUCTIVE_KEYWORDS):
+                    op_capability = "destructive"
+                elif any(k in operation.lower() for k in ApprovalPolicyEngine.WRITE_KEYWORDS):
+                    if op_capability == "read":
+                        op_capability = "write"
+
+                risk = ApprovalPolicyEngine.classify_risk(
+                    target_type="connector",
+                    operation=f"{connector_name}.{operation}",
+                    capability=op_capability,
+                    arguments=arguments,
+                )
+
+                if risk.is_destructive and not kwargs.get("approval_granted", False):
+                    raise ConnectorPermissionError(
+                        f"Operation '{connector_name}.{operation}' is DESTRUCTIVE and strictly requires human approval."
+                    )
+
                 # 3. Retrieve Decrypted Credential Secret
                 cred = await self.credential_store.get(
                     session=session,
@@ -121,6 +142,27 @@ class ConnectorExecutor:
                     if not has_perm:
                         raise ConnectorPermissionError(
                             f"Workspace '{workspace_id}' is not authorized to execute '{connector_name}.{operation}'."
+                        )
+
+                    # 2b. HITL Approval Check (Step 18)
+                    from backend.app.services.hitl.policies import ApprovalPolicyEngine
+                    op_capability = op_meta.permission_level.value if hasattr(op_meta, "permission_level") else "read"
+                    if any(k in operation.lower() for k in ApprovalPolicyEngine.DESTRUCTIVE_KEYWORDS):
+                        op_capability = "destructive"
+                    elif any(k in operation.lower() for k in ApprovalPolicyEngine.WRITE_KEYWORDS):
+                        if op_capability == "read":
+                            op_capability = "write"
+
+                    risk = ApprovalPolicyEngine.classify_risk(
+                        target_type="connector",
+                        operation=f"{connector_name}.{operation}",
+                        capability=op_capability,
+                        arguments=arguments,
+                    )
+
+                    if risk.is_destructive and not kwargs.get("approval_granted", False):
+                        raise ConnectorPermissionError(
+                            f"Operation '{connector_name}.{operation}' is DESTRUCTIVE and strictly requires human approval."
                         )
 
                     cred = await self.credential_store.get(

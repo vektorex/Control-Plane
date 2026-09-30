@@ -21,6 +21,13 @@ from backend.app.db.models.memory import (
     MemorySuggestion,
     UserMemorySettings,
 )
+from backend.app.db.models.hitl import (
+    HumanInterventionRequest,
+    ApprovalDecision,
+    HumanAction,
+    WorkspaceApprovalPolicy,
+    Notification,
+)
 
 __all__ = [
     "Base",
@@ -53,6 +60,11 @@ __all__ = [
     "MemoryConflict",
     "MemorySuggestion",
     "UserMemorySettings",
+    "HumanInterventionRequest",
+    "ApprovalDecision",
+    "HumanAction",
+    "WorkspaceApprovalPolicy",
+    "Notification",
 ]
 
 

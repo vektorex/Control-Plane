@@ -84,6 +84,24 @@ class WorkflowExecutionState:
             "models_used": self.models_used,
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowExecutionState":
+        state = cls(data.get("input", {}))
+        state.variables = dict(data.get("variables", {}))
+        state.step_outputs = dict(data.get("step_outputs", {}))
+        state.tool_results = dict(data.get("tool_results", {}))
+        state.retrieval_results = dict(data.get("retrieval_results", {}))
+        state.generated_outputs = dict(data.get("generated_outputs", {}))
+        state.evaluations = dict(data.get("evaluations", {}))
+        state.total_tokens = data.get("total_tokens", 0)
+        state.input_tokens = data.get("input_tokens", 0)
+        state.output_tokens = data.get("output_tokens", 0)
+        state.estimated_cost = data.get("estimated_cost", 0.0)
+        state.tool_calls = data.get("tool_calls", 0)
+        state.retrieval_calls = data.get("retrieval_calls", 0)
+        state.models_used = list(data.get("models_used", []))
+        return state
+
     def resolve_value(self, expression: Any) -> Any:
         """
         Safely resolves a string template or expression against state.
@@ -193,12 +211,96 @@ class WorkflowExecutor:
             metadata={"workflow_id": str(workflow.id), "version": workflow.version, "workflow_name": workflow.name},
         )
 
+        return await self._run_workflow_loop(
+            workflow=workflow,
+            run=run,
+            definition=definition,
+            user=user,
+            state=state,
+            tracer=tracer,
+            start_idx=0,
+            start_time=start_time,
+        )
+
+    async def resume_execution(
+        self,
+        run: WorkflowRun,
+        intervention: Any,
+        user: User,
+    ) -> WorkflowRun:
+        """
+        Resumes a paused workflow run after an intervention decision (approved/edited).
+        """
+        start_time = time.perf_counter()
+        state_dict = run.execution_state or {}
+        state = WorkflowExecutionState.from_dict(state_dict)
+
+        pending_step_id = state_dict.get("pending_step_id") or getattr(intervention, "step_id", None)
+        current_idx = state_dict.get("current_step_idx", 0)
+
+        # Mark step approved and record edited payload if present
+        if pending_step_id:
+            state.variables.setdefault("__approved_steps__", {})[pending_step_id] = True
+            if getattr(intervention, "status", None) == "edited" and getattr(intervention, "response_data", None):
+                state.variables.setdefault("__edited_inputs__", {})[pending_step_id] = intervention.response_data
+
+        run.status = WorkflowRunStatus.RUNNING.value
+        await self.session.commit()
+
+        # Load workflow and definition
+        workflow = await self.session.get(Workflow, run.workflow_id)
+        if not workflow:
+            raise WorkflowExecutionError(f"Workflow '{run.workflow_id}' not found for run '{run.id}'.")
+
+        from backend.app.services.workflows.service import WorkflowService
+        wf_service = WorkflowService(self.session)
+        definition = await wf_service.get_workflow_definition(run.workflow_id, run.workspace_id)
+
+        tracer = ExecutionTracer(run_id=run.id, workspace_id=run.workspace_id)
+        tracer.record_event(
+            TraceEventType.WORKFLOW_RESUMED if hasattr(TraceEventType, "WORKFLOW_RESUMED") else TraceEventType.RUN_STARTED,
+            status=TraceEventStatus.STARTED,
+            metadata={
+                "intervention_id": str(getattr(intervention, "id", "")),
+                "decision": getattr(intervention, "status", "approved"),
+                "step_id": pending_step_id,
+            },
+        )
+
+        return await self._run_workflow_loop(
+            workflow=workflow,
+            run=run,
+            definition=definition,
+            user=user,
+            state=state,
+            tracer=tracer,
+            start_idx=current_idx,
+            start_time=start_time,
+        )
+
+    async def _run_workflow_loop(
+        self,
+        workflow: Workflow,
+        run: WorkflowRun,
+        definition: WorkflowDefinition,
+        user: User,
+        state: WorkflowExecutionState,
+        tracer: ExecutionTracer,
+        start_idx: int = 0,
+        start_time: Optional[float] = None,
+    ) -> WorkflowRun:
+        """
+        Executes sequential workflow steps with human intervention gating and fail-safe recovery.
+        """
+        if start_time is None:
+            start_time = time.perf_counter()
+
         steps = definition.steps or []
         step_map: Dict[str, WorkflowStepDefinition] = {s.id: s for s in steps}
         step_order_list: List[str] = [s.id for s in steps]
 
-        current_idx = 0
-        executed_step_count = 0
+        current_idx = start_idx
+        executed_step_count = len(state.step_results)
         max_steps = getattr(settings, "MAX_WORKFLOW_STEPS", 20)
 
         try:
@@ -210,8 +312,138 @@ class WorkflowExecutor:
                     current_idx += 1
                     continue
 
-                executed_step_count += 1
                 state.current_step = step_id
+
+                # -------------------------------------------------------------
+                # HITL Step Approval Evaluation (Step 18)
+                # -------------------------------------------------------------
+                approved_steps = state.variables.get("__approved_steps__", {})
+                if step_id not in approved_steps:
+                    from backend.app.services.hitl.service import HITLService
+                    from backend.app.services.hitl.policies import ApprovalPolicyEngine
+                    from backend.app.services.hitl.requests import InterventionRequestManager
+                    from backend.app.services.hitl.schemas import (
+                        InterventionCreateRequest,
+                        InterventionType,
+                        InterventionPriority,
+                        RiskLevel,
+                    )
+                    from backend.app.services.hitl.executor import HITLExecutionCoordinator
+
+                    hitl_svc = HITLService(self.session)
+                    ws_policy = await hitl_svc.get_or_create_policy(run.workspace_id)
+
+                    target_type = "workflow_step"
+                    operation = step.name or step.id
+                    capability = None
+                    step_input_payload: Any = {}
+
+                    cfg = step.config or {}
+                    if step.type == StepType.CONNECTOR:
+                        target_type = "connector"
+                        operation = cfg.get("operation", "execute")
+                        raw_args = cfg.get("arguments", {})
+                        step_input_payload = state.resolve_value(raw_args)
+                        capability = cfg.get("capability")
+                        if not capability:
+                            op_lower = operation.lower()
+                            if any(k in op_lower for k in ApprovalPolicyEngine.DESTRUCTIVE_KEYWORDS):
+                                capability = "destructive"
+                            elif any(k in op_lower for k in ApprovalPolicyEngine.WRITE_KEYWORDS):
+                                capability = "write"
+                            else:
+                                capability = "read"
+                    elif step.type == StepType.TOOL:
+                        target_type = "tool"
+                        operation = cfg.get("tool_name") or cfg.get("tool") or "tool_execute"
+                        raw_params = cfg.get("parameters", {})
+                        step_input_payload = state.resolve_value(raw_params)
+                        op_lower = operation.lower()
+                        if any(k in op_lower for k in ApprovalPolicyEngine.DESTRUCTIVE_KEYWORDS):
+                            capability = "destructive"
+                        elif any(k in op_lower for k in ApprovalPolicyEngine.WRITE_KEYWORDS):
+                            capability = "write"
+                        else:
+                            capability = "read"
+                    else:
+                        step_input_payload = {
+                            "config": cfg,
+                            "resolved_input": state.resolve_value(cfg),
+                        }
+
+                    requires_approval, reason, risk = ApprovalPolicyEngine.evaluate_requirement(
+                        workspace_policy=ws_policy,
+                        step_approval_config=step.approval,
+                        target_type=target_type,
+                        operation=operation,
+                        capability=capability,
+                        arguments=step_input_payload if isinstance(step_input_payload, dict) else {},
+                    )
+
+                    if requires_approval:
+                        logger.info(
+                            f"[WorkflowExecutor] Step '{step_id}' requires human approval ({reason}, risk={risk.level.value}). "
+                            f"Pausing execution for run '{run.id}'."
+                        )
+                        safe_ctx = InterventionRequestManager.build_safe_context(
+                            target_system=target_type,
+                            operation=operation,
+                            input_payload=step_input_payload if isinstance(step_input_payload, dict) else {"payload": step_input_payload},
+                            risk=risk,
+                            workflow_name=workflow.name,
+                            step_name=step.name or step.id,
+                        )
+
+                        priority_map = {
+                            RiskLevel.CRITICAL: InterventionPriority.CRITICAL,
+                            RiskLevel.HIGH: InterventionPriority.HIGH,
+                            RiskLevel.MEDIUM: InterventionPriority.NORMAL,
+                            RiskLevel.LOW: InterventionPriority.LOW,
+                        }
+
+                        req_data = InterventionCreateRequest(
+                            workflow_id=workflow.id,
+                            workflow_run_id=run.id,
+                            run_id=run.id,
+                            step_id=step_id,
+                            project_id=run.project_id,
+                            intervention_type=InterventionType.APPROVAL,
+                            title=f"Approval Required: {step.name or step_id}",
+                            description=f"Action '{operation}' requires human authorization: {reason}",
+                            priority=priority_map.get(risk.level, InterventionPriority.NORMAL),
+                            requested_action=operation,
+                            input_snapshot=step_input_payload if isinstance(step_input_payload, dict) else {"payload": step_input_payload},
+                            safe_context=safe_ctx,
+                            available_actions=["approve", "reject", "edit", "cancel"],
+                            timeout_seconds=(step.approval.timeout_seconds if step.approval else None) or 3600,
+                            assigned_to=None,
+                        )
+
+                        intervention_req = await InterventionRequestManager.create_request(
+                            session=self.session,
+                            workspace_id=run.workspace_id,
+                            request=req_data,
+                            requested_by=user.id,
+                        )
+
+                        tracer.record_event(
+                            TraceEventType.HUMAN_APPROVAL_REQUESTED if hasattr(TraceEventType, "HUMAN_APPROVAL_REQUESTED") else TraceEventType.STEP_STARTED,
+                            status=TraceEventStatus.COMPLETED,
+                            metadata={"step_id": step_id, "intervention_id": str(intervention_req.id), "reason": reason, "risk": risk.level.value},
+                        )
+
+                        paused_run = await HITLExecutionCoordinator.pause_workflow(
+                            session=self.session,
+                            run=run,
+                            step_id=step_id,
+                            current_step_idx=current_idx,
+                            intervention=intervention_req,
+                            execution_state=state.to_dict(),
+                            tracer=tracer,
+                        )
+                        return paused_run
+
+                executed_step_count += 1
 
                 # Execute individual step with retry and failure handling
                 jump_target, step_result = await self._execute_step_with_resilience(
@@ -437,11 +669,17 @@ class WorkflowExecutor:
             raw_params = cfg.get("parameters", {})
             resolved_params = state.resolve_value(raw_params)
 
+            # Apply edited payload from HITL if present
+            edited = state.variables.get("__edited_inputs__", {}).get(step.id)
+            if edited and isinstance(edited, dict):
+                resolved_params = edited
+
             state.tool_calls += 1
             tool_res = await self.tool_executor.execute(
                 tool_name=tool_name,
                 raw_input=resolved_params,
                 user=user,
+                approval_granted=(step.id in state.variables.get("__approved_steps__", {})),
             )
 
             output_data = {
@@ -449,7 +687,7 @@ class WorkflowExecutor:
                 "success": tool_res.success,
                 "data": tool_res.data,
                 "latency_ms": tool_res.latency_ms,
-                "error": tool_res.error,
+                "error": tool_res.error.model_dump() if tool_res.error and hasattr(tool_res.error, "model_dump") else (str(tool_res.error) if tool_res.error else None),
             }
             state.tool_results[step.id] = output_data
             metadata = {"tool_name": tool_name, "success": tool_res.success}
@@ -461,6 +699,11 @@ class WorkflowExecutor:
             raw_args = cfg.get("arguments", {})
             resolved_args = state.resolve_value(raw_args)
 
+            # Apply edited payload from HITL if present
+            edited = state.variables.get("__edited_inputs__", {}).get(step.id)
+            if edited and isinstance(edited, dict):
+                resolved_args = edited
+
             from backend.app.services.connectors.executor import get_connector_executor
             conn_executor = get_connector_executor()
 
@@ -470,6 +713,8 @@ class WorkflowExecutor:
                 arguments=resolved_args,
                 workspace_id=workspace_id,
                 user=user,
+                session=self.session,
+                approval_granted=(step.id in state.variables.get("__approved_steps__", {})),
             )
 
             output_data = {
@@ -689,9 +934,9 @@ class WorkflowExecutor:
             elif fields and isinstance(fields, list):
                 output_data = {f: state.resolve_value(f"{{{{steps.{f}.output}}}}") or state.step_outputs.get(f) for f in fields}
             else:
-                output_data = state.step_outputs
+                output_data = dict(state.step_outputs)
 
-            state.output_data = output_data if isinstance(output_data, dict) else {"output": output_data}
+            state.output_data = dict(output_data) if isinstance(output_data, dict) else {"output": output_data}
             metadata = {"has_output": bool(state.output_data)}
 
         return jump_target, output_data, metadata

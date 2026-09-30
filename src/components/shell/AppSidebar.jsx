@@ -17,15 +17,18 @@ import {
   ChevronRight,
   BarChart3,
   Brain,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
 import { WorkspaceSelector } from "./WorkspaceSelector";
+import { hitlService } from "@/services/hitl";
 
 const iconMap = {
   LayoutDashboard,
   ListTodo,
   Workflow,
+  ShieldCheck,
   Plug,
   Brain,
   FolderKanban,
@@ -37,6 +40,27 @@ const iconMap = {
 
 export function AppSidebar({ className = "", onCloseMobile }) {
   const pathname = usePathname();
+  const [pendingCount, setPendingCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchPending = async () => {
+      try {
+        const res = await hitlService.listRequests({ status: "pending", limit: 50 });
+        if (mounted && Array.isArray(res)) {
+          setPendingCount(res.length);
+        }
+      } catch (err) {
+        // Silent error in background counter
+      }
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 45000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [pathname]);
 
   return (
     <aside
@@ -104,7 +128,14 @@ export function AppSidebar({ className = "", onCloseMobile }) {
                     />
                     <span>{item.label}</span>
                   </div>
-                  {isActive && <ChevronRight className="w-3.5 h-3.5 text-indigo-400/80" />}
+                  <div className="flex items-center gap-1.5">
+                    {item.href === "/app/approvals" && pendingCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {pendingCount}
+                      </span>
+                    )}
+                    {isActive && <ChevronRight className="w-3.5 h-3.5 text-indigo-400/80" />}
+                  </div>
                 </Link>
               );
             })}

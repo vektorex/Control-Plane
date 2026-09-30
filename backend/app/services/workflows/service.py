@@ -161,13 +161,20 @@ class WorkflowService:
         steps_def: List[WorkflowStepDefinition] = []
 
         for st in wf.steps:
+            cfg = dict(st.configuration or {})
+            approval_data = cfg.get("approval")
+            from backend.app.services.workflows.schemas import StepApprovalConfig
+            approval_cfg = StepApprovalConfig.model_validate(approval_data) if approval_data else None
+            step_id = cfg.get("id") or st.name.lower().replace(" ", "_")
+
             steps_def.append(
                 WorkflowStepDefinition(
-                    id=st.name.lower().replace(" ", "_"),
+                    id=step_id,
                     name=st.name,
                     type=StepType(st.step_type),
                     description=st.description,
-                    config=st.configuration or {},
+                    config=cfg,
+                    approval=approval_cfg,
                     enabled=st.enabled,
                 )
             )

@@ -27,6 +27,8 @@ class RetrievalStrategy(str, Enum):
     DATABASE = "database"
     API = "api"
     GITHUB = "github"
+    CONNECTOR = "connector"
+
 
 
 class RetrievalScope(str, Enum):

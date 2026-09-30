@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { connectorService } from "@/services/connectors";
 import {
   Sliders,
   Sparkles,
@@ -15,9 +16,12 @@ import {
   Split,
   GitFork,
   FileCheck,
+  Plug,
   X,
   Plus,
   Trash2,
+  Lock,
+  ExternalLink,
 } from "lucide-react";
 
 const stepTypeIcons = {
@@ -30,12 +34,16 @@ const stepTypeIcons = {
   transform: Split,
   condition: GitFork,
   output: FileCheck,
+  connector: Plug,
 };
 
 export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [] }) {
   const [config, setConfig] = useState({});
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [connectorsList, setConnectorsList] = useState([]);
+  const [operationsList, setOperationsList] = useState([]);
+  const [loadingOps, setLoadingOps] = useState(false);
 
   useEffect(() => {
     if (step) {
@@ -44,6 +52,39 @@ export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [
       setDescription(step.description || "");
     }
   }, [step]);
+
+  // Load connectors and operations dynamically for connector step
+  useEffect(() => {
+    if (step?.type === "connector") {
+      const loadConnectors = async () => {
+        try {
+          const list = await connectorService.listConnectors();
+          setConnectorsList(list || []);
+          const activeConn = config.connector || list?.[0]?.name || "github";
+          if (!config.connector) {
+            handleFieldChange("connector", activeConn);
+          }
+          fetchOps(activeConn);
+        } catch (e) {
+          console.error("Failed to load connectors:", e);
+        }
+      };
+      loadConnectors();
+    }
+  }, [step?.type]);
+
+  const fetchOps = async (connectorName) => {
+    if (!connectorName) return;
+    try {
+      setLoadingOps(true);
+      const ops = await connectorService.getOperations(connectorName);
+      setOperationsList(ops || []);
+    } catch (e) {
+      console.error("Failed to load operations:", e);
+    } finally {
+      setLoadingOps(false);
+    }
+  };
 
   if (!step) return null;
 
@@ -526,6 +567,143 @@ export function StepConfigDrawer({ isOpen, onClose, step, onSave, allStepIds = [
                   <option value="json">Structured JSON</option>
                   <option value="text">Plain Text</option>
                 </select>
+              </div>
+            </div>
+          )}
+
+          {/* CONNECTOR STEP */}
+          {step.type === "connector" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Connector
+                  </label>
+                  <select
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                    value={config.connector ?? "github"}
+                    onChange={(e) => {
+                      const newConn = e.target.value;
+                      handleFieldChange("connector", newConn);
+                      fetchOps(newConn);
+                    }}
+                  >
+                    {connectorsList.length > 0 ? (
+                      connectorsList.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.display_name} ({c.name})
+                        </option>
+                      ))
+                    ) : (
+                      <option value="github">GitHub</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Operation {loadingOps && <span className="text-[10px] text-indigo-400 animate-pulse">(loading...)</span>}
+                  </label>
+                  <select
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono"
+                    value={config.operation ?? "search_issues"}
+                    onChange={(e) => handleFieldChange("operation", e.target.value)}
+                  >
+                    {operationsList.map((op) => (
+                      <option key={op.name} value={op.name}>
+                        {op.name}
+                      </option>
+                    ))}
+                    {operationsList.length === 0 && (
+                      <>
+                        <option value="search_issues">search_issues</option>
+                        <option value="search_repositories">search_repositories</option>
+                        <option value="get_repository">get_repository</option>
+                        <option value="get_file_contents">get_file_contents</option>
+                        <option value="list_pull_requests">list_pull_requests</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Selected Operation Details Badge */}
+              {(() => {
+                const selectedOpData = operationsList.find(
+                  (o) => o.name === (config.operation || "search_issues")
+                );
+                return (
+                  <div className="rounded-lg bg-slate-950/70 border border-slate-800/80 p-2.5 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-indigo-300 font-mono text-[11px] font-semibold">
+                        {config.operation || "search_issues"}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 uppercase">
+                          {selectedOpData?.capability || "read"}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-400">
+                          {selectedOpData?.permission_level || "read"}
+                        </span>
+                      </div>
+                    </div>
+                    {selectedOpData?.description && (
+                      <p className="text-[11px] text-slate-400">{selectedOpData.description}</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Arguments JSON / Template Editor */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-300">
+                    Arguments (JSON or variable mappings)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleFieldChange("arguments", {
+                          query: "{{input.query}}",
+                          repository: "{{input.repository}}",
+                        })
+                      }
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 underline"
+                    >
+                      Use Issue Search Template
+                    </button>
+                  </div>
+                </div>
+
+                <textarea
+                  rows={4}
+                  value={
+                    typeof config.arguments === "object"
+                      ? JSON.stringify(config.arguments, null, 2)
+                      : config.arguments ??
+                        `{\n  "query": "{{input.query}}"\n}`
+                  }
+                  onChange={(e) => {
+                    try {
+                      handleFieldChange("arguments", JSON.parse(e.target.value));
+                    } catch {
+                      handleFieldChange("arguments", e.target.value);
+                    }
+                  }}
+                  placeholder='{"query": "{{input.query}}"}'
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200"
+                />
+              </div>
+
+              {/* Security Boundary Notice */}
+              <div className="p-2.5 rounded bg-indigo-950/30 border border-indigo-900/40 flex items-start gap-2 text-[11px] text-slate-400">
+                <Lock className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                <span>
+                  External connector data returned by this step will be isolated with{" "}
+                  <code className="text-indigo-300">trust_level: &quot;external_untrusted&quot;</code> to prevent
+                  prompt injection vulnerabilities.
+                </span>
               </div>
             </div>
           )}

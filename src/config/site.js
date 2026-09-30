@@ -31,6 +31,12 @@ export const siteConfig = {
       description: "Build, validate, publish, and execute multi-step AI orchestration pipelines",
     },
     {
+      label: "Connectors",
+      href: "/app/connectors",
+      icon: "Plug",
+      description: "Secure external integrations with GitHub, APIs, and data sources",
+    },
+    {
       label: "Projects",
       href: "/app/projects",
       icon: "FolderKanban",

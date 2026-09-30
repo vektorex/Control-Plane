@@ -148,7 +148,61 @@ class RetrievalRouter:
                 top_k=decision.top_k,
             )
 
-        # 4. Strategy: Hybrid (default)
+        # 4. Strategy: Connector / GitHub
+        elif decision.strategy in (RetrievalStrategy.CONNECTOR, RetrievalStrategy.GITHUB):
+            start_time = time.perf_counter()
+            import uuid as uuid_pkg
+            from backend.app.services.connectors.executor import get_connector_executor
+            from backend.app.services.retrieval.models import RetrievalCandidate
+
+            conn_executor = get_connector_executor()
+            conn_name = decision.metadata.get("connector", "github")
+            conn_op = decision.metadata.get("operation", "search_issues")
+
+            conn_res = await conn_executor.execute(
+                connector_name=conn_name,
+                operation=conn_op,
+                arguments={"query": decision.query, "limit": decision.top_k},
+                workspace_id=workspace_id,
+                session=session,
+            )
+
+            candidates: List[RetrievalCandidate] = []
+            if conn_res.success and conn_res.items:
+                for idx, item in enumerate(conn_res.items):
+                    c_title = item.get("title") or item.get("name") or f"Item {idx+1}"
+                    c_body = item.get("body") or item.get("description") or str(item)
+                    content_str = f"[{conn_name.upper()} {conn_op}] {c_title}\n\n{c_body}"
+
+                    candidate = RetrievalCandidate(
+                        chunk_id=uuid_pkg.uuid4(),
+                        document_id=uuid_pkg.uuid4(),
+                        workspace_id=workspace_id,
+                        project_id=effective_project_id,
+                        filename=f"{conn_name}_{conn_op}",
+                        content=content_str,
+                        metadata={
+                            "connector": conn_name,
+                            "operation": conn_op,
+                            "trust_level": "external_untrusted",
+                            "source_url": item.get("html_url") or "",
+                        },
+                        fusion_score=0.9 - (idx * 0.05),
+                        rerank_score=0.9 - (idx * 0.05),
+                    )
+                    candidates.append(candidate)
+
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            return RetrievalResult(
+                candidates=candidates,
+                query=decision.query,
+                total_found=len(candidates),
+                vector_count=0,
+                keyword_count=len(candidates),
+                retrieval_latency_ms=latency_ms,
+            )
+
+        # 5. Strategy: Hybrid (default)
         else:
             return await self.hybrid_retriever.retrieve(
                 query=decision.query,
@@ -157,6 +211,7 @@ class RetrievalRouter:
                 project_id=effective_project_id,
                 top_k=decision.top_k,
             )
+
 
 
 # Default global router instance (lazily initialized)

@@ -13,11 +13,13 @@ class StepType(str, Enum):
     CONTEXT = "context"
     RETRIEVE = "retrieve"
     TOOL = "tool"
+    CONNECTOR = "connector"
     GENERATE = "generate"
     EVALUATE = "evaluate"
     TRANSFORM = "transform"
     CONDITION = "condition"
     OUTPUT = "output"
+
 
 
 class WorkflowStatus(str, Enum):

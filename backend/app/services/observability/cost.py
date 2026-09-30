@@ -1,5 +1,7 @@
-from typing import Any, Dict, List, Optional, Union
-from backend.app.services.models.registry import ModelRegistry, default_model_registry
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.services.models.registry import ModelRegistry
 
 
 class CostCalculator:
@@ -9,8 +11,16 @@ class CostCalculator:
     Returns None if pricing metadata is unavailable (never guesses or invents pricing).
     """
 
-    def __init__(self, registry: Optional[ModelRegistry] = None) -> None:
-        self.registry = registry or default_model_registry
+    def __init__(self, registry: Optional[Any] = None) -> None:
+        self._registry = registry
+
+    @property
+    def registry(self) -> Any:
+        if self._registry is None:
+            from backend.app.services.models.registry import default_model_registry
+            return default_model_registry
+        return self._registry
+
 
     def calculate_generation_cost(
         self,

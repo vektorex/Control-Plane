@@ -454,8 +454,50 @@ class WorkflowExecutor:
             state.tool_results[step.id] = output_data
             metadata = {"tool_name": tool_name, "success": tool_res.success}
 
+        # 4b. CONNECTOR STEP
+        elif stype == StepType.CONNECTOR:
+            connector_name = cfg.get("connector") or cfg.get("connector_name")
+            operation = cfg.get("operation")
+            raw_args = cfg.get("arguments", {})
+            resolved_args = state.resolve_value(raw_args)
+
+            from backend.app.services.connectors.executor import get_connector_executor
+            conn_executor = get_connector_executor()
+
+            conn_res = await conn_executor.execute(
+                connector_name=connector_name,
+                operation=operation,
+                arguments=resolved_args,
+                workspace_id=workspace_id,
+                user=user,
+            )
+
+            output_data = {
+                "connector": connector_name,
+                "operation": operation,
+                "success": conn_res.success,
+                "data": conn_res.data,
+                "items": conn_res.items,
+                "metadata": conn_res.metadata,
+                "source": conn_res.source,
+                "error_code": conn_res.error_code,
+                "error_message": conn_res.error_message,
+            }
+            metadata = {
+                "connector": connector_name,
+                "operation": operation,
+                "item_count": len(conn_res.items),
+                "success": conn_res.success,
+            }
+
+            if not conn_res.success and step.on_failure != "skip":
+                raise WorkflowExecutionError(
+                    f"Connector step '{step.id}' ({connector_name}.{operation}) failed: {conn_res.error_message}"
+                )
+
         # 5. GENERATE STEP
         elif stype == StepType.GENERATE:
+
             prompt_template = cfg.get("prompt_template") or cfg.get("instructions") or "Generate a response."
             prompt = state.resolve_value(prompt_template)
             model_id = cfg.get("model") or getattr(settings, "GENERATION_DEFAULT_MODEL", "gpt-4o-mini")

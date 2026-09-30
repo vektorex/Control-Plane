@@ -19,6 +19,19 @@ class ToolRegistry:
         # Register default tools
         self.register(WebSearchTool())
 
+        # Register connector-backed tools
+        try:
+            from backend.app.services.tools.providers.connector_tool import build_connector_tools
+            from backend.app.services.connectors.registry import get_connector_registry
+            conn_registry = get_connector_registry()
+            for connector in conn_registry.list():
+                for c_tool in build_connector_tools(connector):
+                    self.register(c_tool)
+        except Exception as e:
+            logger.warning(f"[ToolRegistry] Could not auto-register connector tools: {e}")
+
+
+
     def register(self, tool: BaseTool) -> None:
         """Registers a tool in the registry."""
         if not isinstance(tool, BaseTool):

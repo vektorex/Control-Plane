@@ -213,7 +213,9 @@ def client(mock_factory, monkeypatch):
     import backend.app.api.routes.documents as doc_mod
 
     monkeypatch.setattr(db_mod, "AsyncSessionLocal", test_async_session_factory)
+    monkeypatch.setattr(db_mod, "async_session_factory", test_async_session_factory)
     monkeypatch.setattr(doc_mod, "AsyncSessionLocal", test_async_session_factory)
+
 
     app.dependency_overrides[get_llm_factory] = lambda: mock_factory
     app.dependency_overrides[get_db] = override_get_db

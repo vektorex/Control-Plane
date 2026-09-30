@@ -132,6 +132,25 @@ class WorkflowValidator:
                     message="Tool step requires a valid 'tool_name' string in config."
                 ))
 
+        elif stype == StepType.CONNECTOR:
+            connector_name = cfg.get("connector") or cfg.get("connector_name")
+            operation = cfg.get("operation")
+            if not connector_name or not isinstance(connector_name, str):
+                issues.append(WorkflowValidationIssue(
+                    level="error",
+                    step_id=step.id,
+                    field="config.connector",
+                    message="Connector step requires a valid 'connector' string in config (e.g. 'github')."
+                ))
+            if not operation or not isinstance(operation, str):
+                issues.append(WorkflowValidationIssue(
+                    level="error",
+                    step_id=step.id,
+                    field="config.operation",
+                    message="Connector step requires a valid 'operation' string in config (e.g. 'search_issues')."
+                ))
+
+
         elif stype == StepType.GENERATE:
             temp = cfg.get("temperature")
             if temp is not None and (not isinstance(temp, (int, float)) or temp < 0.0 or temp > 2.0):

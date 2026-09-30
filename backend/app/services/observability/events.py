@@ -11,6 +11,9 @@ class TraceEventType(str, Enum):
     RETRIEVAL_COMPLETED = "retrieval_completed"
     TOOL_STARTED = "tool_started"
     TOOL_COMPLETED = "tool_completed"
+    CONNECTOR_STARTED = "connector_started"
+    CONNECTOR_COMPLETED = "connector_completed"
+    CONNECTOR_FAILED = "connector_failed"
     GENERATION_STARTED = "generation_started"
     GENERATION_COMPLETED = "generation_completed"
     EVALUATION_STARTED = "evaluation_started"
@@ -19,6 +22,7 @@ class TraceEventType(str, Enum):
     REVISION_COMPLETED = "revision_completed"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
+
 
 
 class TraceEventStatus(str, Enum):

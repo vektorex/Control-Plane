@@ -21,6 +21,7 @@ class ContextSourceType(str, Enum):
     DATABASE = "database"
     API = "api"
     TOOL = "tool"
+    CONNECTOR = "connector"
 
 
 class ContextItem(BaseModel):

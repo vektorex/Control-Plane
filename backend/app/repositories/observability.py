@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.logging import logger
 from backend.app.db.models.observability import ExecutionTraceEvent, RunTelemetry, UsageRecord
 from backend.app.db.models.task import Task
-from backend.app.services.models.registry import default_model_registry
 from backend.app.services.observability.metrics import calculate_average, calculate_percentile
+
 from backend.app.services.observability.schemas import (
     AnalyticsEvaluationResponse,
     AnalyticsLatencyResponse,
@@ -254,7 +254,9 @@ class ObservabilityRepository:
             key = f"{prov}:{m_id}"
 
             if key not in grouped:
+                from backend.app.services.models.registry import default_model_registry
                 m_def = default_model_registry.get_model(m_id, provider=prov)
+
                 grouped[key] = {
                     "model": m_id,
                     "provider": prov,

@@ -129,8 +129,17 @@ class Settings(BaseSettings):
     MAX_WORKFLOW_EXECUTION_SECONDS: float = 300.0
     MAX_WORKFLOW_OUTPUT_BYTES: int = 1048576  # 1MB output limit
 
+    # Step 16: Connector System Settings
+    CONNECTOR_ENCRYPTION_KEY: Optional[str] = None
+    MAX_CONNECTOR_CALLS_PER_RUN: int = 10
+    MAX_CONNECTOR_RESULTS_PER_CALL: int = 100
+    MAX_CONNECTOR_RESPONSE_BYTES: int = 1000000  # 1MB
+    CONNECTOR_TIMEOUT_SECONDS: float = 30.0
+    GITHUB_API_TOKEN: Optional[str] = None
+
 
 settings = Settings()
+
 
 
 

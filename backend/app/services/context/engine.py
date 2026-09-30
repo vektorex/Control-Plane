@@ -10,6 +10,7 @@ from backend.app.services.context.providers.manual_context import ManualContextP
 from backend.app.services.context.providers.rag_context import RAGContextProvider
 from backend.app.services.context.providers.task_context import TaskContextProvider
 from backend.app.services.context.providers.web_context import WebContextProvider
+from backend.app.services.context.providers.connector_context import ConnectorContextProvider
 from backend.app.services.context.registry import ContextProviderRegistry
 
 
@@ -39,6 +40,9 @@ class ContextEngine:
             self.registry.register(RAGContextProvider())
         if not self.registry.get_provider("web_context"):
             self.registry.register(WebContextProvider())
+        if not self.registry.get_provider("connector_context"):
+            self.registry.register(ConnectorContextProvider())
+
 
 
     def register_provider(self, provider: ContextProvider) -> None:

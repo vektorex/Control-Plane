@@ -413,65 +413,49 @@ class OrchestrationExecutor:
                 if fb_mod:
                     candidates.append((fb_prov, fb_mod))
 
-        last_error = None
-        gen_resp = None
-        active_model = target_model
-        active_provider_id = "unknown"
-        fallback_count = 0
+        # Route execution through unified AIGateway (Step 19)
+        from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 
-        for idx, (cand_prov, cand_model) in enumerate(candidates):
-            try:
-                if cand_prov:
-                    try:
-                        provider = self.llm_factory.get_provider_for_model(cand_model, provider_id=cand_prov)
-                    except TypeError:
-                        provider = self.llm_factory.get_provider_for_model(cand_model)
-                else:
-                    provider = self.llm_factory.get_provider_for_model(cand_model)
+        conv_messages = []
+        for m in messages:
+            role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else "user")
+            content = getattr(m, "content", None) or (m.get("content") if isinstance(m, dict) else str(m))
+            conv_messages.append({"role": role, "content": content})
 
-                active_provider_id = getattr(provider, "provider_id", "unknown")
-                active_model = cand_model
+        prov_hint = None
+        if isinstance(model_sel, dict):
+            prov_hint = model_sel.get("provider")
+        ws_id = getattr(task, "workspace_id", None)
+        gw_request = GatewayRequest(
+            model=target_model,
+            provider=prov_hint,
+            messages=conv_messages,
+            temperature=target_temp,
+            metadata={"task_id": str(task.id) if hasattr(task, "id") else None},
+            workspace_id=str(ws_id) if ws_id else None,
+        )
 
-                llm_request = LLMGenerateRequest(
-                    model=cand_model,
-                    messages=messages,
-                    temperature=target_temp,
-                )
-
-                gen_resp = await provider.generate(llm_request)
-                if idx > 0:
-                    fallback_count = idx
-                    logger.info(
-                        f"[OrchestrationExecutor] Successfully recovered using fallback candidate "
-                        f"'{cand_model}' ({provider.provider_id}) on attempt {idx}."
-                    )
-                break
-            except Exception as exc:
-                last_error = exc
-                logger.warning(
-                    f"[OrchestrationExecutor] Primary/fallback model '{cand_model}' failed: {exc}. "
-                    f"Attempts remaining: {len(candidates) - idx - 1}"
-                )
-                if idx == len(candidates) - 1:
-                    raise last_error
-
-        if not gen_resp:
-            raise last_error or RuntimeError("LLM generation produced no response.")
+        gen_resp = await default_ai_gateway.execute(
+            gw_request, workspace_id=ws_id
+        )
 
         state.generated_output = gen_resp.content
         state.token_usage = {
-            "input_tokens": getattr(gen_resp.usage, "input_tokens", None) or getattr(gen_resp.usage, "prompt_tokens", 0) if gen_resp.usage else 0,
-            "output_tokens": getattr(gen_resp.usage, "output_tokens", None) or getattr(gen_resp.usage, "completion_tokens", 0) if gen_resp.usage else 0,
-            "total_tokens": getattr(gen_resp.usage, "total_tokens", 0) if gen_resp.usage else 0,
+            "input_tokens": gen_resp.usage.input_tokens,
+            "output_tokens": gen_resp.usage.output_tokens,
+            "total_tokens": gen_resp.usage.total_tokens,
         }
-        state.metadata["final_model"] = active_model
-        state.metadata["model_provider"] = active_provider_id
-        state.metadata["fallback_attempts"] = fallback_count
+        state.metadata["final_model"] = gen_resp.model
+        state.metadata["model_provider"] = gen_resp.provider
+        state.metadata["fallback_attempts"] = gen_resp.metadata.get("fallback_attempts", 0)
+        if gen_resp.usage.estimated_cost is not None:
+            state.metadata["estimated_cost"] = gen_resp.usage.estimated_cost
 
         return {
-            "model": active_model,
-            "provider": active_provider_id,
-            "fallback_attempts": fallback_count,
+            "model": gen_resp.model,
+            "provider": gen_resp.provider,
+            "fallback_attempts": gen_resp.metadata.get("fallback_attempts", 0),
             "tokens": state.token_usage,
             "output_length": len(gen_resp.content),
+            "latency_ms": gen_resp.latency_ms,
         }

@@ -28,6 +28,7 @@ from backend.app.db.models.hitl import (
     WorkspaceApprovalPolicy,
     Notification,
 )
+from backend.app.db.models.ai_gateway import WorkspaceModelPolicy
 
 __all__ = [
     "Base",
@@ -65,6 +66,7 @@ __all__ = [
     "HumanAction",
     "WorkspaceApprovalPolicy",
     "Notification",
+    "WorkspaceModelPolicy",
 ]
 
 

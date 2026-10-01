@@ -9,6 +9,7 @@ from backend.app.schemas.llm import (
     LLMGenerateRequest,
     LLMGenerateResponse,
     LLMStreamChunk,
+    TokenUsage,
 )
 from backend.app.services.llm.factory import LLMProviderFactory, get_llm_factory
 
@@ -22,16 +23,35 @@ async def generate_completion(
     factory: LLMProviderFactory = Depends(get_llm_factory),
 ) -> LLMGenerateResponse:
     """
-    Execute standard LLM generation through the provider-agnostic abstraction layer.
-    Validates request against schema, routes to the matching provider adapter,
+    Execute standard LLM generation through the unified AI Gateway runtime.
+    Validates request against schema, enforces policies and limits,
     and returns normalized content and token metrics.
     """
     logger.info(
         f"[LLMRoute] Received generation request for model '{request.model}' "
         f"from user {user.id} with {len(request.messages)} message(s)."
     )
-    provider = factory.get_provider_for_model(request.model)
-    return await provider.generate(request)
+    from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
+
+    gw_req = GatewayRequest(
+        model=request.model,
+        messages=[{"role": m.role, "content": m.content} for m in request.messages],
+        temperature=request.temperature,
+        max_tokens=request.max_tokens,
+        metadata={"user_id": str(user.id)},
+    )
+    res = await default_ai_gateway.execute(gw_req)
+    return LLMGenerateResponse(
+        content=res.content,
+        model=res.model,
+        provider=res.provider,
+        finish_reason=res.finish_reason,
+        usage=TokenUsage(
+            input_tokens=res.usage.input_tokens,
+            output_tokens=res.usage.output_tokens,
+            total_tokens=res.usage.total_tokens,
+        ),
+    )
 
 
 @router.post("/generate/stream")
@@ -40,21 +60,42 @@ async def generate_completion_stream(
     user: User = Depends(get_current_user),
     factory: LLMProviderFactory = Depends(get_llm_factory),
 ):
-
     """
-    Execute streaming LLM generation via Server-Sent Events (SSE).
+    Execute streaming LLM generation via Server-Sent Events (SSE) through AI Gateway.
     Yields JSON event payloads followed by a terminal [DONE] event.
     """
     logger.info(
         f"[LLMRoute] Received streaming generation request for model '{request.model}'."
     )
-    provider = factory.get_provider_for_model(request.model)
+    from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
+
+    gw_req = GatewayRequest(
+        model=request.model,
+        messages=[{"role": m.role, "content": m.content} for m in request.messages],
+        temperature=request.temperature,
+        max_tokens=request.max_tokens,
+        stream=True,
+        metadata={"user_id": str(user.id)},
+    )
 
     async def sse_event_stream() -> AsyncIterator[str]:
         try:
-            async for chunk in provider.generate_stream(request):
-                payload = chunk.model_dump(mode="json")
-                yield f"data: {json.dumps(payload)}\n\n"
+            async for event in default_ai_gateway.execute_stream(gw_req):
+                if event.get("type") == "delta":
+                    chunk = LLMStreamChunk(
+                        content=event.get("content", ""),
+                        model=request.model,
+                        is_finished=False,
+                    )
+                    yield f"data: {json.dumps(chunk.model_dump(mode='json'))}\n\n"
+                elif event.get("type") == "completed":
+                    chunk = LLMStreamChunk(
+                        content="",
+                        model=request.model,
+                        is_finished=True,
+                        finish_reason=event.get("finish_reason", "stop"),
+                    )
+                    yield f"data: {json.dumps(chunk.model_dump(mode='json'))}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error(f"[LLMRoute] Streaming error: {str(e)}")

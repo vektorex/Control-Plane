@@ -94,6 +94,7 @@ Your goal is to propose an optimal, minimal, safe sequential execution plan to f
         self.tool_registry = tool_registry or get_tool_registry()
         self.validator = validator or PlanValidator(tool_registry=self.tool_registry, llm_factory=self.llm_factory)
         self.planner_model = planner_model or settings.PLANNER_MODEL
+        self.planner_provider = getattr(settings, "PLANNER_MODEL_PROVIDER", "openai")
 
     def _build_capabilities(self, req: TaskRunRequest) -> AvailableCapabilities:
         """Derives available capabilities for the planner based on task request and registry."""
@@ -179,15 +180,19 @@ Your goal is to propose an optimal, minimal, safe sequential execution plan to f
                 )
             )
 
-        provider = self.llm_factory.get_provider_for_model(self.planner_model)
-        req = LLMGenerateRequest(
+        # Route planning through unified AIGateway (Step 19)
+        from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
+
+        gw_req = GatewayRequest(
             model=self.planner_model,
-            messages=messages,
+            provider=self.planner_provider,
+            messages=[{"role": m.role, "content": m.content} for m in messages],
             temperature=0.0,
             max_tokens=1000,
+            metadata={"purpose": "planning"},
         )
 
-        resp = await provider.generate(req)
+        resp = await default_ai_gateway.execute(gw_req)
         raw_json = self._extract_json(resp.content)
         return ProposedPlanSchema.model_validate(raw_json)
 

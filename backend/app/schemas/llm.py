@@ -33,8 +33,10 @@ class LLMGenerateResponse(BaseModel):
 
 class LLMStreamChunk(BaseModel):
     content: str = Field(default="", description="Delta text fragment")
-    model: str = Field(description="Model producing the stream")
+    delta: Optional[str] = Field(default=None, description="Optional delta text")
+    model: Optional[str] = Field(default="gpt-4o-mini", description="Model producing the stream")
     provider: Optional[str] = Field(default=None, description="Provider identifier")
+    index: Optional[int] = Field(default=None, description="Chunk index")
     is_finished: bool = Field(default=False, description="Whether this is the terminal chunk")
     usage: Optional[TokenUsage] = Field(default=None, description="Final token usage statistics if available")
     finish_reason: Optional[str] = Field(default=None, description="Reason stream finished")

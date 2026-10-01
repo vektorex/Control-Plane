@@ -128,8 +128,10 @@ class MockLLMProvider(BaseLLMProvider):
             await asyncio.sleep(0.005)
             is_last = idx == len(tokens) - 1
             yield LLMStreamChunk(
+                content=tok,
                 delta=tok,
+                model=request.model,
                 index=idx,
                 finish_reason="stop" if is_last else None,
-                usage=TokenUsage(prompt_tokens=20, completion_tokens=len(tokens), total_tokens=20 + len(tokens)) if is_last else None,
+                usage=TokenUsage(input_tokens=20, output_tokens=len(tokens), total_tokens=20 + len(tokens)) if is_last else None,
             )

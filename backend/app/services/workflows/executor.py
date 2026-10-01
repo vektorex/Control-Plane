@@ -837,30 +837,32 @@ class WorkflowExecutor:
             provider_id = cfg.get("provider") or getattr(settings, "GENERATION_MODEL_PROVIDER", "openai")
             temp = float(cfg.get("temperature", 0.2))
 
-            provider = self.llm_factory.get_provider(provider_id)
-            messages = [{"role": "user", "content": prompt}]
+            # Route through unified AIGateway (Step 19)
+            from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
+
+            gw_req = GatewayRequest(
+                model=model_id,
+                provider=provider_id,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temp,
+                workspace_id=str(workspace_id) if workspace_id else None,
+                metadata={"step_id": step.id, "step_name": step.name},
+            )
 
             try:
-                gen_res = await provider.generate(
-                    messages=messages,
-                    model=model_id,
-                    temperature=temp,
+                gen_res = await default_ai_gateway.execute(
+                    gw_req, workspace_id=workspace_id
                 )
                 text_out = gen_res.content
-                tok_in = gen_res.usage.input_tokens if gen_res.usage else len(prompt) // 4
-                tok_out = gen_res.usage.output_tokens if gen_res.usage else len(text_out) // 4
+                tok_in = gen_res.usage.input_tokens
+                tok_out = gen_res.usage.output_tokens
+                step_cost = gen_res.usage.estimated_cost or 0.0
             except Exception as gen_err:
-                logger.warning(f"[WorkflowExecutor] LLM generation failed ({gen_err}), returning fallback text.")
+                logger.warning(f"[WorkflowExecutor] AI Gateway generation failed ({gen_err}), returning fallback text.")
                 text_out = f"Synthesized response for: {prompt[:100]}"
                 tok_in = len(prompt) // 4
                 tok_out = len(text_out) // 4
-
-            step_cost = CostCalculator().calculate_generation_cost(
-                model_id=model_id,
-                provider=provider_id,
-                input_tokens=tok_in,
-                output_tokens=tok_out,
-            ) or 0.0
+                step_cost = 0.0
 
             state.total_tokens += (tok_in + tok_out)
             state.input_tokens += tok_in

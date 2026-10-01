@@ -63,21 +63,19 @@ class MultiQueryRetriever:
         )
 
         try:
-            provider = self.llm_factory.get_provider_for_model("gpt-4o-mini")
-            if not provider.is_configured:
-                logger.info("[MultiQueryRetriever] LLM provider not configured. Using original query.")
-                return queries
+            from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 
-            llm_req = LLMGenerateRequest(
+            gw_req = GatewayRequest(
                 model="gpt-4o-mini",
                 messages=[
-                    ChatMessage(role="system", content="You are a specialized search query expansion engine. Output only queries, one per line."),
-                    ChatMessage(role="user", content=prompt),
+                    {"role": "system", "content": "You are a specialized search query expansion engine. Output only queries, one per line."},
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,
+                metadata={"purpose": "multi_query_expansion"},
             )
 
-            res = await provider.generate(llm_req)
+            res = await default_ai_gateway.execute(gw_req)
             raw_output = res.content.strip() if res and res.content else ""
 
             # Parse lines and clean up formatting

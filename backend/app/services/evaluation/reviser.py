@@ -112,18 +112,17 @@ Your task is to revise and improve a draft response to resolve specific verifica
         )
 
         try:
-            if self.provider_id:
-                try:
-                    provider = self.llm_factory.get_provider_for_model(
-                        target_model,
-                        provider_id=self.provider_id,
-                    )
-                except TypeError:
-                    provider = self.llm_factory.get_provider_for_model(target_model)
-            else:
-                provider = self.llm_factory.get_provider_for_model(target_model)
+            from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 
-            resp = await provider.generate(req)
+            gw_req = GatewayRequest(
+                model=target_model,
+                provider=self.provider_id,
+                messages=[{"role": m.role, "content": m.content} for m in messages],
+                temperature=temperature,
+                max_tokens=4000,
+                metadata={"purpose": "revision"},
+            )
+            resp = await default_ai_gateway.execute(gw_req)
             revised_text = resp.content.strip()
             return revised_text
 

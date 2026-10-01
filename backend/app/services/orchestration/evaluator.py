@@ -91,6 +91,7 @@ Your job is to determine whether the accumulated context and intermediate eviden
     ) -> None:
         self.llm_factory = llm_factory or get_llm_factory()
         self.evaluator_model = evaluator_model or settings.EVALUATOR_MODEL
+        self.evaluator_provider = getattr(settings, "EVALUATOR_MODEL_PROVIDER", "openai")
 
     def _extract_json(self, raw: str) -> Dict[str, Any]:
         """Extracts JSON from model output."""
@@ -161,14 +162,17 @@ Your job is to determine whether the accumulated context and intermediate eviden
         ]
 
         try:
-            provider = self.llm_factory.get_provider_for_model(self.evaluator_model)
-            req = LLMGenerateRequest(
+            from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
+
+            gw_req = GatewayRequest(
                 model=self.evaluator_model,
-                messages=messages,
+                provider=self.evaluator_provider,
+                messages=[{"role": m.role, "content": m.content} for m in messages],
                 temperature=0.0,
                 max_tokens=500,
+                metadata={"purpose": "evaluation"},
             )
-            resp = await provider.generate(req)
+            resp = await default_ai_gateway.execute(gw_req)
             parsed = self._extract_json(resp.content)
             return CompletionEvaluation.model_validate(parsed)
 

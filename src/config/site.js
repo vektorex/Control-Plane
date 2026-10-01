@@ -67,6 +67,12 @@ export const siteConfig = {
       description: "Observability, token usage, cost tracking, and execution metrics",
     },
     {
+      label: "AI Runtime",
+      href: "/app/ai-runtime",
+      icon: "Cpu",
+      description: "Unified AI Gateway status, providers, model health, routing, and usage",
+    },
+    {
       label: "Playground",
       href: "/app/playground",
       icon: "Terminal",

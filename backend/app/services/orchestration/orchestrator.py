@@ -666,75 +666,65 @@ class Orchestrator:
                     if fb_mod:
                         candidates.append((fb_prov, fb_mod))
 
-            stream_success = False
-            last_err = None
+            # Route streaming through unified AIGateway (Step 19)
+            from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
+
+            conv_messages = []
+            for m in messages:
+                role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else "user")
+                content = getattr(m, "content", None) or (m.get("content") if isinstance(m, dict) else str(m))
+                conv_messages.append({"role": role, "content": content})
+
+            prov_hint = None
+            if model_sel and isinstance(model_sel, dict):
+                prov_hint = model_sel.get("provider")
+
+            gw_request = GatewayRequest(
+                model=target_model,
+                provider=prov_hint,
+                messages=conv_messages,
+                temperature=target_temp,
+                stream=True,
+                metadata={"task_id": str(task.id) if hasattr(task, "id") else None},
+                workspace_id=str(task.workspace_id) if getattr(task, "workspace_id", None) else None,
+            )
+
+            full_content = ""
             active_model = target_model
-            active_provider_id = "unknown"
+            active_provider_id = prov_hint or "unknown"
             fallback_count = 0
 
-            for idx, (cand_prov, cand_model) in enumerate(candidates):
-                try:
-                    if cand_prov:
-                        try:
-                            provider = self.llm_factory.get_provider_for_model(cand_model, provider_id=cand_prov)
-                        except TypeError:
-                            provider = self.llm_factory.get_provider_for_model(cand_model)
-                    else:
-                        provider = self.llm_factory.get_provider_for_model(cand_model)
+            async for event in default_ai_gateway.execute_stream(
+                gw_request, workspace_id=getattr(task, "workspace_id", None)
+            ):
+                etype = event.get("type")
+                if etype == "delta":
+                    delta_text = event.get("content", "")
+                    full_content += delta_text
+                    yield {
+                        "type": "content_delta",
+                        "delta": delta_text,
+                        "content": full_content,
+                    }
+                elif etype == "usage":
+                    u = event.get("usage", {})
+                    state.token_usage = {
+                        "input_tokens": u.get("input_tokens", 0),
+                        "output_tokens": u.get("output_tokens", 0),
+                        "total_tokens": u.get("total_tokens", 0),
+                    }
+                    if u.get("estimated_cost") is not None:
+                        state.metadata["estimated_cost"] = u.get("estimated_cost")
+                elif etype == "model_fallback":
+                    fallback_count = event.get("attempt", fallback_count + 1)
+                    active_model = event.get("to_model", active_model)
+                    active_provider_id = event.get("provider", active_provider_id)
+                    yield event
 
-                    active_provider_id = getattr(provider, "provider_id", "unknown")
-                    active_model = cand_model
-
-                    if idx > 0:
-                        fallback_count = idx
-                        yield {
-                            "type": "model_fallback",
-                            "from_model": target_model,
-                            "to_model": cand_model,
-                            "provider": active_provider_id,
-                            "attempt": idx,
-                        }
-
-                    llm_request = LLMGenerateRequest(
-                        model=cand_model,
-                        messages=messages,
-                        temperature=target_temp,
-                    )
-
-                    full_content = ""
-                    async for chunk in provider.generate_stream(llm_request):
-                        delta_text = getattr(chunk, "delta", None) or getattr(chunk, "content", "")
-                        full_content += delta_text
-                        if chunk.usage:
-                            state.token_usage = {
-                                "input_tokens": getattr(chunk.usage, "input_tokens", None) or getattr(chunk.usage, "prompt_tokens", 0) or 0,
-                                "output_tokens": getattr(chunk.usage, "output_tokens", None) or getattr(chunk.usage, "completion_tokens", 0) or 0,
-                                "total_tokens": getattr(chunk.usage, "total_tokens", 0) or 0,
-                            }
-                        yield {
-                            "type": "content_delta",
-                            "delta": delta_text,
-                            "content": full_content,
-                        }
-
-                    state.generated_output = full_content
-                    state.metadata["final_model"] = active_model
-                    state.metadata["model_provider"] = active_provider_id
-                    state.metadata["fallback_attempts"] = fallback_count
-                    stream_success = True
-                    break
-
-                except Exception as cand_exc:
-                    last_err = cand_exc
-                    logger.warning(
-                        f"[Orchestrator SSE] Streaming attempt failed on model '{cand_model}': {cand_exc}. "
-                        f"Remaining candidates: {len(candidates) - idx - 1}"
-                    )
-                    if idx == len(candidates) - 1:
-                        raise last_err
-
-            if not stream_success:
-                raise last_err or RuntimeError("Streaming LLM generation failed across all candidates.")
+            state.generated_output = full_content
+            state.metadata["final_model"] = active_model
+            state.metadata["model_provider"] = active_provider_id
+            state.metadata["fallback_attempts"] = fallback_count
 
             gen_record.mark_completed({"output_length": len(state.generated_output), "model": active_model, "provider": active_provider_id})
 

@@ -109,18 +109,17 @@ class LLMEvaluator(BaseEvaluator):
         )
 
         try:
-            if self.evaluator_provider:
-                try:
-                    provider = self.llm_factory.get_provider_for_model(
-                        self.evaluator_model,
-                        provider_id=self.evaluator_provider,
-                    )
-                except TypeError:
-                    provider = self.llm_factory.get_provider_for_model(self.evaluator_model)
-            else:
-                provider = self.llm_factory.get_provider_for_model(self.evaluator_model)
+            from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 
-            resp = await provider.generate(req)
+            gw_req = GatewayRequest(
+                model=self.evaluator_model,
+                provider=self.evaluator_provider,
+                messages=[{"role": m.role, "content": m.content} for m in messages],
+                temperature=0.0,
+                max_tokens=1000,
+                metadata={"purpose": "evaluation_rule"},
+            )
+            resp = await default_ai_gateway.execute(gw_req)
             parsed_json = self._extract_json(resp.content)
             return response_model.model_validate(parsed_json)
 

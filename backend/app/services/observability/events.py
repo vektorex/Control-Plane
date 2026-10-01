@@ -32,6 +32,12 @@ class TraceEventType(str, Enum):
     HUMAN_APPROVAL_EXPIRED = "human_approval_expired"
     WORKFLOW_PAUSED = "workflow_paused"
     WORKFLOW_RESUMED = "workflow_resumed"
+    GATEWAY_REQUEST_STARTED = "gateway_request_started"
+    GATEWAY_REQUEST_COMPLETED = "gateway_request_completed"
+    GATEWAY_RETRY = "gateway_retry"
+    GATEWAY_FALLBACK = "gateway_fallback"
+    GATEWAY_TIMEOUT = "gateway_timeout"
+    GATEWAY_FAILED = "gateway_failed"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
 

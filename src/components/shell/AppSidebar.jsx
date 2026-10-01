@@ -34,6 +34,7 @@ const iconMap = {
   FolderKanban,
   Files,
   BarChart3,
+  Cpu,
   Terminal,
   Settings,
 };

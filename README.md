@@ -1075,6 +1075,67 @@ Step 18 establishes a production-grade Human-in-the-Loop (HITL) architecture and
 - [x] Next.js frontend compiled and optimized with 0 build errors and 0 ESLint warnings.
 - [x] 16/16 HITL tests passing, 304/304 total backend tests passing.
 
+---
+
+## ⚡ Step 19: Production-Grade AI Gateway & Unified Runtime
+
+Step 19 upgrades the model abstraction and routing layer into a production-grade AI Gateway serving as the single runtime entry point for all model executions across tasks, workflows, planning, evaluation, and revision.
+
+> **Fundamental Invariant:**  
+> **"No application component calls provider SDKs directly. All model invocations flow through the AI Gateway runtime to guarantee policy enforcement, deterministic routing, resilience fallbacks, circuit breaking, bounded concurrency, and accurate cost tracking."**
+
+### 🧩 Core Architecture & Components:
+1. **AI Gateway Runtime Suite (`backend/app/services/ai_gateway/`)**:
+   - `gateway.py`: `AIGateway` central facade managing requests, policy checks, model routing, fallbacks, bounded retries, concurrency limits, and observability.
+   - `requests.py`: Normalized, provider-independent `GatewayRequest` contract with safe request fingerprinting for deduplication and caching.
+   - `responses.py`: Normalized `GatewayResponse` and `GatewayUsage` token accounting and official pricing calculation.
+   - `streaming.py`: Normalized streaming event protocol (`delta`, `usage`, `model_fallback`, `completed`, `error`) and SSE formatting.
+   - `adapters.py`: `ModelProviderAdapter` interface with `OpenAIAdapter`, `MockAdapter`, and `BaseProviderAdapter` wrappers isolating vendor SDKs.
+   - `providers.py`: `ProviderRegistry` reflecting available providers and capabilities without exposing credentials.
+   - `routing.py`: `GatewayRouter` delegating to existing `ModelRouter` without duplicate ranking logic.
+   - `fallback.py`: `FallbackEngine` supporting sequential fallback execution (`MAX_MODEL_FALLBACKS = 2`) for transient errors with hard capability preservation.
+   - `health.py`: `CircuitBreaker` (threshold 5 failures, 60s reset) and `ModelHealthService` tracking operational availability.
+   - `limits.py`: `ConcurrencyLimiter` (`MAX_CONCURRENT_MODEL_REQUESTS = 10`), `RetryPolicy` (exponential backoff on transient errors), and timeout management.
+   - `policies.py`: `WorkspaceModelPolicyManager` enforcing provider/model whitelists and ceilings server-side.
+   - `errors.py`: 13 normalized, safe gateway error exceptions without provider stack trace leaks.
+2. **Database Models & Alembic Migration**:
+   - `backend/app/db/models/ai_gateway.py`: `WorkspaceModelPolicy` (`allowed_providers`, `allowed_models`, `default_model`, `max_tokens_per_request`, `max_requests_per_run`, `max_concurrent_requests`, `fallback_enabled`).
+   - Migration `017_ai_gateway.py`.
+3. **Application Integration**:
+   - `TaskExecutionService` & `Orchestrator`: Standard and streaming generation routed through `default_ai_gateway`.
+   - `WorkflowExecutor`: Generate steps routed through `default_ai_gateway.execute`.
+   - `LLMPlanner`: Planning prompts routed through `default_ai_gateway.execute`.
+   - `CompletionEvaluator` & `RuleEvaluators`: Evaluator validations routed through `default_ai_gateway.execute`.
+   - `ControlledReviser`: Revision generations routed through `default_ai_gateway.execute`.
+   - `/api/llm/generate` and `/api/llm/generate/stream`: Backward-compatible delegation through `default_ai_gateway`.
+4. **Observability & Cost Intelligence**:
+   - Trace events: `gateway_request_started`, `gateway_request_completed`, `gateway_retry`, `gateway_fallback`, `gateway_timeout`, `gateway_failed`.
+   - Official 1M-token pricing calculation via `CostCalculator`.
+5. **Pure JavaScript Frontend AI Runtime**:
+   - `/app/ai-runtime`: Unified dashboard with 7 sections (Gateway Status, Providers, Models, Health & Circuits, Routing, Fallback, Usage) plus live diagnostic test runner.
+   - `/app/ai-runtime/routing`: Interactive model routing preview with task category and capability constraint toggles.
+   - `/app/settings/models`: Workspace model settings page for provider/model permissions, limits, and fallback controls.
+   - Navigation: "AI Runtime" menu item with `Cpu` icon.
+
+### ✅ Step 19 Verification Checklist:
+- [x] AI Gateway package `backend/app/services/ai_gateway/` created and fully exported.
+- [x] WorkspaceModelPolicy database model and Alembic migration `017_ai_gateway.py` implemented.
+- [x] Normalized request and response contracts (`GatewayRequest`, `GatewayResponse`, `GatewayUsage`) without provider leaks.
+- [x] Unified streaming events abstraction (`delta`, `usage`, `completed`, `model_fallback`).
+- [x] Provider adapters (`ModelProviderAdapter`, `OpenAIAdapter`, `MockAdapter`, `BaseProviderAdapter`) isolating SDKs.
+- [x] Centralized routing reuse with `ModelRouter` and objective capability constraint matching.
+- [x] Safe fallback engine enforcing capability compatibility and handling only transient errors.
+- [x] Bounded exponential backoff retries and non-retryable policy protection.
+- [x] In-memory circuit breaker isolating repeated provider/model outages.
+- [x] Bounded concurrency limiting protecting upstream and downstream services.
+- [x] Server-side workspace model policy enforcement.
+- [x] Complete integration across Tasks, Workflows, Planners, Evaluation, Reviser, and Retrieval.
+- [x] Telemetry events and cost intelligence integration.
+- [x] Zero-secrets guarantee and no prompt/CoT leakage.
+- [x] Pure JavaScript Next.js frontend pages and components built with 0 build errors and 0 ESLint warnings.
+- [x] 22/22 AI Gateway tests passing.
+
+
 
 
 

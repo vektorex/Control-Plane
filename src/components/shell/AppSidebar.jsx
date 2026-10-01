@@ -18,6 +18,7 @@ import {
   BarChart3,
   Brain,
   ShieldCheck,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -28,6 +29,7 @@ const iconMap = {
   LayoutDashboard,
   ListTodo,
   Workflow,
+  RotateCcw,
   ShieldCheck,
   Plug,
   Brain,

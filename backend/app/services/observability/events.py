@@ -41,6 +41,11 @@ class TraceEventType(str, Enum):
     TASK_ANALYSIS_STARTED = "task_analysis_started"
     TASK_ANALYSIS_COMPLETED = "task_analysis_completed"
     TASK_REQUIREMENT_VALIDATION_FAILED = "task_requirement_validation_failed"
+    REPLAY_STARTED = "replay_started"
+    REPLAY_COMPLETED = "replay_completed"
+    REPLAY_FAILED = "replay_failed"
+    REPLAY_CANCELLED = "replay_cancelled"
+    REPLAY_SIDE_EFFECT_BLOCKED = "replay_side_effect_blocked"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
 

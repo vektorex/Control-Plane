@@ -29,6 +29,7 @@ from backend.app.db.models.hitl import (
     Notification,
 )
 from backend.app.db.models.ai_gateway import WorkspaceModelPolicy
+from backend.app.db.models.replay import ReplayRun
 
 __all__ = [
     "Base",
@@ -67,6 +68,7 @@ __all__ = [
     "WorkspaceApprovalPolicy",
     "Notification",
     "WorkspaceModelPolicy",
+    "ReplayRun",
 ]
 
 

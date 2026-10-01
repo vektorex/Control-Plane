@@ -99,6 +99,7 @@ class RunRepository:
             error_message=data.error_message,
             input_snapshot=data.input_snapshot,
             output_content=data.output_content,
+            execution_steps=getattr(data, "execution_steps", None),
             started_at=data.started_at,
             completed_at=data.completed_at,
         )

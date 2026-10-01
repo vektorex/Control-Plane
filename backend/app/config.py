@@ -144,6 +144,11 @@ class Settings(BaseSettings):
     TASK_ANALYSIS_MODEL: str = "gpt-4o-mini"
     TASK_ANALYSIS_CONFIDENCE_THRESHOLD: float = 0.8
 
+    # Step 21: AI Execution Replay & Debugging Studio Settings
+    MAX_REPLAY_SNAPSHOT_BYTES: int = 5000000  # 5MB
+    DEFAULT_REPLAY_MODE: str = "dry_run"  # inspect | dry_run | replay | compare
+    REPLAY_TIMEOUT_SECONDS: float = 120.0
+
 
 settings = Settings()
 

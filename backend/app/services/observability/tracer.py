@@ -78,6 +78,9 @@ class ExecutionTracer:
         if not self.events:
             return 0
 
+        to_flush = list(self.events)
+        self.events.clear()
+
         try:
             db_objs = [
                 ExecutionTraceEvent(
@@ -97,7 +100,7 @@ class ExecutionTracer:
                     error_code=e["error_code"],
                     created_at=e["created_at"],
                 )
-                for e in self.events
+                for e in to_flush
             ]
             session.add_all(db_objs)
             await session.flush()

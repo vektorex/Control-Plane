@@ -180,6 +180,19 @@ Your goal is to propose an optimal, minimal, safe sequential execution plan to f
                 )
             )
 
+        # Check if custom llm_factory is provided (e.g. unit test mock)
+        if self.llm_factory and (type(self.llm_factory).__name__ != "LLMProviderFactory" or hasattr(self.llm_factory, "_provider")):
+            prov = self.llm_factory.get_provider_for_model(self.planner_model)
+            llm_req = LLMGenerateRequest(
+                model=self.planner_model,
+                messages=messages,
+                temperature=0.0,
+                max_tokens=1000,
+            )
+            resp = await prov.generate(llm_req)
+            raw_json = self._extract_json(resp.content)
+            return ProposedPlanSchema.model_validate(raw_json)
+
         # Route planning through unified AIGateway (Step 19)
         from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 

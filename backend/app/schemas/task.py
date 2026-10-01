@@ -19,6 +19,9 @@ class TaskBase(BaseModel):
     evaluation_mode: Optional[str] = Field(default="standard", description="Evaluation mode: off | basic | standard | strict")
     strict_evaluation: Optional[bool] = Field(default=False, description="Strict evaluation mode flag")
     expected_format: Optional[str] = Field(default=None, description="Expected format constraint (json, table, list, code)")
+    # Step 20: Task Intelligence Preferences
+    execution_mode: Optional[str] = Field(default="auto", description="Execution mode: auto | direct | retrieval | tool_assisted | orchestrated | workflow")
+    task_type: Optional[str] = Field(default=None, description="Optional task category classification")
 
 
 class TaskCreate(TaskBase):
@@ -36,6 +39,8 @@ class TaskUpdate(BaseModel):
     evaluation_mode: Optional[str] = Field(default=None)
     strict_evaluation: Optional[bool] = Field(default=None)
     expected_format: Optional[str] = Field(default=None)
+    execution_mode: Optional[str] = Field(default=None)
+    task_type: Optional[str] = Field(default=None)
 
 
 class TaskRunRequest(BaseModel):
@@ -73,6 +78,11 @@ class TaskRunRequest(BaseModel):
     expected_format: Optional[str] = Field(default=None, description="Expected format override: json | table | list | code")
     max_revision_attempts: Optional[int] = Field(default=2, ge=0, le=3, description="Max revision attempts on verification failure")
 
+    # Step 20: Task Intelligence Configuration
+    execution_mode: Optional[str] = Field(default="auto", description="Execution mode: auto | direct | retrieval | tool_assisted | orchestrated | workflow")
+    task_type: Optional[str] = Field(default=None, description="Optional task type override")
+    task_intelligence_mode: Optional[str] = Field(default="auto", description="Intelligence mode: auto | deterministic | llm | hybrid")
+
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -89,6 +99,8 @@ class TaskResponse(BaseModel):
     evaluation_mode: Optional[str] = "standard"
     strict_evaluation: Optional[bool] = False
     expected_format: Optional[str] = None
+    execution_mode: Optional[str] = "auto"
+    task_type: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     run_count: Optional[int] = 0

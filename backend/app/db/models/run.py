@@ -152,6 +152,41 @@ class Run(Base):
         order_by="UsageRecord.created_at",
     )
 
-    def __repr__(self) -> str:
+    @property
+    def task_type(self) -> Optional[str]:
+        if not self.input_snapshot:
+            return None
+        return (
+            self.input_snapshot.get("task_type")
+            or self.input_snapshot.get("task_intelligence", {}).get("task_type")
+        )
 
+    @property
+    def execution_mode(self) -> Optional[str]:
+        if not self.input_snapshot:
+            return None
+        return (
+            self.input_snapshot.get("execution_mode")
+            or self.input_snapshot.get("task_intelligence", {}).get("execution_mode")
+        )
+
+    @property
+    def execution_requirements(self) -> Optional[Dict[str, Any]]:
+        if not self.input_snapshot:
+            return None
+        return (
+            self.input_snapshot.get("execution_requirements")
+            or self.input_snapshot.get("task_intelligence", {}).get("execution_requirements")
+        )
+
+    @property
+    def task_analysis_version(self) -> Optional[str]:
+        if not self.input_snapshot:
+            return None
+        return (
+            self.input_snapshot.get("task_analysis_version")
+            or self.input_snapshot.get("task_intelligence", {}).get("task_analysis_version")
+        )
+
+    def __repr__(self) -> str:
         return f"<Run(id={self.id}, task_id={self.task_id}, status='{self.status}', model='{self.model_name}')>"

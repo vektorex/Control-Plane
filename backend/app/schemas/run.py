@@ -68,6 +68,12 @@ class RunBase(BaseModel):
     revision_attempts: Optional[int] = Field(default=0, ge=0, description="Total revision loop iterations performed")
     evaluation_result: Optional[Dict[str, Any]] = Field(default=None, description="Structured evaluation result snapshot")
 
+    # Step 20: Task Intelligence Metadata
+    task_type: Optional[str] = Field(default=None, description="Classified task category")
+    execution_mode: Optional[str] = Field(default=None, description="Resolved execution mode")
+    execution_requirements: Optional[Dict[str, Any]] = Field(default=None, description="Authoritative execution requirements")
+    task_analysis_version: Optional[str] = Field(default=None, description="Version of task intelligence analysis used")
+
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -133,6 +139,10 @@ class RunResponse(BaseModel):
     evaluation_attempts: Optional[int] = 0
     revision_attempts: Optional[int] = 0
     evaluation_result: Optional[Dict[str, Any]] = None
+    task_type: Optional[str] = None
+    execution_mode: Optional[str] = None
+    execution_requirements: Optional[Dict[str, Any]] = None
+    task_analysis_version: Optional[str] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

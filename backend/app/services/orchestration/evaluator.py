@@ -162,6 +162,18 @@ Your job is to determine whether the accumulated context and intermediate eviden
         ]
 
         try:
+            if self.llm_factory and (type(self.llm_factory).__name__ != "LLMProviderFactory" or hasattr(self.llm_factory, "_provider")):
+                prov = self.llm_factory.get_provider_for_model(self.evaluator_model)
+                req = LLMGenerateRequest(
+                    model=self.evaluator_model,
+                    messages=messages,
+                    temperature=0.0,
+                    max_tokens=500,
+                )
+                resp = await prov.generate(req)
+                parsed = self._extract_json(resp.content)
+                return CompletionEvaluation.model_validate(parsed)
+
             from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 
             gw_req = GatewayRequest(

@@ -227,6 +227,7 @@ class AIGateway:
         await self.concurrency.acquire(workspace_id=workspace_id, limit=ws_concurrency_limit)
 
         last_error: Optional[Exception] = None
+        primary_error: Optional[Exception] = None
         fallback_attempt = 0
 
         try:
@@ -299,6 +300,8 @@ class AIGateway:
                     return response
 
                 except Exception as cand_exc:
+                    if idx == 0:
+                        primary_error = cand_exc
                     last_error = cand_exc
                     logger.warning(
                         f"[AIGateway] Candidate '{cand_model}' ({cand_prov}) failed: {cand_exc}. "
@@ -319,7 +322,13 @@ class AIGateway:
                     "error": str(last_error),
                 },
             )
+            from backend.app.core.errors import ProviderRateLimitError
+            from backend.app.services.ai_gateway.errors import RateLimitedError
+            if primary_error and isinstance(primary_error, (ProviderRateLimitError, RateLimitedError)):
+                raise primary_error
             if len(candidates) == 1 and last_error:
+                raise last_error
+            if last_error and isinstance(last_error, (ProviderRateLimitError, RateLimitedError)):
                 raise last_error
             raise AllFallbacksFailedError(
                 f"All model candidates failed for request. Last error: {last_error}"

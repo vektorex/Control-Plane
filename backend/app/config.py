@@ -137,6 +137,13 @@ class Settings(BaseSettings):
     CONNECTOR_TIMEOUT_SECONDS: float = 30.0
     GITHUB_API_TOKEN: Optional[str] = None
 
+    # Step 20: AI Task Intelligence Settings
+    TASK_INTELLIGENCE_MODE: str = "hybrid"  # deterministic | llm | hybrid
+    TASK_ANALYSIS_MAX_TOKENS: int = 1000
+    TASK_ANALYSIS_TIMEOUT_SECONDS: float = 15.0
+    TASK_ANALYSIS_MODEL: str = "gpt-4o-mini"
+    TASK_ANALYSIS_CONFIDENCE_THRESHOLD: float = 0.8
+
 
 settings = Settings()
 

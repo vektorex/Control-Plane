@@ -288,8 +288,44 @@ export const taskService = {
   /**
    * Get evaluation history and verification findings for a run (Step 13)
    */
-  async getRunEvaluation(runId) {
-    return apiClient(`/runs/${runId}/evaluation`);
+  /**
+   * Analyze task to determine execution requirements (Step 20 Task Intelligence)
+   */
+  async analyzeTask(payload = {}) {
+    return apiClient("/tasks/analyze", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
+   * Analyze an existing task by taskId (Step 20)
+   */
+  async analyzeExistingTask(taskId, payload = {}) {
+    return apiClient(`/tasks/${taskId}/analyze`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
+   * Preview execution requirements without executing (Step 20)
+   */
+  async previewExecution(payload = {}) {
+    return apiClient("/tasks/preview-execution", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
+   * Preview execution for an existing task by taskId (Step 20)
+   */
+  async previewExistingTaskExecution(taskId, payload = {}) {
+    return apiClient(`/tasks/${taskId}/preview-execution`, {
+      method: "POST",
+      body: payload,
+    });
   },
 };
 

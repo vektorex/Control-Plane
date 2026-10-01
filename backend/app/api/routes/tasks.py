@@ -46,6 +46,12 @@ from backend.app.services.llm.factory import LLMProviderFactory, get_llm_factory
 from backend.app.services.orchestration.plan import ExecutionPlan
 from backend.app.services.retrieval import RetrievalRouter, get_retrieval_router
 from backend.app.services.task_execution import TaskExecutionService
+from backend.app.services.task_intelligence import (
+    default_task_intelligence_service,
+    TaskAnalysisRequest,
+    TaskAnalysisResponse,
+    ExecutionPreviewResponse,
+)
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
@@ -119,6 +125,117 @@ async def delete_task(
     repo = TaskRepository(session)
     await repo.delete(task_id, user.id)
     return None
+
+
+# --- Step 20: Task Intelligence Endpoints ---
+
+@router.post("/analyze", response_model=TaskAnalysisResponse)
+async def analyze_task(
+    payload: TaskAnalysisRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> TaskAnalysisResponse:
+    """
+    Analyze incoming task requirements and suggested execution mode.
+    Does NOT execute the task.
+    """
+    task_text = payload.task
+    context_text = payload.context
+    workspace_id = payload.workspace_id
+
+    if payload.task_id and (not task_text or not task_text.strip()):
+        repo = TaskRepository(session)
+        task = await repo.get_by_id_and_owner_or_raise(payload.task_id, user.id)
+        task_text = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
+        context_text = task.context_text or context_text
+        if task.project and task.project.workspace_id:
+            workspace_id = str(task.project.workspace_id)
+
+    return await default_task_intelligence_service.analyze(
+        task_text=task_text or "",
+        context_text=context_text,
+        mode=payload.mode or "auto",
+        workspace_id=workspace_id,
+    )
+
+
+@router.post("/preview-execution", response_model=ExecutionPreviewResponse)
+async def preview_task_execution(
+    payload: TaskAnalysisRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> ExecutionPreviewResponse:
+    """
+    Produce a bounded execution preview showing knowledge sources, tools,
+    model capabilities, evaluation, and HITL requirements.
+    Does NOT execute the task.
+    """
+    task_text = payload.task
+    context_text = payload.context
+    workspace_id = payload.workspace_id
+
+    if payload.task_id and (not task_text or not task_text.strip()):
+        repo = TaskRepository(session)
+        task = await repo.get_by_id_and_owner_or_raise(payload.task_id, user.id)
+        task_text = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
+        context_text = task.context_text or context_text
+        if task.project and task.project.workspace_id:
+            workspace_id = str(task.project.workspace_id)
+
+    return await default_task_intelligence_service.preview_execution(
+        task_text=task_text or "",
+        context_text=context_text,
+        mode=payload.mode or "auto",
+        workspace_id=workspace_id,
+    )
+
+
+@router.post("/{task_id}/analyze", response_model=TaskAnalysisResponse)
+async def analyze_existing_task(
+    task_id: UUID,
+    mode: Optional[str] = Query("auto"),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> TaskAnalysisResponse:
+    """
+    Analyze an existing saved task by task_id.
+    Does NOT execute the task.
+    """
+    repo = TaskRepository(session)
+    task = await repo.get_by_id_and_owner_or_raise(task_id, user.id)
+    task_text = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
+    ws_id = str(task.project.workspace_id) if (task.project and task.project.workspace_id) else None
+
+    return await default_task_intelligence_service.analyze(
+        task_text=task_text,
+        context_text=task.context_text,
+        mode=mode or "auto",
+        workspace_id=ws_id,
+    )
+
+
+@router.post("/{task_id}/preview-execution", response_model=ExecutionPreviewResponse)
+async def preview_existing_task_execution(
+    task_id: UUID,
+    mode: Optional[str] = Query("auto"),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> ExecutionPreviewResponse:
+    """
+    Preview execution configuration for an existing saved task by task_id.
+    Does NOT execute the task.
+    """
+    repo = TaskRepository(session)
+    task = await repo.get_by_id_and_owner_or_raise(task_id, user.id)
+    task_text = (task.instructions or "").strip() or (task.description or "").strip() or (task.title or "").strip()
+    ws_id = str(task.project.workspace_id) if (task.project and task.project.workspace_id) else None
+
+    return await default_task_intelligence_service.preview_execution(
+        task_text=task_text,
+        context_text=task.context_text,
+        mode=mode or "auto",
+        workspace_id=ws_id,
+    )
 
 
 # --- Task AI Execution & Orchestration Endpoints ---

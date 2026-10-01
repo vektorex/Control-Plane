@@ -108,6 +108,9 @@ class ProviderAuthenticationError(LLMError):
     status_code = status.HTTP_401_UNAUTHORIZED
 
 
+ProviderAuthError = ProviderAuthenticationError
+
+
 class ProviderRateLimitError(LLMError):
     """Raised when provider throttles or rate limits requests."""
     code = "PROVIDER_RATE_LIMIT_ERROR"

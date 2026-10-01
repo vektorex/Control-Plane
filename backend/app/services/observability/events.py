@@ -38,6 +38,9 @@ class TraceEventType(str, Enum):
     GATEWAY_FALLBACK = "gateway_fallback"
     GATEWAY_TIMEOUT = "gateway_timeout"
     GATEWAY_FAILED = "gateway_failed"
+    TASK_ANALYSIS_STARTED = "task_analysis_started"
+    TASK_ANALYSIS_COMPLETED = "task_analysis_completed"
+    TASK_REQUIREMENT_VALIDATION_FAILED = "task_requirement_validation_failed"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
 

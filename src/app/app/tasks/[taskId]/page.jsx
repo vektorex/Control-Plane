@@ -18,6 +18,7 @@ import { taskService } from "@/services/tasks";
 import { orchestratorService } from "@/services/orchestrator";
 import { toolService } from "@/services/tools";
 import { formatDate } from "@/lib/utils";
+import { ExecutionPreview } from "@/components/features/tasks/ExecutionPreview";
 import {
   Play,
   Square,
@@ -155,6 +156,13 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
   const [revisionAttempts, setRevisionAttempts] = useState(0);
   const [evaluationError, setEvaluationError] = useState(null);
 
+  // Step 20: AI Task Intelligence state
+  const [executionMode, setExecutionMode] = useState("auto"); // "auto" | "direct" | "retrieval" | "tool_assisted" | "orchestrated" | "workflow"
+  const [taskAnalysis, setTaskAnalysis] = useState(null);
+  const [executionRequirements, setExecutionRequirements] = useState(null);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+  const [analysisError, setAnalysisError] = useState(null);
+
   // Execution & Run state
   const [activeRun, setActiveRun] = useState(null);
   const [runs, setRuns] = useState([]);
@@ -214,9 +222,29 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       if (taskData.expected_format) {
         setExpectedFormat(taskData.expected_format);
       }
+      if (taskData.execution_mode) {
+        setExecutionMode(taskData.execution_mode);
+      }
 
       // Fetch contexts and runs in parallel
       await Promise.all([fetchTaskContexts(), fetchTaskRuns()]);
+
+      // Step 20: Initial Task Intelligence Analysis Preview
+      try {
+        const previewRes = await taskService.previewExistingTaskExecution(taskId, {
+          task: taskData.instructions || taskData.description || taskData.title,
+          context: taskData.context_text,
+          mode: taskData.execution_mode || "auto",
+        });
+        if (previewRes?.analysis) {
+          setTaskAnalysis(previewRes.analysis);
+        }
+        if (previewRes?.requirements) {
+          setExecutionRequirements(previewRes.requirements);
+        }
+      } catch (analysisErr) {
+        console.warn("[TaskWorkspace] Initial task intelligence preview skipped:", analysisErr);
+      }
     } catch (err) {
       console.error("[TaskWorkspace] Error loading task:", err);
       setExecutionError(err.message || "Failed to load task details");
@@ -435,6 +463,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         evaluation_mode: evaluationMode,
         strict_evaluation: strictEvaluation,
         expected_format: expectedFormat || null,
+        execution_mode: executionMode,
       });
 
       setTask(updated);
@@ -467,6 +496,31 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       setEvaluationError(err.message || "Failed to evaluate task output");
     } finally {
       setIsEvaluating(false);
+    }
+  };
+
+  // Step 20: Refresh AI Task Intelligence Analysis
+  const handleRefreshAnalysis = async () => {
+    if (!taskId) return;
+    try {
+      setIsLoadingAnalysis(true);
+      setAnalysisError(null);
+      const res = await taskService.previewExistingTaskExecution(taskId, {
+        task: instructions.trim() || task?.instructions || task?.description || title.trim(),
+        context: contextText.trim() || task?.context_text,
+        mode: executionMode,
+      });
+      if (res?.analysis) {
+        setTaskAnalysis(res.analysis);
+      }
+      if (res?.requirements) {
+        setExecutionRequirements(res.requirements);
+      }
+    } catch (err) {
+      console.error("[TaskWorkspace] Error analyzing task:", err);
+      setAnalysisError(err.message || "Failed to analyze task execution requirements.");
+    } finally {
+      setIsLoadingAnalysis(false);
     }
   };
 
@@ -634,6 +688,7 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
       evaluation_mode: evaluationMode,
       strict_evaluation: strictEvaluation,
       expected_format: expectedFormat || undefined,
+      execution_mode: executionMode,
     };
 
     if (enableStreaming) {
@@ -817,6 +872,19 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
           if (completedRun.execution_steps) {
             setLiveSteps(completedRun.execution_steps);
           }
+          if (completedRun.execution_mode) {
+            setExecutionMode(completedRun.execution_mode);
+          }
+          if (completedRun.execution_requirements) {
+            setExecutionRequirements(completedRun.execution_requirements);
+          }
+          if (completedRun.task_type) {
+            setTaskAnalysis({
+              task_type: completedRun.task_type,
+              suggested_execution_mode: completedRun.execution_mode,
+              requirements: completedRun.execution_requirements,
+            });
+          }
           setOutputStream(completedRun.output_content || accumulated);
           fetchTaskRuns();
         },
@@ -864,6 +932,19 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
         }
         if (completedRun.execution_steps) {
           setLiveSteps(completedRun.execution_steps);
+        }
+        if (completedRun.execution_mode) {
+          setExecutionMode(completedRun.execution_mode);
+        }
+        if (completedRun.execution_requirements) {
+          setExecutionRequirements(completedRun.execution_requirements);
+        }
+        if (completedRun.task_type) {
+          setTaskAnalysis({
+            task_type: completedRun.task_type,
+            suggested_execution_mode: completedRun.execution_mode,
+            requirements: completedRun.execution_requirements,
+          });
         }
         setOutputStream(completedRun.output_content || "");
         await fetchTaskRuns();
@@ -913,6 +994,19 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
     }
     if (run.execution_steps) {
       setLiveSteps(run.execution_steps);
+    }
+    if (run.execution_mode) {
+      setExecutionMode(run.execution_mode);
+    }
+    if (run.execution_requirements) {
+      setExecutionRequirements(run.execution_requirements);
+    }
+    if (run.task_type) {
+      setTaskAnalysis({
+        task_type: run.task_type,
+        suggested_execution_mode: run.execution_mode,
+        requirements: run.execution_requirements,
+      });
     }
   };
 
@@ -1123,6 +1217,84 @@ export default function TaskWorkspacePage({ params: paramsProp }) {
                   rows={2}
                   className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
                 />
+              </div>
+
+              {/* Step 20: AI Task Intelligence & Execution Mode */}
+              <div className="pt-2 border-t border-slate-800 space-y-3.5">
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/30 space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-400" />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-100 block">
+                          Execution Mode
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          AI Task Intelligence analyzes what this task actually needs
+                        </span>
+                      </div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-indigo-500/30 text-indigo-300 font-mono capitalize"
+                    >
+                      {executionMode}
+                    </Badge>
+                  </div>
+
+                  {/* Execution Mode Radio Grid */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-medium text-slate-300 block">
+                      Select Execution Mode:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {[
+                        { id: "auto", label: "Auto", desc: "Intelligence decides" },
+                        { id: "direct", label: "Direct", desc: "Simple generation" },
+                        { id: "retrieval", label: "Retrieval", desc: "Knowledge retrieval" },
+                        { id: "tool_assisted", label: "Tool-assisted", desc: "Tools enabled" },
+                        { id: "orchestrated", label: "Orchestrated", desc: "Multi-capability" },
+                        { id: "workflow", label: "Workflow", desc: "Workflow pipeline" },
+                      ].map((mode) => (
+                        <label
+                          key={mode.id}
+                          className={`flex flex-col p-2 rounded-lg border cursor-pointer transition-all ${
+                            executionMode === mode.id
+                              ? "bg-indigo-950/70 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/30"
+                              : "bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="radio"
+                              name="execution_mode_selector"
+                              value={mode.id}
+                              checked={executionMode === mode.id}
+                              onChange={() => setExecutionMode(mode.id)}
+                              className="accent-indigo-500"
+                            />
+                            <span className="text-xs font-semibold">{mode.label}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 pl-4 mt-0.5 leading-tight">{mode.desc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Execution Preview Panel (Step 20) */}
+                  {(executionMode === "auto" || taskAnalysis) && (
+                    <div className="pt-2">
+                      <ExecutionPreview
+                        analysis={taskAnalysis}
+                        requirements={executionRequirements}
+                        executionMode={executionMode}
+                        isLoading={isLoadingAnalysis}
+                        onRefresh={handleRefreshAnalysis}
+                        error={analysisError}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Model & Budget Controls */}

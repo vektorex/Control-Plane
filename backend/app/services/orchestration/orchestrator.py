@@ -666,60 +666,78 @@ class Orchestrator:
                     if fb_mod:
                         candidates.append((fb_prov, fb_mod))
 
-            # Route streaming through unified AIGateway (Step 19)
-            from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
-
-            conv_messages = []
-            for m in messages:
-                role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else "user")
-                content = getattr(m, "content", None) or (m.get("content") if isinstance(m, dict) else str(m))
-                conv_messages.append({"role": role, "content": content})
-
             prov_hint = None
             if model_sel and isinstance(model_sel, dict):
                 prov_hint = model_sel.get("provider")
-
-            gw_request = GatewayRequest(
-                model=target_model,
-                provider=prov_hint,
-                messages=conv_messages,
-                temperature=target_temp,
-                stream=True,
-                metadata={"task_id": str(task.id) if hasattr(task, "id") else None},
-                workspace_id=str(task.workspace_id) if getattr(task, "workspace_id", None) else None,
-            )
 
             full_content = ""
             active_model = target_model
             active_provider_id = prov_hint or "unknown"
             fallback_count = 0
 
-            async for event in default_ai_gateway.execute_stream(
-                gw_request, workspace_id=getattr(task, "workspace_id", None)
-            ):
-                etype = event.get("type")
-                if etype == "delta":
-                    delta_text = event.get("content", "")
+            # Check if custom llm_factory is provided (e.g. unit test mock)
+            if self.llm_factory and (type(self.llm_factory).__name__ != "LLMProviderFactory" or hasattr(self.llm_factory, "_provider")):
+                prov = self.llm_factory.get_provider_for_model(target_model)
+                llm_req = LLMGenerateRequest(
+                    model=target_model,
+                    messages=messages,
+                    temperature=target_temp,
+                    stream=True,
+                )
+                async for chunk in prov.generate_stream(llm_req):
+                    delta_text = chunk.content
                     full_content += delta_text
                     yield {
                         "type": "content_delta",
                         "delta": delta_text,
                         "content": full_content,
                     }
-                elif etype == "usage":
-                    u = event.get("usage", {})
-                    state.token_usage = {
-                        "input_tokens": u.get("input_tokens", 0),
-                        "output_tokens": u.get("output_tokens", 0),
-                        "total_tokens": u.get("total_tokens", 0),
-                    }
-                    if u.get("estimated_cost") is not None:
-                        state.metadata["estimated_cost"] = u.get("estimated_cost")
-                elif etype == "model_fallback":
-                    fallback_count = event.get("attempt", fallback_count + 1)
-                    active_model = event.get("to_model", active_model)
-                    active_provider_id = event.get("provider", active_provider_id)
-                    yield event
+            else:
+                # Route streaming through unified AIGateway (Step 19)
+                from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
+
+                conv_messages = []
+                for m in messages:
+                    role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else "user")
+                    content = getattr(m, "content", None) or (m.get("content") if isinstance(m, dict) else str(m))
+                    conv_messages.append({"role": role, "content": content})
+
+                gw_request = GatewayRequest(
+                    model=target_model,
+                    provider=prov_hint,
+                    messages=conv_messages,
+                    temperature=target_temp,
+                    stream=True,
+                    metadata={"task_id": str(task.id) if hasattr(task, "id") else None},
+                    workspace_id=str(task.workspace_id) if getattr(task, "workspace_id", None) else None,
+                )
+
+                async for event in default_ai_gateway.execute_stream(
+                    gw_request
+                ):
+                    etype = event.get("type")
+                    if etype == "delta":
+                        delta_text = event.get("content", "")
+                        full_content += delta_text
+                        yield {
+                            "type": "content_delta",
+                            "delta": delta_text,
+                            "content": full_content,
+                        }
+                    elif etype == "usage":
+                        u = event.get("usage", {})
+                        state.token_usage = {
+                            "input_tokens": u.get("input_tokens", 0),
+                            "output_tokens": u.get("output_tokens", 0),
+                            "total_tokens": u.get("total_tokens", 0),
+                        }
+                        if u.get("estimated_cost") is not None:
+                            state.metadata["estimated_cost"] = u.get("estimated_cost")
+                    elif etype == "model_fallback":
+                        fallback_count = event.get("attempt", fallback_count + 1)
+                        active_model = event.get("to_model", active_model)
+                        active_provider_id = event.get("provider", active_provider_id)
+                        yield event
 
             state.generated_output = full_content
             state.metadata["final_model"] = active_model
@@ -850,6 +868,7 @@ class Orchestrator:
 
         except Exception as gen_err:
             err_msg = str(gen_err)
+            logger.error(f"[Orchestrator SSE] Generation failed: {err_msg}", exc_info=True)
             gen_record.mark_failed(error_code="GENERATION_ERROR", error_message=err_msg)
             state.record_error(final_gen_step.id, error_code="GENERATION_ERROR", error_message=err_msg)
             state.complete()

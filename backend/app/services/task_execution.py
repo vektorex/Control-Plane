@@ -35,6 +35,7 @@ from backend.app.services.observability import (
 )
 from backend.app.services.orchestration.orchestrator import Orchestrator, get_orchestrator
 from backend.app.services.orchestration.plan import ExecutionPlan, StepType
+from backend.app.services.task_intelligence import default_task_intelligence_service, ExecutionRequirements
 
 
 def calculate_estimated_cost(
@@ -120,6 +121,37 @@ class TaskExecutionService:
         # Resolve workspace context
         workspace_id = task.project.workspace_id if (task.project and task.project.workspace_id) else None
 
+        # Step 20: AI Task Intelligence - Resolve Execution Requirements
+        prompt_str = prompt_check
+        context_str = task.context_text or ""
+        user_overrides = {
+            "execution_mode": request.execution_mode or getattr(task, "execution_mode", "auto"),
+            "enable_web_search": request.enable_web_search,
+            "retrieval_mode": request.retrieval_mode,
+            "retrieval_top_k": request.retrieval_top_k,
+            "tool_mode": request.tool_mode,
+            "tools_enabled": request.tools_enabled,
+            "evaluation_mode": request.evaluation_mode or getattr(task, "evaluation_mode", None),
+            "expected_format": request.expected_format or getattr(task, "expected_format", None),
+            "max_context_tokens": request.max_context_tokens,
+            "max_agent_iterations": request.max_agent_iterations,
+        }
+        resolved_reqs: ExecutionRequirements = await default_task_intelligence_service.resolve_execution_requirements(
+            task_text=prompt_str,
+            context_text=context_str,
+            mode=getattr(request, "task_intelligence_mode", "auto"),
+            user_overrides=user_overrides,
+            workspace_id=str(workspace_id) if workspace_id else None,
+        )
+
+        # Apply intelligence-resolved execution configuration to request if auto
+        if resolved_reqs.tools.get("web_search") and not request.enable_web_search:
+            request.enable_web_search = True
+        if resolved_reqs.retrieval.get("enabled") and (not request.retrieval_mode or request.retrieval_mode == "auto"):
+            request.retrieval_mode = "always"
+        if resolved_reqs.evaluation.get("enabled") and (not request.evaluation_mode or request.evaluation_mode == "off"):
+            request.evaluation_mode = resolved_reqs.evaluation.get("mode", "standard")
+
         # 1. Generate & Validate Plan
         plan = await self.orchestrator.plan_task(
             task=task,
@@ -203,6 +235,18 @@ class TaskExecutionService:
             repair_count=repair_count,
             iteration_count=1,
             input_snapshot={
+                "task_type": resolved_reqs.task_type,
+                "execution_mode": resolved_reqs.execution_mode,
+                "complexity": resolved_reqs.complexity,
+                "execution_requirements": resolved_reqs.model_dump(mode="json"),
+                "task_analysis_version": resolved_reqs.version,
+                "task_intelligence": {
+                    "task_type": resolved_reqs.task_type,
+                    "execution_mode": resolved_reqs.execution_mode,
+                    "complexity": resolved_reqs.complexity,
+                    "execution_requirements": resolved_reqs.model_dump(mode="json"),
+                    "task_analysis_version": resolved_reqs.version,
+                },
                 "model": model_selection.model_id,
                 "provider": model_selection.provider,
                 "model_mode": model_mode,
@@ -541,6 +585,37 @@ class TaskExecutionService:
             yield f"data: {json.dumps({'type': 'error', 'error': 'Task has no instructions, description, or title.'})}\n\n"
             return
 
+        # Step 20: AI Task Intelligence - Resolve Execution Requirements
+        prompt_str = prompt_check
+        context_str = task.context_text or ""
+        stream_ws_id = task.project.workspace_id if (task.project and task.project.workspace_id) else None
+        user_overrides = {
+            "execution_mode": request.execution_mode or getattr(task, "execution_mode", "auto"),
+            "enable_web_search": request.enable_web_search,
+            "retrieval_mode": request.retrieval_mode,
+            "retrieval_top_k": request.retrieval_top_k,
+            "tool_mode": request.tool_mode,
+            "tools_enabled": request.tools_enabled,
+            "evaluation_mode": request.evaluation_mode or getattr(task, "evaluation_mode", None),
+            "expected_format": request.expected_format or getattr(task, "expected_format", None),
+            "max_context_tokens": request.max_context_tokens,
+            "max_agent_iterations": request.max_agent_iterations,
+        }
+        resolved_reqs: ExecutionRequirements = await default_task_intelligence_service.resolve_execution_requirements(
+            task_text=prompt_str,
+            context_text=context_str,
+            mode=getattr(request, "task_intelligence_mode", "auto"),
+            user_overrides=user_overrides,
+            workspace_id=str(stream_ws_id) if stream_ws_id else None,
+        )
+
+        if resolved_reqs.tools.get("web_search") and not request.enable_web_search:
+            request.enable_web_search = True
+        if resolved_reqs.retrieval.get("enabled") and (not request.retrieval_mode or request.retrieval_mode == "auto"):
+            request.retrieval_mode = "always"
+        if resolved_reqs.evaluation.get("enabled") and (not request.evaluation_mode or request.evaluation_mode == "off"):
+            request.evaluation_mode = resolved_reqs.evaluation.get("mode", "standard")
+
         # 1. Generate & Validate Plan
         try:
             plan = await self.orchestrator.plan_task(
@@ -636,6 +711,28 @@ class TaskExecutionService:
             planner_model=planner_model,
             repair_count=repair_count,
             iteration_count=1,
+            input_snapshot={
+                "task_type": resolved_reqs.task_type,
+                "execution_mode": resolved_reqs.execution_mode,
+                "complexity": resolved_reqs.complexity,
+                "execution_requirements": resolved_reqs.model_dump(mode="json"),
+                "task_analysis_version": resolved_reqs.version,
+                "task_intelligence": {
+                    "task_type": resolved_reqs.task_type,
+                    "execution_mode": resolved_reqs.execution_mode,
+                    "complexity": resolved_reqs.complexity,
+                    "execution_requirements": resolved_reqs.model_dump(mode="json"),
+                    "task_analysis_version": resolved_reqs.version,
+                },
+                "model": model_selection.model_id,
+                "provider": model_selection.provider,
+                "model_mode": model_mode,
+                "model_selection": model_selection.model_dump(mode="json"),
+                "temperature": request.temperature,
+                "max_context_tokens": request.max_context_tokens or 8000,
+                "execution_plan": plan_json,
+                "plan_reason": plan.plan_reason,
+            },
             execution_plan=plan_json,
             retrieval_enabled=retrieval_required,
             retrieval_mode=request.retrieval_mode or "auto",

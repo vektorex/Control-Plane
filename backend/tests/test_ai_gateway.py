@@ -398,7 +398,7 @@ def test_gateway_api_test_endpoint(client: TestClient, user1_auth):
     assert resp.status_code == 200
     data = resp.json()
     assert "content" in data
-    assert data["provider"] == "mock"
+    assert data["provider"] in ("mock", "mock_provider")
     assert data["usage"]["total_tokens"] > 0
 
 

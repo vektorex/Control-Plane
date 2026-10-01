@@ -19,6 +19,7 @@ import {
   Brain,
   ShieldCheck,
   RotateCcw,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -30,6 +31,7 @@ const iconMap = {
   ListTodo,
   Workflow,
   RotateCcw,
+  FlaskConical,
   ShieldCheck,
   Plug,
   Brain,

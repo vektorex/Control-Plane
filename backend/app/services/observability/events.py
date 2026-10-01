@@ -46,6 +46,13 @@ class TraceEventType(str, Enum):
     REPLAY_FAILED = "replay_failed"
     REPLAY_CANCELLED = "replay_cancelled"
     REPLAY_SIDE_EFFECT_BLOCKED = "replay_side_effect_blocked"
+    EVALUATION_EXPERIMENT_STARTED = "evaluation_experiment_started"
+    EVALUATION_CASE_STARTED = "evaluation_case_started"
+    EVALUATION_CASE_COMPLETED = "evaluation_case_completed"
+    EVALUATION_CASE_FAILED = "evaluation_case_failed"
+    EVALUATION_EXPERIMENT_COMPLETED = "evaluation_experiment_completed"
+    EVALUATION_EXPERIMENT_CANCELLED = "evaluation_experiment_cancelled"
+    EVALUATION_REGRESSION_DETECTED = "evaluation_regression_detected"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
 

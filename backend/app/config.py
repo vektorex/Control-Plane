@@ -149,6 +149,15 @@ class Settings(BaseSettings):
     DEFAULT_REPLAY_MODE: str = "dry_run"  # inspect | dry_run | replay | compare
     REPLAY_TIMEOUT_SECONDS: float = 120.0
 
+    # Step 22: AI Evaluation Lab Settings
+    MAX_EVALUATION_CASES: int = 10000
+    MAX_CASE_INPUT_BYTES: int = 100000
+    MAX_DATASET_BYTES: int = 50000000  # 50MB
+    MAX_EVALUATION_CONCURRENCY: int = 5
+    MAX_FAILURE_RATE_INCREASE: float = 0.05
+    MAX_LATENCY_INCREASE_PERCENT: float = 25.0
+    MAX_COST_INCREASE_PERCENT: float = 25.0
+
 
 settings = Settings()
 

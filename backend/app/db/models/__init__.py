@@ -30,6 +30,13 @@ from backend.app.db.models.hitl import (
 )
 from backend.app.db.models.ai_gateway import WorkspaceModelPolicy
 from backend.app.db.models.replay import ReplayRun
+from backend.app.db.models.evaluation_lab import (
+    EvaluationDataset,
+    EvaluationDatasetVersion,
+    EvaluationCase,
+    EvaluationExperiment,
+    EvaluationExperimentRun,
+)
 
 __all__ = [
     "Base",
@@ -69,6 +76,11 @@ __all__ = [
     "Notification",
     "WorkspaceModelPolicy",
     "ReplayRun",
+    "EvaluationDataset",
+    "EvaluationDatasetVersion",
+    "EvaluationCase",
+    "EvaluationExperiment",
+    "EvaluationExperimentRun",
 ]
 
 

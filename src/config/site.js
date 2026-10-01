@@ -37,6 +37,12 @@ export const siteConfig = {
       description: "Execution replay, trace inspection, diff comparisons, and safe debugging",
     },
     {
+      label: "Evaluation Lab",
+      href: "/app/evaluation",
+      icon: "FlaskConical",
+      description: "Datasets, repeatable experiments, assertions, factual comparisons, and regression detection",
+    },
+    {
       label: "Approvals",
       href: "/app/approvals",
       icon: "ShieldCheck",

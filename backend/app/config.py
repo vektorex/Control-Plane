@@ -173,6 +173,18 @@ class Settings(BaseSettings):
     JOB_MAX_ATTEMPTS: int = 3
     JOB_WORKER_CONCURRENCY: int = 5
 
+    # Step 25: Notifications & External Delivery Layer Settings
+    NOTIFICATION_MAX_DELIVERIES_PER_MINUTE: int = 120
+    WEBHOOK_MAX_DELIVERIES_PER_MINUTE: int = 60
+    EMAIL_MAX_DELIVERIES_PER_MINUTE: int = 30
+    EMAIL_PROVIDER: Optional[str] = None  # None | "smtp" | "mock"
+    EMAIL_FROM: Optional[str] = "notifications@aiworklayer.internal"
+    EMAIL_API_KEY: Optional[str] = None
+    EMAIL_SMTP_HOST: Optional[str] = None
+    EMAIL_SMTP_PORT: int = 587
+    WEBHOOK_TIMEOUT_SECONDS: float = 10.0
+    WEBHOOK_TOLERANCE_SECONDS: int = 300
+
 
 settings = Settings()
 

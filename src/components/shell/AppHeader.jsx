@@ -3,11 +3,33 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Menu, Search, ChevronRight, Activity } from "lucide-react";
+import { Menu, Search, ChevronRight, Activity, Bell } from "lucide-react";
 import { UserDropdown } from "./UserDropdown";
+import { notificationService } from "@/services/notifications";
 
 export function AppHeader({ onToggleMobile }) {
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let active = true;
+    const fetchUnread = async () => {
+      try {
+        const res = await notificationService.getUnreadCount();
+        if (active && res?.unread_count !== undefined) {
+          setUnreadCount(res.unread_count);
+        }
+      } catch (e) {
+        // silent
+      }
+    };
+    fetchUnread();
+    const timer = setInterval(fetchUnread, 30000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [pathname]);
 
   // Generate breadcrumb items
   const pathSegments = pathname.split("/").filter(Boolean);
@@ -70,6 +92,22 @@ export function AppHeader({ onToggleMobile }) {
           <span className="text-slate-400">Layer:</span>
           <span className="text-slate-200 font-mono">FastAPI Target Ready</span>
         </div>
+
+        {/* Notification Bell */}
+        <Link
+          href="/app/notifications"
+          className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors"
+          title="Notification Center"
+          aria-label="View notifications"
+        >
+          <Bell className="w-4 h-4" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500" />
+            </span>
+          )}
+        </Link>
 
         {/* User Menu */}
         <UserDropdown />

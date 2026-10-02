@@ -21,11 +21,13 @@ import {
   RotateCcw,
   FlaskConical,
   Layers,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
 import { WorkspaceSelector } from "./WorkspaceSelector";
 import { hitlService } from "@/services/hitl";
+import { notificationService } from "@/services/notifications";
 
 const iconMap = {
   LayoutDashboard,
@@ -42,27 +44,37 @@ const iconMap = {
   BarChart3,
   Cpu,
   Terminal,
+  Bell,
   Settings,
 };
 
 export function AppSidebar({ className = "", onCloseMobile }) {
   const pathname = usePathname();
   const [pendingCount, setPendingCount] = React.useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = React.useState(0);
 
   React.useEffect(() => {
     let mounted = true;
-    const fetchPending = async () => {
+    const fetchCounters = async () => {
       try {
-        const res = await hitlService.listRequests({ status: "pending", limit: 50 });
-        if (mounted && Array.isArray(res)) {
-          setPendingCount(res.length);
+        const [hitlRes, notifRes] = await Promise.allSettled([
+          hitlService.listRequests({ status: "pending", limit: 50 }),
+          notificationService.getUnreadCount(),
+        ]);
+        if (mounted) {
+          if (hitlRes.status === "fulfilled" && Array.isArray(hitlRes.value)) {
+            setPendingCount(hitlRes.value.length);
+          }
+          if (notifRes.status === "fulfilled" && notifRes.value?.unread_count !== undefined) {
+            setUnreadNotifCount(notifRes.value.unread_count);
+          }
         }
       } catch (err) {
         // Silent error in background counter
       }
     };
-    fetchPending();
-    const interval = setInterval(fetchPending, 45000);
+    fetchCounters();
+    const interval = setInterval(fetchCounters, 45000);
     return () => {
       mounted = false;
       clearInterval(interval);
@@ -139,6 +151,11 @@ export function AppSidebar({ className = "", onCloseMobile }) {
                     {item.href === "/app/approvals" && pendingCount > 0 && (
                       <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                         {pendingCount}
+                      </span>
+                    )}
+                    {item.href === "/app/notifications" && unreadNotifCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        {unreadNotifCount}
                       </span>
                     )}
                     {isActive && <ChevronRight className="w-3.5 h-3.5 text-indigo-400/80" />}

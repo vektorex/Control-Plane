@@ -201,6 +201,20 @@ class JobWorker:
                         await session.commit()
                         logger.info(f"[JobWorker] Job {job.id} ({job.job_type}) completed in {time.time() - start_time:.2f}s.")
 
+                        if job.job_type != JobType.NOTIFICATION_DELIVERY.value:
+                            try:
+                                from backend.app.services.notifications.dispatcher import NotificationEventBus
+                                from backend.app.services.notifications.constants import NotificationEventType
+                                await NotificationEventBus.publish({
+                                    "workspace_id": workspace_id,
+                                    "event_type": NotificationEventType.JOB_COMPLETED.value,
+                                    "source_type": "job",
+                                    "source_id": str(job.id),
+                                    "metadata": {"job_type": job.job_type, "duration_ms": int((time.time() - start_time) * 1000)},
+                                })
+                            except Exception as notif_err:
+                                logger.warning(f"[JobWorker] Failed to publish job.completed notification: {notif_err}")
+
                     except JobCancellationError as cancel_err:
                         now = datetime.now(timezone.utc)
                         job.status = JobStatus.CANCELLED.value
@@ -254,6 +268,20 @@ class JobWorker:
                             session.add(retry_event)
                             await session.commit()
                             logger.info(f"[JobWorker] Job {job.id} failed transiently. Scheduled retry in {delay}s.")
+
+                            if job.job_type != JobType.NOTIFICATION_DELIVERY.value:
+                                try:
+                                    from backend.app.services.notifications.dispatcher import NotificationEventBus
+                                    from backend.app.services.notifications.constants import NotificationEventType
+                                    await NotificationEventBus.publish({
+                                        "workspace_id": workspace_id,
+                                        "event_type": NotificationEventType.JOB_RETRYING.value,
+                                        "source_type": "job",
+                                        "source_id": str(job.id),
+                                        "metadata": {"job_type": job.job_type, "attempt": job.attempts, "error_code": err_code},
+                                    })
+                                except Exception as notif_err:
+                                    logger.warning(f"[JobWorker] Failed to publish job.retrying notification: {notif_err}")
                         else:
                             # Permanent failure
                             job.status = JobStatus.FAILED.value
@@ -275,6 +303,20 @@ class JobWorker:
                             session.add(fail_event)
                             await session.commit()
                             logger.warning(f"[JobWorker] Job {job.id} failed permanently: {err_msg}")
+
+                            if job.job_type != JobType.NOTIFICATION_DELIVERY.value:
+                                try:
+                                    from backend.app.services.notifications.dispatcher import NotificationEventBus
+                                    from backend.app.services.notifications.constants import NotificationEventType
+                                    await NotificationEventBus.publish({
+                                        "workspace_id": workspace_id,
+                                        "event_type": NotificationEventType.JOB_FAILED.value,
+                                        "source_type": "job",
+                                        "source_id": str(job.id),
+                                        "metadata": {"job_type": job.job_type, "error_code": err_code, "final_attempt": job.attempts},
+                                    })
+                                except Exception as notif_err:
+                                    logger.warning(f"[JobWorker] Failed to publish job.failed notification: {notif_err}")
 
             finally:
                 self._cancellation_events.pop(job_id, None)

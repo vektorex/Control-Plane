@@ -26,7 +26,12 @@ from backend.app.db.models.hitl import (
     ApprovalDecision,
     HumanAction,
     WorkspaceApprovalPolicy,
+)
+from backend.app.db.models.notification import (
     Notification,
+    NotificationDelivery,
+    WebhookEndpoint,
+    NotificationPreference,
 )
 from backend.app.db.models.ai_gateway import WorkspaceModelPolicy
 from backend.app.db.models.replay import ReplayRun
@@ -82,6 +87,9 @@ __all__ = [
     "HumanAction",
     "WorkspaceApprovalPolicy",
     "Notification",
+    "NotificationDelivery",
+    "WebhookEndpoint",
+    "NotificationPreference",
     "WorkspaceModelPolicy",
     "ReplayRun",
     "EvaluationDataset",

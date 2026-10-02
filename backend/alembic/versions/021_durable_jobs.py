@@ -96,14 +96,17 @@ def upgrade() -> None:
     # 3. Add job_id reference to trigger_runs
     op.add_column("trigger_runs", sa.Column("job_id", GUID(), nullable=True))
     op.create_index("ix_trigger_runs_job_id", "trigger_runs", ["job_id"], unique=False)
-    op.create_foreign_key(
-        "fk_trigger_runs_job_id",
-        "trigger_runs",
-        "jobs",
-        ["job_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    bind = op.get_bind()
+    dialect = bind.dialect.name if bind else "postgresql"
+    if dialect != "sqlite":
+        op.create_foreign_key(
+            "fk_trigger_runs_job_id",
+            "trigger_runs",
+            "jobs",
+            ["job_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
 
 def downgrade() -> None:

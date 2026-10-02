@@ -63,6 +63,24 @@ class HITLExecutionCoordinator:
 
         await session.commit()
         await session.refresh(run)
+
+        try:
+            from backend.app.services.notifications.dispatcher import NotificationEventBus
+            from backend.app.services.notifications.constants import NotificationEventType
+            await NotificationEventBus.publish({
+                "workspace_id": run.workspace_id,
+                "event_type": NotificationEventType.WORKFLOW_WAITING_APPROVAL.value,
+                "source_type": "workflow_run",
+                "source_id": str(run.id),
+                "metadata": {
+                    "workflow_id": str(run.workflow_id),
+                    "step_id": step_id,
+                    "intervention_id": str(intervention.id),
+                },
+            }, session=session)
+        except Exception as notif_err:
+            logger.warning(f"[HITLExecutor] Failed to publish approval notification: {notif_err}")
+
         logger.info(f"[HITLExecutor] WorkflowRun '{run.id}' paused at step '{step_id}' awaiting intervention '{intervention.id}'")
         return run
 

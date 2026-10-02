@@ -33,6 +33,7 @@ class JobType(str, Enum):
     EVALUATION_EXPERIMENT = "evaluation_experiment"
     REPLAY_RUN = "replay_run"
     CONNECTOR_OPERATION = "connector_operation"
+    NOTIFICATION_DELIVERY = "notification_delivery"
 
 
 class JobEventType(str, Enum):

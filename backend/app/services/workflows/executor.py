@@ -490,6 +490,23 @@ class WorkflowExecutor:
             )
             await tracer.flush_to_db(self.session)
 
+            try:
+                from backend.app.services.notifications.dispatcher import NotificationEventBus
+                from backend.app.services.notifications.constants import NotificationEventType
+                await NotificationEventBus.publish({
+                    "workspace_id": run.workspace_id,
+                    "event_type": NotificationEventType.WORKFLOW_COMPLETED.value,
+                    "source_type": "workflow_run",
+                    "source_id": str(run.id),
+                    "metadata": {
+                        "workflow_id": str(run.workflow_id),
+                        "duration_ms": elapsed_ms,
+                        "total_tokens": state.total_tokens,
+                    },
+                }, session=self.session)
+            except Exception as notif_err:
+                logger.warning(f"[WorkflowExecutor] Failed to publish workflow.completed: {notif_err}")
+
             await self.session.commit()
             return run
 
@@ -514,6 +531,24 @@ class WorkflowExecutor:
                 await tracer.flush_to_db(self.session)
             except Exception as obs_err:
                 logger.warning(f"[WorkflowExecutor] Failed to record failure telemetry: {obs_err}")
+
+            try:
+                from backend.app.services.notifications.dispatcher import NotificationEventBus
+                from backend.app.services.notifications.constants import NotificationEventType
+                await NotificationEventBus.publish({
+                    "workspace_id": run.workspace_id,
+                    "event_type": NotificationEventType.WORKFLOW_FAILED.value,
+                    "source_type": "workflow_run",
+                    "source_id": str(run.id),
+                    "metadata": {
+                        "workflow_id": str(run.workflow_id),
+                        "error_code": run.error_code,
+                        "error_message": str(exc),
+                        "duration_ms": elapsed_ms,
+                    },
+                }, session=self.session)
+            except Exception as notif_err:
+                logger.warning(f"[WorkflowExecutor] Failed to publish workflow.failed: {notif_err}")
 
             await self.session.commit()
             return run

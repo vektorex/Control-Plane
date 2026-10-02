@@ -97,6 +97,12 @@ export const siteConfig = {
       description: "Internal developer testbed for LLM abstraction & streaming",
     },
     {
+      label: "Notifications",
+      href: "/app/notifications",
+      icon: "Bell",
+      description: "Unified notification center, delivery logs, and webhook status",
+    },
+    {
       label: "Settings",
       href: "/app/settings",
       icon: "Settings",

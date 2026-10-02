@@ -241,6 +241,24 @@ class TriggerExecutor:
                         },
                     )
                     await tracer.flush_to_db(self.session)
+
+                    try:
+                        from backend.app.services.notifications.dispatcher import NotificationEventBus
+                        from backend.app.services.notifications.constants import NotificationEventType
+                        await NotificationEventBus.publish({
+                            "workspace_id": trigger.workspace_id,
+                            "event_type": NotificationEventType.TRIGGER_COMPLETED.value,
+                            "source_type": "trigger",
+                            "source_id": str(trigger.id),
+                            "metadata": {
+                                "trigger_run_id": str(trigger_run.id),
+                                "workflow_run_id": str(wf_run.id),
+                                "status": trigger_run.status,
+                            },
+                        }, session=self.session)
+                    except Exception as notif_err:
+                        logger.warning(f"[TriggerExecutor] Failed to publish trigger.completed: {notif_err}")
+
                     break
                 else:
                     # Workflow run ended in failed or cancelled
@@ -277,6 +295,24 @@ class TriggerExecutor:
                         },
                     )
                     await tracer.flush_to_db(self.session)
+
+                    try:
+                        from backend.app.services.notifications.dispatcher import NotificationEventBus
+                        from backend.app.services.notifications.constants import NotificationEventType
+                        await NotificationEventBus.publish({
+                            "workspace_id": trigger.workspace_id,
+                            "event_type": NotificationEventType.TRIGGER_FAILED.value,
+                            "source_type": "trigger",
+                            "source_id": str(trigger.id),
+                            "metadata": {
+                                "trigger_run_id": str(trigger_run.id),
+                                "error_code": err_code,
+                                "error_message": err_msg,
+                            },
+                        }, session=self.session)
+                    except Exception as notif_err:
+                        logger.warning(f"[TriggerExecutor] Failed to publish trigger.failed: {notif_err}")
+
                     break
 
             except Exception as e:

@@ -291,46 +291,13 @@ class WorkspaceApprovalPolicy(Base):
     )
 
 
-class Notification(Base):
-    """
-    In-app user notification for human approvals and execution events.
-    """
-    __tablename__ = "notifications"
+# Re-export unified Notification model from Step 25
+from backend.app.db.models.notification import Notification
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID(),
-        primary_key=True,
-        default=uuid.uuid4,
-        index=True,
-    )
-    workspace_id: Mapped[uuid.UUID] = mapped_column(
-        GUID(),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        GUID(),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    type: Mapped[str] = mapped_column(String(100), nullable=False)  # approval_required, approval_resolved, workflow_paused, etc.
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    message: Mapped[str] = mapped_column(Text, nullable=False)
-    reference_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # intervention, workflow_run
-    reference_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        index=True,
-    )
-
-    user: Mapped["User"] = relationship("User", lazy="selectin")
-
-    __table_args__ = (
-        Index("ix_notifications_user_read", "user_id", "read", "created_at"),
-        Index("ix_notifications_ws_user", "workspace_id", "user_id"),
-    )
+__all__ = [
+    "HumanInterventionRequest",
+    "ApprovalDecision",
+    "HumanAction",
+    "WorkspaceApprovalPolicy",
+    "Notification",
+]

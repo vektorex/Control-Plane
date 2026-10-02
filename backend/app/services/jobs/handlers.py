@@ -214,9 +214,39 @@ class DocumentProcessingJobHandler(JobHandler):
             raise JobCancellationError("Document processing cancelled.")
 
         pipeline = DocumentIngestionPipeline()
-        doc = await pipeline.process_document(document_id, session)
+        try:
+            doc = await pipeline.process_document(document_id, session)
+            status_val = doc.status
+        except Exception as doc_err:
+            try:
+                from backend.app.services.notifications.dispatcher import NotificationEventBus
+                from backend.app.services.notifications.constants import NotificationEventType
+                await NotificationEventBus.publish({
+                    "workspace_id": job.workspace_id,
+                    "event_type": NotificationEventType.DOCUMENT_FAILED.value,
+                    "source_type": "document",
+                    "source_id": str(document_id),
+                    "metadata": {"error": str(doc_err)},
+                }, session=session)
+            except Exception as notif_err:
+                logger.warning(f"[DocumentJobHandler] Failed to publish doc failure notification: {notif_err}")
+            raise
 
         await context.update_progress(100, "Ingestion completed", 4, 4, f"Document indexed: {doc.filename}")
+
+        try:
+            from backend.app.services.notifications.dispatcher import NotificationEventBus
+            from backend.app.services.notifications.constants import NotificationEventType
+            ev_type = NotificationEventType.DOCUMENT_COMPLETED.value if doc.status in ("completed", "indexed", "ready") else NotificationEventType.DOCUMENT_FAILED.value
+            await NotificationEventBus.publish({
+                "workspace_id": job.workspace_id,
+                "event_type": ev_type,
+                "source_type": "document",
+                "source_id": str(doc.id),
+                "metadata": {"filename": doc.filename, "chunk_count": doc.chunk_count, "token_count": doc.token_count},
+            }, session=session)
+        except Exception as notif_err:
+            logger.warning(f"[DocumentJobHandler] Failed to publish doc notification: {notif_err}")
 
         return {
             "document_id": str(doc.id),
@@ -256,6 +286,27 @@ class EvaluationExperimentJobHandler(JobHandler):
         )
 
         await context.update_progress(100, "Experiment finished", 4, 4, f"Finished with status: {finished_exp.status}")
+
+        try:
+            from backend.app.services.notifications.dispatcher import NotificationEventBus
+            from backend.app.services.notifications.constants import NotificationEventType
+            # Check for regression flag in metrics
+            has_regression = bool(finished_exp.metrics and finished_exp.metrics.get("has_regression"))
+            ev_type = NotificationEventType.EVALUATION_REGRESSION.value if has_regression else NotificationEventType.EVALUATION_COMPLETED.value
+            await NotificationEventBus.publish({
+                "workspace_id": job.workspace_id,
+                "event_type": ev_type,
+                "source_type": "evaluation_experiment",
+                "source_id": str(finished_exp.id),
+                "metadata": {
+                    "experiment_id": str(finished_exp.id),
+                    "status": finished_exp.status,
+                    "metrics": finished_exp.metrics or {},
+                    "link": f"/app/evaluation-lab?experiment_id={finished_exp.id}",
+                },
+            }, session=session)
+        except Exception as notif_err:
+            logger.warning(f"[EvaluationJobHandler] Failed to publish evaluation notification: {notif_err}")
 
         return {
             "experiment_id": str(finished_exp.id),
@@ -301,6 +352,24 @@ class ReplayRunJobHandler(JobHandler):
 
         await context.update_progress(100, "Replay run completed", 3, 3, f"Status: {finished_replay.status}")
 
+        try:
+            from backend.app.services.notifications.dispatcher import NotificationEventBus
+            from backend.app.services.notifications.constants import NotificationEventType
+            ev_type = NotificationEventType.REPLAY_COMPLETED.value if finished_replay.status == "completed" else NotificationEventType.REPLAY_FAILED.value
+            await NotificationEventBus.publish({
+                "workspace_id": job.workspace_id,
+                "event_type": ev_type,
+                "source_type": "replay_run",
+                "source_id": str(finished_replay.id),
+                "metadata": {
+                    "replay_id": str(finished_replay.id),
+                    "status": finished_replay.status,
+                    "link": f"/app/replay?run_id={finished_replay.id}",
+                },
+            }, session=session)
+        except Exception as notif_err:
+            logger.warning(f"[ReplayJobHandler] Failed to publish replay notification: {notif_err}")
+
         return {
             "replay_id": str(finished_replay.id),
             "status": finished_replay.status,
@@ -344,12 +413,86 @@ class ConnectorOperationJobHandler(JobHandler):
 
         await context.update_progress(100, "Connector operation finished", 3, 3, "Execution succeeded")
 
+        try:
+            from backend.app.services.notifications.dispatcher import NotificationEventBus
+            from backend.app.services.notifications.constants import NotificationEventType
+            ev_type = NotificationEventType.CONNECTOR_COMPLETED.value if result.status == "success" else NotificationEventType.CONNECTOR_FAILED.value
+            await NotificationEventBus.publish({
+                "workspace_id": job.workspace_id,
+                "event_type": ev_type,
+                "source_type": "connector",
+                "source_id": str(result.connector_id or "connector"),
+                "metadata": {
+                    "operation": result.operation,
+                    "status": result.status,
+                    "external_untrusted": True,
+                },
+            }, session=session)
+        except Exception as notif_err:
+            logger.warning(f"[ConnectorJobHandler] Failed to publish connector notification: {notif_err}")
+
         return {
             "connector_id": str(result.connector_id) if result.connector_id else None,
             "operation": result.operation,
             "status": result.status,
             "data": result.data,
             "error": result.error,
+        }
+
+
+class NotificationDeliveryJobHandler(JobHandler):
+    """
+    Executes an asynchronous notification delivery (webhook, email, in_app) via DeliveryDispatcher.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.notifications.delivery import DeliveryDispatcher
+        from backend.app.services.notifications.constants import DeliveryStatus
+        from backend.app.db.models.notification import NotificationDelivery
+
+        payload = job.payload
+        delivery_id = uuid.UUID(str(payload["delivery_id"]))
+
+        await context.update_progress(10, "Dispatching notification delivery", 1, 3, f"Channel: {payload.get('channel')}")
+
+        if cancellation_token.is_set():
+            raise JobCancellationError("Notification delivery cancelled before execution.")
+
+        success = await DeliveryDispatcher.execute_delivery(
+            delivery_id=delivery_id,
+            session=context.session,
+            cancellation_token=cancellation_token,
+        )
+
+        # Reload delivery record for details
+        stmt = select(NotificationDelivery).where(NotificationDelivery.id == delivery_id)
+        res = await context.session.execute(stmt)
+        delivery = res.scalar_one_or_none()
+
+        if not success and delivery and delivery.status == DeliveryStatus.RETRYING.value:
+            await context.update_progress(50, f"Delivery retrying: {delivery.error_code}", 2, 3, delivery.error_message)
+            raise RuntimeError(f"Transient delivery failure ({delivery.error_code}): {delivery.error_message}")
+        elif not success and delivery and delivery.status == DeliveryStatus.FAILED.value:
+            await context.update_progress(100, f"Delivery failed: {delivery.error_code}", 3, 3, delivery.error_message)
+            return {
+                "delivery_id": str(delivery_id),
+                "status": delivery.status,
+                "error_code": delivery.error_code,
+                "error_message": delivery.error_message,
+                "success": False,
+            }
+
+        await context.update_progress(100, "Notification delivery completed", 3, 3, "Sent successfully")
+        return {
+            "delivery_id": str(delivery_id),
+            "status": delivery.status if delivery else "sent",
+            "provider_message_id": delivery.provider_message_id if delivery else None,
+            "success": success,
         }
 
 
@@ -369,6 +512,7 @@ class JobHandlerRegistry:
         self.register(JobType.EVALUATION_EXPERIMENT.value, EvaluationExperimentJobHandler())
         self.register(JobType.REPLAY_RUN.value, ReplayRunJobHandler())
         self.register(JobType.CONNECTOR_OPERATION.value, ConnectorOperationJobHandler())
+        self.register(JobType.NOTIFICATION_DELIVERY.value, NotificationDeliveryJobHandler())
 
     def register(self, job_type: str, handler: JobHandler) -> None:
         self._handlers[job_type] = handler

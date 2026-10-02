@@ -50,6 +50,10 @@ from backend.app.db.models.job import (
     Job,
     JobEvent,
 )
+from backend.app.db.models.event import (
+    Event,
+    EventDelivery,
+)
 
 __all__ = [
     "Base",
@@ -101,6 +105,8 @@ __all__ = [
     "TriggerRun",
     "Job",
     "JobEvent",
+    "Event",
+    "EventDelivery",
 ]
 
 

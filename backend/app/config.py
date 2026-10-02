@@ -185,6 +185,15 @@ class Settings(BaseSettings):
     WEBHOOK_TIMEOUT_SECONDS: float = 10.0
     WEBHOOK_TOLERANCE_SECONDS: int = 300
 
+    # Step 26: Unified Event Bus & Real-Time Execution Updates Settings
+    EVENT_MAX_PAYLOAD_BYTES: int = 65536  # 64 KB
+    EVENT_MAX_METADATA_BYTES: int = 16384  # 16 KB
+    EVENT_STREAM_BATCH_SIZE: int = 50
+    EVENT_REPLAY_MAX_EVENTS: int = 100
+    EVENT_RETENTION_DAYS: int = 30
+    SSE_HEARTBEAT_INTERVAL_SECONDS: float = 15.0
+    SSE_CLIENT_BUFFER_SIZE: int = 100
+
 
 settings = Settings()
 

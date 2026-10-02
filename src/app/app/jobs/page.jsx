@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { jobService } from "@/services/jobs";
 import { useAuth } from "@/lib/authContext";
+import { useEventStream } from "@/lib/events";
 
 const STATUS_CONFIG = {
   running: {
@@ -132,14 +133,28 @@ export default function JobsPage() {
     loadData();
   }, [loadData]);
 
-  // Bounded auto-refresh polling (every 5 seconds)
+  // Step 26: Real-time SSE Execution Stream for jobs with automatic polling fallback
+  const { isConnected: isSseConnected, isPollingFallback } = useEventStream({
+    workspaceId,
+    eventType: "job.*",
+    onEvent: (event) => {
+      loadData();
+      if (selectedJob && event.aggregate?.id === selectedJob.id) {
+        handleInspectJob({ ...selectedJob, status: event.data?.status || selectedJob.status });
+      }
+    },
+    fallbackPollingInterval: 5000,
+    fallbackPollingFn: autoRefresh ? loadData : undefined,
+  });
+
+  // Bounded auto-refresh polling (only active when autoRefresh is enabled AND SSE is in fallback/not connected)
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || isSseConnected) return;
     const interval = setInterval(() => {
       loadData();
     }, 5000);
     return () => clearInterval(interval);
-  }, [autoRefresh, loadData]);
+  }, [autoRefresh, isSseConnected, loadData]);
 
   // Load details & events for selected job
   const handleInspectJob = async (job) => {
@@ -259,6 +274,20 @@ export default function JobsPage() {
             <Server className="w-3.5 h-3.5 text-slate-400" />
             Operations Health
           </Link>
+
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-slate-900 border border-slate-800"
+            title={isSseConnected ? "Live execution stream active" : isPollingFallback ? "Polling fallback active" : "Connecting..."}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isSseConnected ? "bg-emerald-400 animate-pulse" : isPollingFallback ? "bg-amber-400" : "bg-slate-500"
+              }`}
+            />
+            <span className="text-slate-300 text-[11px]">
+              {isSseConnected ? "LIVE SSE" : isPollingFallback ? "POLLING FALLBACK" : "CONNECTING"}
+            </span>
+          </div>
 
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}

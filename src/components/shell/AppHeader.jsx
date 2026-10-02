@@ -6,30 +6,42 @@ import Link from "next/link";
 import { Menu, Search, ChevronRight, Activity, Bell } from "lucide-react";
 import { UserDropdown } from "./UserDropdown";
 import { notificationService } from "@/services/notifications";
+import { useWorkspace } from "@/lib/workspaceContext";
+import { useEventStream } from "@/lib/events";
 
 export function AppHeader({ onToggleMobile }) {
   const pathname = usePathname();
+  const { activeWorkspace } = useWorkspace();
   const [unreadCount, setUnreadCount] = React.useState(0);
 
-  React.useEffect(() => {
-    let active = true;
-    const fetchUnread = async () => {
-      try {
-        const res = await notificationService.getUnreadCount();
-        if (active && res?.unread_count !== undefined) {
-          setUnreadCount(res.unread_count);
-        }
-      } catch (e) {
-        // silent
+  const fetchUnread = React.useCallback(async () => {
+    try {
+      const res = await notificationService.getUnreadCount();
+      if (res?.unread_count !== undefined) {
+        setUnreadCount(res.unread_count);
       }
-    };
+    } catch (e) {
+      // silent
+    }
+  }, []);
+
+  React.useEffect(() => {
     fetchUnread();
-    const timer = setInterval(fetchUnread, 30000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [pathname]);
+  }, [pathname, fetchUnread]);
+
+  const { isConnected, isPollingFallback } = useEventStream({
+    workspaceId: activeWorkspace?.id,
+    eventType: "notification.*",
+    onEvent: (event) => {
+      if (event.type === "notification.created") {
+        setUnreadCount((prev) => prev + 1);
+      } else {
+        fetchUnread();
+      }
+    },
+    fallbackPollingInterval: 30000,
+    fallbackPollingFn: fetchUnread,
+  });
 
   // Generate breadcrumb items
   const pathSegments = pathname.split("/").filter(Boolean);
@@ -91,6 +103,21 @@ export function AppHeader({ onToggleMobile }) {
           <Activity className="w-3 h-3 text-emerald-400 animate-pulse" />
           <span className="text-slate-400">Layer:</span>
           <span className="text-slate-200 font-mono">FastAPI Target Ready</span>
+        </div>
+
+        {/* Real-time SSE Stream Status */}
+        <div
+          className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300"
+          title={isConnected ? "Real-time Event Stream Connected" : isPollingFallback ? "Polling Fallback Active" : "Connecting to Event Stream..."}
+        >
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isConnected ? "bg-emerald-400 animate-pulse" : isPollingFallback ? "bg-amber-400" : "bg-slate-500"
+            }`}
+          />
+          <span className="text-slate-400 font-mono text-[10px]">
+            {isConnected ? "LIVE SSE" : isPollingFallback ? "FALLBACK" : "SYNC"}
+          </span>
         </div>
 
         {/* Notification Bell */}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/ui/StatCard";
 import { workflowService } from "@/services/workflows";
+import { useEventStream } from "@/lib/events";
 import {
   Workflow,
   ArrowLeft,
@@ -85,6 +86,23 @@ export default function WorkflowRunDetailPage({ params }) {
 
   useEffect(() => {
     fetchRunData();
+  }, [runId]);
+
+  // Step 26: Real-time execution stream for workflow runs with fallback polling
+  const { isConnected: isSseConnected, isPollingFallback } = useEventStream({
+    workspaceId: run?.workspace_id,
+    eventType: "workflow.*",
+    aggregateId: runId,
+    onEvent: (event) => {
+      fetchRunData();
+    },
+    fallbackPollingInterval: 3000,
+    fallbackPollingFn: run && (run.status === "running" || run.status === "queued" || run.status === "retrying") ? fetchRunData : undefined,
+  });
+
+  // Bounded auto-refresh polling (only when SSE is not connected or in fallback)
+  useEffect(() => {
+    if (isSseConnected) return;
     let pollCount = 0;
     const maxPolls = 60; // Bounded interval: max 3 minutes of auto-polling
     const interval = setInterval(() => {
@@ -97,7 +115,7 @@ export default function WorkflowRunDetailPage({ params }) {
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [runId, run?.status]);
+  }, [runId, run?.status, isSseConnected]);
 
   const toggleStep = (stepId) => {
     setExpandedSteps((prev) => ({

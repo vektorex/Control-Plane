@@ -116,6 +116,32 @@ class NotificationEventBus:
                 source_id=ev_obj.source_id,
                 metadata_json=ev_obj.metadata,
             )
+
+            # Step 26: Mirror to Unified Event Store and Real-Time SSE Streams
+            try:
+                from backend.app.services.events.publisher import EventPublisher
+                from backend.app.services.events.schemas import EventPublishRequest
+
+                pub = EventPublisher(db_session)
+                await pub.publish(EventPublishRequest(
+                    event_type=ev_obj.event_type,
+                    aggregate_type=ev_obj.source_type or "system",
+                    aggregate_id=ev_obj.source_id or "system",
+                    workspace_id=ev_obj.workspace_id,
+                    project_id=ev_obj.project_id,
+                    actor_type="system",
+                    payload={
+                        "title": title,
+                        "body": body,
+                        "severity": severity,
+                        **(ev_obj.metadata or {}),
+                    },
+                    metadata={"notification_id": str(created.id)},
+                    idempotency_key=f"notif_{created.id}",
+                ))
+            except Exception as ep_err:
+                logger.debug(f"[NotificationEventBus] Non-fatal event bus mirror notice: {ep_err}")
+
             return created.id
 
         try:

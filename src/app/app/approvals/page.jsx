@@ -27,6 +27,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/lib/workspaceContext";
 import { hitlService } from "@/services/hitl";
+import { useEventStream } from "@/lib/events";
 
 export default function ApprovalsPage() {
   const { activeWorkspace } = useWorkspace();
@@ -73,6 +74,17 @@ export default function ApprovalsPage() {
   useEffect(() => {
     fetchRequests();
   }, [activeTab, activeWorkspace]);
+
+  // Step 26: Real-time execution stream for human approvals with polling fallback
+  const { isConnected: isSseConnected, isPollingFallback } = useEventStream({
+    workspaceId: activeWorkspace?.id,
+    eventType: "approval.*",
+    onEvent: (event) => {
+      fetchRequests();
+    },
+    fallbackPollingInterval: 10000,
+    fallbackPollingFn: fetchRequests,
+  });
 
   // Load Policies
   const fetchPolicies = async () => {

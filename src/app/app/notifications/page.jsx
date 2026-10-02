@@ -21,6 +21,8 @@ import {
   X,
 } from "lucide-react";
 import { notificationService } from "@/services/notifications";
+import { useWorkspace } from "@/lib/workspaceContext";
+import { useEventStream } from "@/lib/events";
 
 const severityConfig = {
   info: { icon: Info, color: "text-sky-400 bg-sky-950/40 border-sky-800/40" },
@@ -31,6 +33,7 @@ const severityConfig = {
 };
 
 export default function NotificationCenterPage() {
+  const { activeWorkspace } = useWorkspace();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -66,6 +69,37 @@ export default function NotificationCenterPage() {
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  // Step 26: Real-time SSE updates for Notification Center
+  const { isConnected: isSseConnected, isPollingFallback } = useEventStream({
+    workspaceId: activeWorkspace?.id,
+    eventType: "notification.*",
+    onEvent: (event) => {
+      if (event.type === "notification.created") {
+        setUnreadCount((prev) => prev + 1);
+        const newNotif = {
+          id: event.metadata?.notification_id || event.id,
+          title: event.data?.title || event.type,
+          body: event.data?.body || "",
+          severity: event.data?.severity || "info",
+          status: "unread",
+          read: false,
+          created_at: event.timestamp || new Date().toISOString(),
+          source_type: event.aggregate?.type || "system",
+          source_id: event.aggregate?.id || "",
+          metadata_json: event.data || {},
+        };
+        setNotifications((prev) => {
+          if (prev.some((n) => n.id === newNotif.id)) return prev;
+          return [newNotif, ...prev];
+        });
+      } else {
+        fetchNotifications();
+      }
+    },
+    fallbackPollingInterval: 15000,
+    fallbackPollingFn: fetchNotifications,
+  });
 
   const handleMarkRead = async (id, e) => {
     if (e) e.stopPropagation();
@@ -133,7 +167,20 @@ export default function NotificationCenterPage() {
         </div>
 
         {/* Quick Links & Actions */}
-        <div className="flex items-center gap-2 self-stretch sm:self-auto">
+        <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-slate-900 border border-slate-800"
+            title={isSseConnected ? "Real-time execution stream connected" : isPollingFallback ? "Polling fallback active" : "Connecting..."}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isSseConnected ? "bg-emerald-400 animate-pulse" : isPollingFallback ? "bg-amber-400" : "bg-slate-500"
+              }`}
+            />
+            <span className="text-slate-300 text-[10px]">
+              {isSseConnected ? "LIVE SSE" : isPollingFallback ? "POLL" : "SYNC"}
+            </span>
+          </div>
           <Link
             href="/app/notifications/deliveries"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white transition-colors"

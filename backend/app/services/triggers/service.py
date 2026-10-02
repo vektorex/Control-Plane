@@ -560,18 +560,39 @@ class TriggerService:
         await self.session.commit()
         await self.session.refresh(trig_run)
 
-        # 10. Execute asynchronously or dispatch immediately
-        executor = TriggerExecutor(self.session)
-        await executor.execute_trigger_run(
-            trigger=trigger,
-            trigger_run=trig_run,
-            event=event,
+        # 10. Enqueue durable background job
+        from backend.app.services.jobs.service import JobService
+        from backend.app.services.jobs.schemas import JobCreateRequest
+        from backend.app.services.jobs.constants import JobType
+
+        job_service = JobService(self.session)
+        job_resp, _ = await job_service.create_job(
+            workspace_id=trigger.workspace_id,
+            request=JobCreateRequest(
+                job_type=JobType.TRIGGER_RUN,
+                payload={
+                    "trigger_id": str(trigger.id),
+                    "trigger_run_id": str(trig_run.id),
+                    "event": {
+                        "event_id": event.event_id,
+                        "event_type": event.event_type,
+                        "source": event.source,
+                        "payload": event.payload,
+                        "metadata": event.metadata,
+                    },
+                },
+                project_id=trigger.project_id,
+                idempotency_key=f"trig_run_{trig_run.id}",
+            ),
         )
+        trig_run.job_id = job_resp.id
+        await self.session.commit()
 
         return {
             "accepted": True,
             "status": "queued",
             "trigger_run_id": str(trig_run.id),
+            "job_id": str(job_resp.id),
             "workflow_run_id": str(trig_run.workflow_run_id) if trig_run.workflow_run_id else None,
             "event_id": event.event_id,
         }

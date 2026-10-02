@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   RotateCcw,
   FlaskConical,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -30,6 +31,7 @@ const iconMap = {
   LayoutDashboard,
   ListTodo,
   Workflow,
+  Layers,
   RotateCcw,
   FlaskConical,
   ShieldCheck,

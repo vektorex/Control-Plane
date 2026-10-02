@@ -146,6 +146,7 @@ class TriggerRunResponse(BaseModel):
     id: uuid.UUID
     trigger_id: uuid.UUID
     workflow_run_id: Optional[uuid.UUID] = None
+    job_id: Optional[uuid.UUID] = None
     workspace_id: uuid.UUID
     event_id: Optional[str] = None
     status: TriggerRunStatus

@@ -142,7 +142,25 @@ async def upload_document(
     await session.commit()
     await session.refresh(doc)
 
-    # 8. Dispatch non-blocking background ingestion
+    # 8. Dispatch durable background job + background task
+    try:
+        from backend.app.services.jobs.service import JobService
+        from backend.app.services.jobs.schemas import JobCreateRequest
+        from backend.app.services.jobs.constants import JobType, JobPriority
+        job_service = JobService(session)
+        await job_service.create_job(
+            workspace_id=workspace_id,
+            request=JobCreateRequest(
+                job_type=JobType.DOCUMENT_PROCESSING,
+                priority=JobPriority.NORMAL,
+                payload={"document_id": str(doc.id), "workspace_id": str(workspace_id)},
+                idempotency_key=f"doc_process_{doc.id}",
+            ),
+            user_id=user.id,
+        )
+    except Exception as exc:
+        logger.warning(f"Could not enqueue durable document processing job: {exc}")
+
     background_tasks.add_task(_process_document_in_background, doc.id)
 
     return DocumentResponse.model_validate(doc)
@@ -260,6 +278,25 @@ async def reprocess_document(
     doc.error_message = None
     await session.commit()
     await session.refresh(doc)
+
+    try:
+        from backend.app.services.jobs.service import JobService
+        from backend.app.services.jobs.schemas import JobCreateRequest
+        from backend.app.services.jobs.constants import JobType, JobPriority
+        from datetime import datetime, timezone
+        job_service = JobService(session)
+        await job_service.create_job(
+            workspace_id=doc.workspace_id,
+            request=JobCreateRequest(
+                job_type=JobType.DOCUMENT_PROCESSING,
+                priority=JobPriority.NORMAL,
+                payload={"document_id": str(doc.id), "workspace_id": str(doc.workspace_id)},
+                idempotency_key=f"doc_reprocess_{doc.id}_{int(datetime.now(timezone.utc).timestamp())}",
+            ),
+            user_id=user.id,
+        )
+    except Exception as exc:
+        logger.warning(f"Could not enqueue durable document reprocess job: {exc}")
 
     background_tasks.add_task(_process_document_in_background, doc.id)
     return DocumentResponse.model_validate(doc)

@@ -264,20 +264,57 @@ async def update_connector_permission(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
 
 
-@router.post("/{connector_name}/execute", response_model=ConnectorResult)
+@router.post("/{connector_name}/execute")
 async def execute_connector_operation(
     connector_name: str,
     payload: ConnectorExecuteRequest,
+    mode: Optional[str] = Query("sync", description="Execution mode: sync or async"),
     x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
     workspace_id: Optional[UUID] = Query(None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
     executor: ConnectorExecutor = Depends(get_connector_executor),
-) -> ConnectorResult:
+):
     """
-    Execute a connector operation directly in workspace context.
+    Execute a connector operation directly in workspace context (sync or async background job).
     """
     ws_id = _resolve_workspace_id(user, x_workspace_id, workspace_id)
+
+    if mode == "async":
+        from fastapi.responses import JSONResponse
+        from backend.app.services.jobs.service import JobService
+        from backend.app.services.jobs.schemas import JobCreateRequest
+        from backend.app.services.jobs.constants import JobType, JobPriority
+
+        job_service = JobService(session)
+        job_resp, _ = await job_service.create_job(
+            workspace_id=ws_id,
+            request=JobCreateRequest(
+                job_type=JobType.CONNECTOR_OPERATION,
+                priority=JobPriority.NORMAL,
+                payload={
+                    "request": {
+                        "connector_name": connector_name,
+                        "operation": payload.operation,
+                        "arguments": payload.arguments,
+                    },
+                    "user_id": str(user.id),
+                },
+            ),
+            user_id=user.id,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content={
+                "job_id": str(job_resp.id),
+                "status": job_resp.status,
+                "job_type": job_resp.job_type,
+                "created_at": job_resp.created_at.isoformat() if job_resp.created_at else None,
+                "available_at": job_resp.available_at.isoformat() if job_resp.available_at else None,
+                "poll_url": f"/api/jobs/{job_resp.id}",
+                "cancel_url": f"/api/jobs/{job_resp.id}/cancel",
+            },
+        )
     res = await executor.execute(
         connector_name=connector_name,
         operation=payload.operation,

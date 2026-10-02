@@ -368,6 +368,68 @@ class WorkflowService:
 
         return self._format_run_response(run, workflow_name=wf.name)
 
+    async def run_workflow_async(
+        self,
+        workflow_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        user: User,
+        request: WorkflowRunRequest,
+    ) -> Dict[str, Any]:
+        wf = await self.repo.get_workflow_by_id_or_raise(workflow_id, workspace_id)
+
+        validated_input = WorkflowValidator.validate_runtime_input(
+            input_schema=wf.input_schema or {},
+            runtime_input=request.input_data or {},
+        )
+
+        target_version = request.version or wf.version
+
+        # Create initial pending WorkflowRun
+        run = await self.repo.create_run(
+            workflow_id=wf.id,
+            workflow_version=target_version,
+            workspace_id=workspace_id,
+            project_id=request.project_id or wf.project_id,
+            input_data=validated_input,
+        )
+
+        # Enqueue durable workflow_run job
+        from backend.app.services.jobs.service import JobService
+        from backend.app.services.jobs.schemas import JobCreateRequest
+        from backend.app.services.jobs.constants import JobType
+
+        job_service = JobService(self.session)
+        job_resp, _ = await job_service.create_job(
+            workspace_id=workspace_id,
+            request=JobCreateRequest(
+                job_type=JobType.WORKFLOW_RUN,
+                payload={
+                    "workflow_id": str(wf.id),
+                    "workflow_run_id": str(run.id),
+                    "version": target_version,
+                    "input_data": validated_input,
+                    "user_id": str(user.id),
+                },
+                project_id=run.project_id,
+            ),
+            user=user,
+        )
+
+        run.execution_state = {"job_id": str(job_resp.id)}
+        await self.session.commit()
+
+        return {
+            "job_id": str(job_resp.id),
+            "status": "queued",
+            "job_type": "workflow_run",
+            "created_at": job_resp.created_at,
+            "available_at": job_resp.available_at,
+            "poll_url": f"/api/jobs/{job_resp.id}",
+            "cancel_url": f"/api/jobs/{job_resp.id}/cancel",
+            "workflow_run_id": str(run.id),
+            "workflow_id": str(wf.id),
+        }
+
     async def get_workflow_run(
         self,
         run_id: uuid.UUID,

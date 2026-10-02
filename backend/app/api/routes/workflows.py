@@ -1,7 +1,7 @@
 """
 Workflow System API endpoints for CRUD, validation, publishing, templates, and execution.
 """
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -250,18 +250,27 @@ async def duplicate_workflow(
 
 # --- EXECUTION & RUNS ENDPOINTS ---
 
-@router.post("/workflows/{workflow_id}/run", response_model=WorkflowRunResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/workflows/{workflow_id}/run", status_code=status.HTTP_201_CREATED)
 async def run_workflow(
     workflow_id: UUID,
     request: Optional[WorkflowRunRequest] = None,
     workspace_id: UUID = Query(..., description="Active workspace ID"),
+    mode: str = Query("sync", description="Execution mode: 'sync' or 'async'"),
     user: User = Depends(get_current_user),
     service: WorkflowService = Depends(get_workflow_service),
-) -> WorkflowRunResponse:
+) -> Any:
     """
-    Execute a workflow run with runtime input parameters and record full telemetry.
+    Execute a workflow run with runtime input parameters (sync or async durable job).
     """
     req = request or WorkflowRunRequest()
+    if mode == "async":
+        return await service.run_workflow_async(
+            workflow_id=workflow_id,
+            workspace_id=workspace_id,
+            user=user,
+            request=req,
+        )
+
     return await service.run_workflow(
         workflow_id=workflow_id,
         workspace_id=workspace_id,

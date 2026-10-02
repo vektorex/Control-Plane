@@ -147,6 +147,12 @@ class TriggerRun(Base):
         nullable=True,
         index=True,
     )
+    job_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        GUID(),
+        ForeignKey("jobs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         GUID(),
         ForeignKey("workspaces.id", ondelete="CASCADE"),

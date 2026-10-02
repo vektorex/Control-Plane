@@ -35,6 +35,7 @@ import {
   Loader2,
   ShieldAlert,
   ExternalLink,
+  Layers,
 } from "lucide-react";
 
 const stepIcons = {
@@ -84,7 +85,19 @@ export default function WorkflowRunDetailPage({ params }) {
 
   useEffect(() => {
     fetchRunData();
-  }, [runId]);
+    let pollCount = 0;
+    const maxPolls = 60; // Bounded interval: max 3 minutes of auto-polling
+    const interval = setInterval(() => {
+      if (run && (run.status === "running" || run.status === "queued" || run.status === "retrying")) {
+        if (pollCount++ < maxPolls) {
+          fetchRunData();
+        } else {
+          clearInterval(interval);
+        }
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [runId, run?.status]);
 
   const toggleStep = (stepId) => {
     setExpandedSteps((prev) => ({
@@ -257,6 +270,33 @@ export default function WorkflowRunDetailPage({ params }) {
         <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Durable Background Job Integration Banner */}
+      {(run.job_id || executionState?.job_id) && (
+        <div className="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-800/40 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-200">Durable Background Job:</span>
+                <span className="font-mono text-indigo-300 font-bold">{run.job_id || executionState.job_id}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Managed asynchronously by PostgreSQL durable queue with automatic retry policies and lease protection.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/app/jobs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-300 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 transition-colors shrink-0"
+          >
+            <span>Job Center</span>
+            <ExternalLink className="w-3 h-3" />
+          </Link>
         </div>
       )}
 

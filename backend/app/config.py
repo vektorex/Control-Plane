@@ -166,6 +166,13 @@ class Settings(BaseSettings):
     TRIGGER_RATE_LIMIT_PER_MINUTE: int = 60
     MAX_TRIGGER_CONCURRENCY_PER_WORKSPACE: int = 5
 
+    # Step 24: Durable Background Job System Settings
+    JOB_LEASE_SECONDS: int = 300
+    JOB_HEARTBEAT_SECONDS: int = 30
+    JOB_POLL_INTERVAL_SECONDS: float = 2.0
+    JOB_MAX_ATTEMPTS: int = 3
+    JOB_WORKER_CONCURRENCY: int = 5
+
 
 settings = Settings()
 

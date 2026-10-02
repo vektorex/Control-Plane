@@ -41,6 +41,10 @@ from backend.app.db.models.trigger import (
     WorkflowTrigger,
     TriggerRun,
 )
+from backend.app.db.models.job import (
+    Job,
+    JobEvent,
+)
 
 __all__ = [
     "Base",
@@ -87,6 +91,8 @@ __all__ = [
     "EvaluationExperimentRun",
     "WorkflowTrigger",
     "TriggerRun",
+    "Job",
+    "JobEvent",
 ]
 
 

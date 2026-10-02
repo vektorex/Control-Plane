@@ -141,7 +141,6 @@ async def dry_run_replay(
 
 @router.post(
     "/runs/{run_id}/replay",
-    response_model=ReplayRunResponse,
     status_code=status.HTTP_200_OK,
     summary="Replay run execution",
     description="Re-execute eligible AI computation. External side effects remain dry-run by default unless approved.",
@@ -149,11 +148,12 @@ async def dry_run_replay(
 async def execute_run_replay(
     run_id: UUID,
     body: Optional[ReplayRunCreateRequest] = None,
+    mode: Optional[str] = Query("sync", description="Execution mode: sync or async"),
     workspace_id: Optional[UUID] = Query(None, alias="workspace_id"),
     x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
-) -> ReplayRunResponse:
+):
     ws_id = _resolve_workspace_id(user, x_workspace_id, workspace_id)
     service = ReplayService()
     req = body or ReplayRunCreateRequest(mode=ReplayMode.REPLAY, dry_run=True)
@@ -166,6 +166,39 @@ async def execute_run_replay(
             user=user,
             session=session,
         )
+        if mode == "async":
+            from fastapi.responses import JSONResponse
+            from backend.app.services.jobs.service import JobService
+            from backend.app.services.jobs.schemas import JobCreateRequest
+            from backend.app.services.jobs.constants import JobType, JobPriority
+
+            job_service = JobService(session)
+            job_resp, _ = await job_service.create_job(
+                workspace_id=ws_id,
+                request=JobCreateRequest(
+                    job_type=JobType.REPLAY_RUN,
+                    priority=JobPriority.NORMAL,
+                    payload={
+                        "replay_id": str(replay.id),
+                        "run_id": str(run_id),
+                        "workspace_id": str(ws_id),
+                    },
+                    idempotency_key=f"replay_{replay.id}",
+                ),
+                user_id=user.id,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_201_CREATED,
+                content={
+                    "job_id": str(job_resp.id),
+                    "status": job_resp.status,
+                    "job_type": job_resp.job_type,
+                    "created_at": job_resp.created_at.isoformat() if job_resp.created_at else None,
+                    "available_at": job_resp.available_at.isoformat() if job_resp.available_at else None,
+                    "poll_url": f"/api/jobs/{job_resp.id}",
+                    "cancel_url": f"/api/jobs/{job_resp.id}/cancel",
+                },
+            )
         return ReplayRunResponse.model_validate(replay)
     except ReplayNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
@@ -326,18 +359,18 @@ async def dry_run_workflow_replay(
 
 @router.post(
     "/workflow-runs/{workflow_run_id}/replay",
-    response_model=ReplayRunResponse,
     status_code=status.HTTP_200_OK,
     summary="Replay workflow execution",
 )
 async def execute_workflow_replay(
     workflow_run_id: UUID,
     body: Optional[ReplayRunCreateRequest] = None,
+    mode: Optional[str] = Query("sync", description="Execution mode: sync or async"),
     workspace_id: Optional[UUID] = Query(None, alias="workspace_id"),
     x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
-) -> ReplayRunResponse:
+):
     ws_id = _resolve_workspace_id(user, x_workspace_id, workspace_id)
     service = ReplayService()
     req = body or ReplayRunCreateRequest(mode=ReplayMode.REPLAY, dry_run=True)
@@ -350,6 +383,39 @@ async def execute_workflow_replay(
             user=user,
             session=session,
         )
+        if mode == "async":
+            from fastapi.responses import JSONResponse
+            from backend.app.services.jobs.service import JobService
+            from backend.app.services.jobs.schemas import JobCreateRequest
+            from backend.app.services.jobs.constants import JobType, JobPriority
+
+            job_service = JobService(session)
+            job_resp, _ = await job_service.create_job(
+                workspace_id=ws_id,
+                request=JobCreateRequest(
+                    job_type=JobType.REPLAY_RUN,
+                    priority=JobPriority.NORMAL,
+                    payload={
+                        "replay_id": str(replay.id),
+                        "workflow_run_id": str(workflow_run_id),
+                        "workspace_id": str(ws_id),
+                    },
+                    idempotency_key=f"replay_wf_{replay.id}",
+                ),
+                user_id=user.id,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_201_CREATED,
+                content={
+                    "job_id": str(job_resp.id),
+                    "status": job_resp.status,
+                    "job_type": job_resp.job_type,
+                    "created_at": job_resp.created_at.isoformat() if job_resp.created_at else None,
+                    "available_at": job_resp.available_at.isoformat() if job_resp.available_at else None,
+                    "poll_url": f"/api/jobs/{job_resp.id}",
+                    "cancel_url": f"/api/jobs/{job_resp.id}/cancel",
+                },
+            )
         return ReplayRunResponse.model_validate(replay)
     except ReplayNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))

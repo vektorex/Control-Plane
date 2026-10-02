@@ -635,16 +635,49 @@ async def get_experiment(
 
 @router.post(
     "/experiments/{experiment_id}/run",
-    response_model=EvaluationExperimentResponse,
     summary="Execute evaluation experiment",
 )
 async def run_experiment(
     experiment_id: UUID,
+    mode: Optional[str] = Query("sync", description="Execution mode: sync or async"),
     x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     workspace_id = _resolve_workspace_id(user, header_ws_id=x_workspace_id)
+    if mode == "async":
+        from fastapi.responses import JSONResponse
+        from backend.app.services.jobs.service import JobService
+        from backend.app.services.jobs.schemas import JobCreateRequest
+        from backend.app.services.jobs.constants import JobType, JobPriority
+
+        job_service = JobService(session)
+        job_resp, _ = await job_service.create_job(
+            workspace_id=workspace_id,
+            request=JobCreateRequest(
+                job_type=JobType.EVALUATION_EXPERIMENT,
+                priority=JobPriority.NORMAL,
+                payload={
+                    "experiment_id": str(experiment_id),
+                    "workspace_id": str(workspace_id),
+                },
+                idempotency_key=f"exp_{experiment_id}",
+            ),
+            user_id=user.id,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content={
+                "job_id": str(job_resp.id),
+                "status": job_resp.status,
+                "job_type": job_resp.job_type,
+                "created_at": job_resp.created_at.isoformat() if job_resp.created_at else None,
+                "available_at": job_resp.available_at.isoformat() if job_resp.available_at else None,
+                "poll_url": f"/api/jobs/{job_resp.id}",
+                "cancel_url": f"/api/jobs/{job_resp.id}/cancel",
+            },
+        )
+
     try:
         exp = await eval_lab_service.run_experiment(
             session=session, experiment_id=experiment_id, workspace_id=workspace_id

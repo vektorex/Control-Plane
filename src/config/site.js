@@ -31,6 +31,12 @@ export const siteConfig = {
       description: "Build, validate, publish, and execute multi-step AI orchestration pipelines",
     },
     {
+      label: "Jobs",
+      href: "/app/jobs",
+      icon: "Layers",
+      description: "Durable background job execution queue, active leases, retries, and events",
+    },
+    {
       label: "Replays",
       href: "/app/replays",
       icon: "RotateCcw",

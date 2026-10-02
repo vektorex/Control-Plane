@@ -20,6 +20,7 @@ from backend.app.api.routes.notifications import router as notifications_router
 from backend.app.api.routes.gateway import router as gateway_router
 from backend.app.api.routes.replay import router as replay_router
 from backend.app.api.routes.evaluation_lab import router as evaluation_lab_router
+from backend.app.api.routes.triggers import router as triggers_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -44,6 +45,7 @@ api_router.include_router(notifications_router)
 api_router.include_router(gateway_router)
 api_router.include_router(replay_router)
 api_router.include_router(evaluation_lab_router)
+api_router.include_router(triggers_router)
 
 __all__ = ["api_router"]
 

@@ -37,6 +37,10 @@ from backend.app.db.models.evaluation_lab import (
     EvaluationExperiment,
     EvaluationExperimentRun,
 )
+from backend.app.db.models.trigger import (
+    WorkflowTrigger,
+    TriggerRun,
+)
 
 __all__ = [
     "Base",
@@ -81,6 +85,8 @@ __all__ = [
     "EvaluationCase",
     "EvaluationExperiment",
     "EvaluationExperimentRun",
+    "WorkflowTrigger",
+    "TriggerRun",
 ]
 
 

@@ -40,6 +40,7 @@ import {
   Code2,
   Plug,
   Brain,
+  Clock,
 } from "lucide-react";
 
 const stepIcons = {
@@ -360,6 +361,28 @@ export default function WorkflowBuilderPage({ params }) {
             )}
             <span>Publish Version</span>
           </Button>
+
+          <Link href={`/app/workflows/${workflowId}/triggers`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5 text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Triggers</span>
+            </Button>
+          </Link>
+
+          <Link href={`/app/workflows/${workflowId}/runs`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5 text-slate-300 border-slate-700 hover:bg-slate-800"
+            >
+              <History className="w-3.5 h-3.5 text-slate-400" />
+              <span>Runs</span>
+            </Button>
+          </Link>
 
           <Button
             variant="primary"

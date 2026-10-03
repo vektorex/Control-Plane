@@ -29,6 +29,7 @@ class AggregateType(str, Enum):
     ARTIFACT = "artifact"
     CACHE = "cache"
     GOVERNANCE = "governance"
+    DATA_GOVERNANCE = "data_governance"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -190,6 +191,26 @@ class SystemEventType(str, Enum):
     GOVERNANCE_BUDGET_BLOCKED = "governance.budget_blocked"
     GOVERNANCE_BUDGET_THRESHOLD_REACHED = "governance.budget_threshold_reached"
 
+    # Step 33 Data Governance events
+    DATA_ASSET_CREATED = "data.asset.created"
+    DATA_ASSET_CLASSIFIED = "data.asset.classified"
+    DATA_ASSET_ACCESSED = "data.asset.accessed"
+    DATA_ASSET_UPDATED = "data.asset.updated"
+    DATA_ASSET_RETENTION_DUE = "data.asset.retention_due"
+    DATA_LIFECYCLE_STARTED = "data.lifecycle.started"
+    DATA_LIFECYCLE_COMPLETED = "data.lifecycle.completed"
+    DATA_LIFECYCLE_FAILED = "data.lifecycle.failed"
+    DATA_DELETION_REQUESTED = "data.deletion.requested"
+    DATA_DELETION_COMPLETED = "data.deletion.completed"
+    DATA_DELETION_BLOCKED = "data.deletion.blocked"
+    DATA_EXPORT_REQUESTED = "data.export.requested"
+    DATA_EXPORT_COMPLETED = "data.export.completed"
+    DATA_PRIVACY_REQUEST_CREATED = "data.privacy_request.created"
+    DATA_PRIVACY_REQUEST_COMPLETED = "data.privacy_request.completed"
+    DATA_LEGAL_HOLD_CREATED = "data.legal_hold.created"
+    DATA_LEGAL_HOLD_RELEASED = "data.legal_hold.released"
+    DATA_EVIDENCE_CREATED = "data.evidence.created"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
@@ -242,6 +263,18 @@ AUDITABLE_EVENTS = {
     SystemEventType.GOVERNANCE_APPROVAL_REQUIRED.value,
     SystemEventType.GOVERNANCE_VERIFICATION_REQUIRED.value,
     SystemEventType.GOVERNANCE_BUDGET_BLOCKED.value,
+    # Step 33 Data Governance auditable events
+    SystemEventType.DATA_ASSET_CLASSIFIED.value,
+    SystemEventType.DATA_DELETION_REQUESTED.value,
+    SystemEventType.DATA_DELETION_COMPLETED.value,
+    SystemEventType.DATA_DELETION_BLOCKED.value,
+    SystemEventType.DATA_EXPORT_REQUESTED.value,
+    SystemEventType.DATA_EXPORT_COMPLETED.value,
+    SystemEventType.DATA_PRIVACY_REQUEST_CREATED.value,
+    SystemEventType.DATA_PRIVACY_REQUEST_COMPLETED.value,
+    SystemEventType.DATA_LEGAL_HOLD_CREATED.value,
+    SystemEventType.DATA_LEGAL_HOLD_RELEASED.value,
+    SystemEventType.DATA_EVIDENCE_CREATED.value,
 }
 
 # Sensitive keys scrubbed from all payloads

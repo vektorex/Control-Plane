@@ -55,5 +55,19 @@ class User(Base):
         order_by="desc(Workspace.created_at)",
     )
 
+    @property
+    def organization_id(self) -> uuid.UUID:
+        if hasattr(self, "_organization_id") and self._organization_id:
+            return self._organization_id
+        if hasattr(self, "workspaces") and self.workspaces:
+            for ws in self.workspaces:
+                if getattr(ws, "organization_id", None):
+                    return ws.organization_id
+        return self.id
+
+    @organization_id.setter
+    def organization_id(self, val):
+        self._organization_id = val
+
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email='{self.email}', auth_user_id='{self.auth_user_id}')>"

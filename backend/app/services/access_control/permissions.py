@@ -134,6 +134,14 @@ GOVERNANCE_SIMULATE = "governance.simulate"
 GOVERNANCE_ACTIVATE = "governance.activate"
 GOVERNANCE_AUDIT = "governance.audit"
 
+# Data Governance permissions (Step 33)
+DATA_GOVERNANCE_READ = "data_governance.read"
+DATA_GOVERNANCE_MANAGE = "data_governance.manage"
+DATA_GOVERNANCE_EXPORT = "data_governance.export"
+DATA_GOVERNANCE_DELETE = "data_governance.delete"
+DATA_GOVERNANCE_LEGAL_HOLD = "data_governance.legal_hold"
+DATA_GOVERNANCE_AUDIT = "data_governance.audit"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
     CACHE_READ,
@@ -145,6 +153,12 @@ ALL_PERMISSIONS = {
     GOVERNANCE_SIMULATE,
     GOVERNANCE_ACTIVATE,
     GOVERNANCE_AUDIT,
+    DATA_GOVERNANCE_READ,
+    DATA_GOVERNANCE_MANAGE,
+    DATA_GOVERNANCE_EXPORT,
+    DATA_GOVERNANCE_DELETE,
+    DATA_GOVERNANCE_LEGAL_HOLD,
+    DATA_GOVERNANCE_AUDIT,
     ORGANIZATION_READ,
     ORGANIZATION_UPDATE,
     ORGANIZATION_DELETE,

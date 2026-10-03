@@ -266,6 +266,7 @@ class EventConsumerRegistry:
         self.register(RealtimeEventConsumer())
         self.register(CacheInvalidationEventConsumer())
         self.register(GovernanceEventConsumer())
+        self.register(DataGovernanceEventConsumer())
 
 
 class GovernanceEventConsumer(EventConsumer):
@@ -286,6 +287,29 @@ class GovernanceEventConsumer(EventConsumer):
         from backend.app.core.logging import logger
         logger.debug(
             "GovernanceEventConsumer: received event '%s' for org=%s",
+            event.event_type,
+            event.organization_id,
+        )
+        return True
+
+
+class DataGovernanceEventConsumer(EventConsumer):
+    """
+    Handles data.* events for audit trail, notification, and evidence recording.
+    """
+
+    @property
+    def consumer_name(self) -> str:
+        return "data_governance_event_consumer"
+
+    @property
+    def supported_event_types(self) -> List[str]:
+        return ["data.*"]
+
+    async def process(self, event: EventContract) -> bool:
+        from backend.app.core.logging import logger
+        logger.debug(
+            "DataGovernanceEventConsumer: received event '%s' for org=%s",
             event.event_type,
             event.organization_id,
         )

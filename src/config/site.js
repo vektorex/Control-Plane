@@ -115,6 +115,12 @@ export const siteConfig = {
       description: "AI Governance, policy control plane, safety guardrails, budget limits, and audit logs",
     },
     {
+      label: "Data Governance",
+      href: "/app/data-governance",
+      icon: "FileCheck2",
+      description: "Data inventory, classification, provenance lineage, retention lifecycle, legal holds, and immutable compliance evidence",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

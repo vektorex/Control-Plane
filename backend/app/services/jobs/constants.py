@@ -47,6 +47,12 @@ class JobType(str, Enum):
     CACHE_REFRESH = "cache_refresh"
     CACHE_CLEANUP = "cache_cleanup"
     GOVERNANCE_POLICY_RECHECK = "governance_policy_recheck"
+    DATA_RETENTION_SCAN = "data_retention_scan"
+    DATA_DELETION = "data_deletion"
+    DATA_EXPORT = "data_export"
+    DATA_ANONYMIZATION = "data_anonymization"
+    DATA_ARCHIVE = "data_archive"
+    PRIVACY_REQUEST = "privacy_request"
 
 
 class JobEventType(str, Enum):

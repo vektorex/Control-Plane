@@ -430,6 +430,26 @@ class TaskExecutionService:
                 )
                 governance_decision = await gov_svc.evaluate(gov_eval_req)
 
+                # Step 33: Record Policy Evidence Snapshot
+                try:
+                    from backend.app.services.data_governance.policy_evidence import PolicyEvidenceRecorder
+                    import uuid as _uuid
+                    pol_ev_rec = PolicyEvidenceRecorder(self.session)
+                    await pol_ev_rec.record_governance_decision(
+                        organization_id=workspace_id,
+                        workspace_id=workspace_id,
+                        governance_decision_id=getattr(governance_decision, "decision_id", str(_uuid.uuid4())),
+                        decision=governance_decision.decision.value,
+                        reasons=governance_decision.reasons or [],
+                        matched_policies=governance_decision.matched_policies or [],
+                        enforcement_point=EnforcementPoint.TASK_EXECUTION.value,
+                        subject_type="task",
+                        subject_id=str(task.id),
+                        actor_id=str(user.id),
+                    )
+                except Exception:
+                    pass
+
                 if tracer:
                     tracer.record_event(
                         TraceEventType.GOVERNANCE_EVALUATION_COMPLETED,

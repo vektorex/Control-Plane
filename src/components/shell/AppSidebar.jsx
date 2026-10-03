@@ -28,6 +28,7 @@ import {
   FileImage,
   DatabaseZap,
   ShieldAlert,
+  FileCheck2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -46,6 +47,7 @@ const iconMap = {
   FlaskConical,
   ShieldCheck,
   ShieldAlert,
+  FileCheck2,
   Plug,
   Brain,
   Network,

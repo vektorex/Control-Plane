@@ -91,6 +91,20 @@ from backend.app.services.governance.models import (
     BudgetReservation,
     GovernanceDecisionLog,
 )
+from backend.app.services.data_governance.models import (
+    DataAsset,
+    ClassificationRecord,
+    DataFinding,
+    DataLineageEdge,
+    RetentionPolicy,
+    DeletionRequest,
+    ExportRequest,
+    PrivacyRequest,
+    LegalHold,
+    LegalHoldAsset,
+    ComplianceEvidence,
+    DataAccessRecord,
+)
 
 __all__ = [
     "Base",
@@ -171,6 +185,18 @@ __all__ = [
     "BudgetPolicy",
     "BudgetReservation",
     "GovernanceDecisionLog",
+    "DataAsset",
+    "ClassificationRecord",
+    "DataFinding",
+    "DataLineageEdge",
+    "RetentionPolicy",
+    "DeletionRequest",
+    "ExportRequest",
+    "PrivacyRequest",
+    "LegalHold",
+    "LegalHoldAsset",
+    "ComplianceEvidence",
+    "DataAccessRecord",
 ]
 
 

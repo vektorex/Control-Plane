@@ -35,6 +35,7 @@ from backend.app.api.routes.knowledge_graph import router as knowledge_graph_rou
 from backend.app.api.routes.artifacts import router as artifacts_router
 from backend.app.api.routes.cache import router as cache_router
 from backend.app.api.routes.governance import router as governance_router
+from backend.app.api.routes.data_governance import router as data_governance_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -52,6 +53,7 @@ api_router.include_router(documents_router)
 api_router.include_router(artifacts_router)
 api_router.include_router(cache_router)
 api_router.include_router(governance_router)
+api_router.include_router(data_governance_router)
 api_router.include_router(tools_router)
 api_router.include_router(evaluation_router)
 api_router.include_router(analytics_router)

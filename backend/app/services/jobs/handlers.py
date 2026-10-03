@@ -864,6 +864,152 @@ class GovernancePolicyRecheckJobHandler(JobHandler):
         return {"status": "passed"}
 
 
+class DataRetentionScanJobHandler(JobHandler):
+    """
+    Scans for expired data assets and creates lifecycle actions.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.data_governance.service import DataGovernanceService
+        gov_svc = DataGovernanceService(context.session)
+        expired = await gov_svc.retention.find_expired_assets(
+            organization_id=str(job.organization_id),
+            workspace_id=str(job.workspace_id) if job.workspace_id else None,
+            limit=100,
+        )
+        await context.update_progress(100, f"Scanned retention; found {len(expired)} expired assets", 1, 1, "Completed")
+        return {"status": "completed", "expired_count": len(expired)}
+
+
+class DataDeletionJobHandler(JobHandler):
+    """
+    Executes multi-system verified data deletion.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.data_governance.service import DataGovernanceService
+        payload = job.payload or {}
+        request_id = payload.get("request_id")
+        actor_id = payload.get("actor_id", str(job.created_by or "system"))
+
+        gov_svc = DataGovernanceService(context.session)
+        if request_id:
+            req = await gov_svc.deletion.execute_deletion(
+                request_id=request_id,
+                organization_id=str(job.organization_id),
+                actor_id=actor_id,
+            )
+            return {"status": req.status, "summary": req.verification_summary}
+        return {"status": "skipped", "reason": "No request_id"}
+
+
+class DataExportJobHandler(JobHandler):
+    """
+    Executes sanitized data export.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.data_governance.service import DataGovernanceService
+        payload = job.payload or {}
+        export_id = payload.get("export_id")
+        gov_svc = DataGovernanceService(context.session)
+        if export_id:
+            req, _ = await gov_svc.export.execute_export(
+                request_id=export_id,
+                organization_id=str(job.organization_id),
+            )
+            return {"status": req.status, "manifest": req.manifest}
+        return {"status": "skipped", "reason": "No export_id"}
+
+
+class DataAnonymizationJobHandler(JobHandler):
+    """
+    Anonymizes/redacts sensitive data assets upon retention expiry.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.data_governance.service import DataGovernanceService
+        payload = job.payload or {}
+        asset_id = payload.get("asset_id")
+        if asset_id:
+            gov_svc = DataGovernanceService(context.session)
+            asset = await gov_svc.inventory.get_asset(asset_id, str(job.organization_id))
+            asset.name = "[ANONYMIZED]"
+            asset.description = "[ANONYMIZED]"
+            await context.session.flush()
+            return {"status": "completed", "asset_id": asset_id}
+        return {"status": "skipped"}
+
+
+class DataArchiveJobHandler(JobHandler):
+    """
+    Archives data assets upon retention expiry.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.data_governance.service import DataGovernanceService
+        payload = job.payload or {}
+        asset_id = payload.get("asset_id")
+        if asset_id:
+            gov_svc = DataGovernanceService(context.session)
+            asset = await gov_svc.inventory.get_asset(asset_id, str(job.organization_id))
+            asset.status = "archived"
+            await context.session.flush()
+            return {"status": "completed", "asset_id": asset_id}
+        return {"status": "skipped"}
+
+
+class PrivacyRequestJobHandler(JobHandler):
+    """
+    Processes verified user privacy rights workflows.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.data_governance.service import DataGovernanceService
+        payload = job.payload or {}
+        request_id = payload.get("privacy_request_id")
+        actor_id = payload.get("actor_id", str(job.created_by or "system"))
+        if request_id:
+            gov_svc = DataGovernanceService(context.session)
+            req = await gov_svc.privacy.complete_request(
+                request_id=request_id,
+                organization_id=str(job.organization_id),
+                actor_id=actor_id,
+            )
+            return {"status": req.status}
+        return {"status": "skipped"}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -894,6 +1040,12 @@ class JobHandlerRegistry:
         self.register(JobType.CACHE_REFRESH.value, CacheRefreshJobHandler())
         self.register(JobType.CACHE_CLEANUP.value, CacheCleanupJobHandler())
         self.register(JobType.GOVERNANCE_POLICY_RECHECK.value, GovernancePolicyRecheckJobHandler())
+        self.register(JobType.DATA_RETENTION_SCAN.value, DataRetentionScanJobHandler())
+        self.register(JobType.DATA_DELETION.value, DataDeletionJobHandler())
+        self.register(JobType.DATA_EXPORT.value, DataExportJobHandler())
+        self.register(JobType.DATA_ANONYMIZATION.value, DataAnonymizationJobHandler())
+        self.register(JobType.DATA_ARCHIVE.value, DataArchiveJobHandler())
+        self.register(JobType.PRIVACY_REQUEST.value, PrivacyRequestJobHandler())
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

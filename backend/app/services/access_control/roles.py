@@ -97,6 +97,12 @@ from backend.app.services.access_control.permissions import (
     GOVERNANCE_SIMULATE,
     GOVERNANCE_ACTIVATE,
     GOVERNANCE_AUDIT,
+    DATA_GOVERNANCE_READ,
+    DATA_GOVERNANCE_MANAGE,
+    DATA_GOVERNANCE_EXPORT,
+    DATA_GOVERNANCE_DELETE,
+    DATA_GOVERNANCE_LEGAL_HOLD,
+    DATA_GOVERNANCE_AUDIT,
 )
 
 # 1. Organization Role Permissions
@@ -191,6 +197,12 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GOVERNANCE_SIMULATE,
         GOVERNANCE_ACTIVATE,
         GOVERNANCE_AUDIT,
+        DATA_GOVERNANCE_READ,
+        DATA_GOVERNANCE_MANAGE,
+        DATA_GOVERNANCE_EXPORT,
+        DATA_GOVERNANCE_DELETE,
+        DATA_GOVERNANCE_LEGAL_HOLD,
+        DATA_GOVERNANCE_AUDIT,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -262,6 +274,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         CACHE_INVALIDATE,
         GOVERNANCE_READ,
         GOVERNANCE_SIMULATE,
+        DATA_GOVERNANCE_READ,
     },
 
     # VIEWER: read-only access to granted resources.
@@ -289,6 +302,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_READ,
         CACHE_READ,
         GOVERNANCE_READ,
+        DATA_GOVERNANCE_READ,
     },
 }
 
@@ -372,6 +386,12 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GOVERNANCE_SIMULATE,
         GOVERNANCE_ACTIVATE,
         GOVERNANCE_AUDIT,
+        DATA_GOVERNANCE_READ,
+        DATA_GOVERNANCE_MANAGE,
+        DATA_GOVERNANCE_EXPORT,
+        DATA_GOVERNANCE_DELETE,
+        DATA_GOVERNANCE_LEGAL_HOLD,
+        DATA_GOVERNANCE_AUDIT,
     },
     WorkspaceRole.MEMBER.value: {
         WORKSPACE_READ,
@@ -439,6 +459,7 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         CACHE_INVALIDATE,
         GOVERNANCE_READ,
         GOVERNANCE_SIMULATE,
+        DATA_GOVERNANCE_READ,
     },
     WorkspaceRole.VIEWER.value: {
         WORKSPACE_READ,
@@ -461,6 +482,7 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_READ,
         CACHE_READ,
         GOVERNANCE_READ,
+        DATA_GOVERNANCE_READ,
     },
 }
 

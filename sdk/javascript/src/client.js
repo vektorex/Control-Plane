@@ -30,7 +30,9 @@ export class AIWorkLayerClient {
     this.usage = new UsageResource(this);
     this.webhooks = new WebhooksResource(this);
     this.marketplace = new MarketplaceResource(this);
+    this.collaboration = new CollaborationResource(this);
   }
+
 
   async request(method, path, options = {}) {
     const url = `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
@@ -368,3 +370,106 @@ class MarketplaceResource {
     return this.client.request("GET", `/marketplace/packages/${packageId}/usage`);
   }
 }
+
+export class CollaborationCommentsResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async list(sessionId, params = {}) {
+    const query = new URLSearchParams();
+    if (params.resourceType) query.set("resource_type", params.resourceType);
+    if (params.resourceId) query.set("resource_id", params.resourceId);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/collaboration/sessions/${sessionId}/comments${qs ? `?${qs}` : ""}`);
+  }
+
+  async create(sessionId, data, options = {}) {
+    return this.client.request("POST", `/collaboration/sessions/${sessionId}/comments`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+}
+
+export class CollaborationAssignmentsResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async list(sessionId, params = {}) {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.assignedTo) query.set("assigned_to", params.assignedTo);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/collaboration/sessions/${sessionId}/assignments${qs ? `?${qs}` : ""}`);
+  }
+
+  async create(sessionId, data, options = {}) {
+    return this.client.request("POST", `/collaboration/sessions/${sessionId}/assignments`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+}
+
+export class CollaborationSessionsResource {
+  constructor(client) {
+    this.client = client;
+    this.comments = new CollaborationCommentsResource(client);
+    this.assignments = new CollaborationAssignmentsResource(client);
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/collaboration/sessions", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.workspaceId) query.set("workspace_id", params.workspaceId);
+    if (params.resourceType) query.set("resource_type", params.resourceType);
+    if (params.resourceId) query.set("resource_id", params.resourceId);
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/collaboration/sessions${qs ? `?${qs}` : ""}`);
+  }
+
+  async get(sessionId) {
+    return this.client.request("GET", `/collaboration/sessions/${sessionId}`);
+  }
+
+  async events(sessionId, onEvent) {
+    const url = `${this.client.baseUrl}/collaboration/sessions/${sessionId}/events`;
+    if (typeof EventSource !== "undefined") {
+      const es = new EventSource(url);
+      if (onEvent) {
+        es.onmessage = (e) => {
+          try {
+            onEvent(JSON.parse(e.data));
+          } catch {
+            onEvent(e.data);
+          }
+        };
+      }
+      return es;
+    }
+    return { url };
+  }
+}
+
+export class CollaborationResource {
+  constructor(client) {
+    this.client = client;
+    this.sessions = new CollaborationSessionsResource(client);
+  }
+}
+

@@ -35,6 +35,8 @@ class AggregateType(str, Enum):
     RECOVERY = "recovery"
     DEVELOPER = "developer"
     MARKETPLACE = "marketplace"
+    COLLABORATION = "collaboration"
+
 
 
 class EventDeliveryStatus(str, Enum):
@@ -284,9 +286,33 @@ class SystemEventType(str, Enum):
     MARKETPLACE_REVIEW_CREATED = "marketplace.review.created"
     MARKETPLACE_SECURITY_WARNING = "marketplace.security.warning"
 
+    # Step 39 Multi-User Collaboration events
+    COLLABORATION_SESSION_CREATED = "collaboration.session.created"
+    COLLABORATION_PARTICIPANT_JOINED = "collaboration.participant.joined"
+    COLLABORATION_PARTICIPANT_LEFT = "collaboration.participant.left"
+    COLLABORATION_PRESENCE_UPDATED = "collaboration.presence.updated"
+    COLLABORATION_COMMENT_CREATED = "collaboration.comment.created"
+    COLLABORATION_COMMENT_UPDATED = "collaboration.comment.updated"
+    COLLABORATION_COMMENT_DELETED = "collaboration.comment.deleted"
+    COLLABORATION_MENTION_CREATED = "collaboration.mention.created"
+    COLLABORATION_ASSIGNMENT_CREATED = "collaboration.assignment.created"
+    COLLABORATION_ASSIGNMENT_UPDATED = "collaboration.assignment.updated"
+    COLLABORATION_ANNOTATION_CREATED = "collaboration.annotation.created"
+    COLLABORATION_ANNOTATION_UPDATED = "collaboration.annotation.updated"
+    COLLABORATION_DECISION_CREATED = "collaboration.decision.created"
+    COLLABORATION_RESOURCE_UPDATED = "collaboration.resource.updated"
+    COLLABORATION_CONFLICT_DETECTED = "collaboration.conflict.detected"
+    COLLABORATION_RUN_STARTED = "collaboration.run.started"
+    COLLABORATION_RUN_UPDATED = "collaboration.run.updated"
+    COLLABORATION_RUN_COMPLETED = "collaboration.run.completed"
+    COLLABORATION_RUN_FAILED = "collaboration.run.failed"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
+    SystemEventType.COLLABORATION_DECISION_CREATED.value,
+    SystemEventType.COLLABORATION_CONFLICT_DETECTED.value,
+
     SystemEventType.RELIABILITY_COMPONENT_DEGRADED.value,
     SystemEventType.RELIABILITY_COMPONENT_RECOVERED.value,
     SystemEventType.RELIABILITY_RESUME_COMPLETED.value,

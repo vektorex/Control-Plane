@@ -29,6 +29,9 @@ VALID_API_SCOPES: Set[str] = {
     "marketplace:read",
     "marketplace:install",
     "marketplace:manage",
+    "collaboration:read",
+    "collaboration:write",
+    "collaboration:execute",
 }
 PUBLIC_SCOPES = VALID_API_SCOPES
 
@@ -57,6 +60,9 @@ SCOPE_TO_PERMISSION_MAP: Dict[str, str] = {
     "marketplace:read": "marketplace.read",
     "marketplace:install": "marketplace.install",
     "marketplace:manage": "marketplace.manage",
+    "collaboration:read": "collaboration.session_read",
+    "collaboration:write": "collaboration.comment",
+    "collaboration:execute": "collaboration.execute",
 }
 
 # Sensitive scopes that require explicit organization admin privileges
@@ -66,6 +72,7 @@ SENSITIVE_SCOPES: Set[str] = {
     "artifacts:create",
     "marketplace:install",
     "marketplace:manage",
+    "collaboration:execute",
     "memory:write",
     "webhooks:manage",
     "applications:manage",

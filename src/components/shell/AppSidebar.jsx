@@ -33,7 +33,9 @@ import {
   LifeBuoy,
   Code2,
   Store,
+  Users,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
 import { OrganizationSelector } from "./OrganizationSelector";
@@ -70,7 +72,9 @@ const iconMap = {
   LifeBuoy,
   Code2,
   Store,
+  Users,
 };
+
 
 export function AppSidebar({ className = "", onCloseMobile }) {
   const pathname = usePathname();

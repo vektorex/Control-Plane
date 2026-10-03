@@ -1325,3 +1325,265 @@ async def public_get_marketplace_package_usage(
         return await svc.get_package_usage(package_id)
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)
+
+
+# =============================================================================
+# Step 39: Collaboration Public API Endpoints
+# =============================================================================
+
+@public_v1_router.post("/collaboration/sessions", status_code=status.HTTP_201_CREATED)
+async def public_create_collaboration_session(
+    payload: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Creates a new collaboration session via Public API (requires collaboration:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:write")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.collaboration.schemas import CollaborationSessionResponse
+
+        workspace_id = payload.get("workspace_id")
+        if not workspace_id:
+            workspace_id = principal.workspace_id or ""
+
+        svc = CollaborationService(db)
+        session_obj = await svc.create_session(
+            organization_id=principal.organization_id,
+            workspace_id=workspace_id,
+            resource_type=payload["resource_type"],
+            resource_id=payload["resource_id"],
+            created_by=principal.application_id,
+            project_id=payload.get("project_id"),
+            expires_at=payload.get("expires_at"),
+        )
+        return CollaborationSessionResponse.model_validate(session_obj)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/collaboration/sessions")
+async def public_list_collaboration_sessions(
+    workspace_id: Optional[str] = Query(None),
+    resource_type: Optional[str] = Query(None),
+    resource_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists collaboration sessions scoped to tenant (requires collaboration:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:read")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.collaboration.schemas import CollaborationSessionResponse
+
+        svc = CollaborationService(db)
+        sessions = await svc.list_sessions(
+            organization_id=principal.organization_id,
+            workspace_id=workspace_id or principal.workspace_id,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+        return [CollaborationSessionResponse.model_validate(s) for s in sessions]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/collaboration/sessions/{id}")
+async def public_get_collaboration_session(
+    id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieves session details (requires collaboration:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:read")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.collaboration.schemas import CollaborationSessionResponse
+
+        svc = CollaborationService(db)
+        session_obj = await svc.get_session(id, user_organization_id=principal.organization_id)
+        return CollaborationSessionResponse.model_validate(session_obj)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/collaboration/sessions/{id}/comments", status_code=status.HTTP_201_CREATED)
+async def public_create_collaboration_comment(
+    id: str,
+    payload: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Adds a comment to a collaboration session (requires collaboration:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:write")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.collaboration.schemas import CollaborationCommentResponse
+
+        svc = CollaborationService(db)
+        sess = await svc.get_session(id, user_organization_id=principal.organization_id)
+        # Ensure application has a participant record or is owner
+        participant = await svc.repo.get_participant(id, principal.application_id)
+        if not participant:
+            await svc.sessions.join_session(id, principal.application_id, role="editor")
+
+        comment = await svc.add_comment(
+            session_id=id,
+            author_id=principal.application_id,
+            user_organization_id=principal.organization_id,
+            resource_type=payload.get("resource_type", sess.resource_type),
+            resource_id=payload.get("resource_id", sess.resource_id),
+            body=payload["body"],
+            parent_comment_id=payload.get("parent_comment_id"),
+            author_type="ai" if payload.get("is_ai") else "user",
+        )
+        return CollaborationCommentResponse.model_validate(comment)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/collaboration/sessions/{id}/comments")
+async def public_list_collaboration_comments(
+    id: str,
+    resource_type: Optional[str] = Query(None),
+    resource_id: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists comments in a collaboration session (requires collaboration:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:read")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.collaboration.schemas import CollaborationCommentResponse
+
+        svc = CollaborationService(db)
+        comments = await svc.list_comments(
+            session_id=id,
+            user_organization_id=principal.organization_id,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            limit=limit,
+            offset=offset,
+        )
+        return [CollaborationCommentResponse.model_validate(c) for c in comments]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/collaboration/sessions/{id}/events")
+async def public_stream_collaboration_events(
+    id: str,
+    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+    after: Optional[uuid.UUID] = Query(None),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Subscribes to live SSE events for a session (requires collaboration:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:read")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.events.stream import EventStreamService
+
+        svc = CollaborationService(db)
+        collab_session = await svc.get_session(id, user_organization_id=principal.organization_id)
+
+        effective_after = None
+        if last_event_id:
+            try:
+                effective_after = uuid.UUID(last_event_id)
+            except ValueError:
+                pass
+        elif after:
+            effective_after = after
+
+        user_uuid = uuid.UUID(principal.application_id) if len(principal.application_id) == 36 else uuid.uuid4()
+        generator = EventStreamService.stream_events(
+            workspace_id=uuid.UUID(collab_session.workspace_id),
+            user_id=user_uuid,
+            project_id=uuid.UUID(collab_session.project_id) if collab_session.project_id else None,
+            event_type_pattern="collaboration.*",
+            aggregate_type="collaboration",
+            aggregate_id=id,
+            last_event_id=effective_after,
+        )
+
+        return StreamingResponse(
+            generator,
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/collaboration/sessions/{id}/assignments", status_code=status.HTTP_201_CREATED)
+async def public_create_collaboration_assignment(
+    id: str,
+    payload: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Creates a task assignment in a session (requires collaboration:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:write")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.collaboration.schemas import CollaborationAssignmentResponse
+
+        svc = CollaborationService(db)
+        sess = await svc.get_session(id, user_organization_id=principal.organization_id)
+        assignment = await svc.create_assignment(
+            session_id=id,
+            assigned_by=principal.application_id,
+            assigned_to=payload["assigned_to"],
+            assignment_type=payload["assignment_type"],
+            user_organization_id=principal.organization_id,
+            resource_type=payload.get("resource_type", sess.resource_type),
+            resource_id=payload.get("resource_id", sess.resource_id),
+            due_at=payload.get("due_at"),
+        )
+        return CollaborationAssignmentResponse.model_validate(assignment)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/collaboration/sessions/{id}/assignments")
+async def public_list_collaboration_assignments(
+    id: str,
+    status: Optional[str] = Query(None),
+    assigned_to: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists assignments for a session (requires collaboration:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "collaboration:read")
+        from backend.app.services.collaboration.service import CollaborationService
+        from backend.app.services.collaboration.schemas import CollaborationAssignmentResponse
+
+        svc = CollaborationService(db)
+        assignments = await svc.list_assignments(
+            session_id=id,
+            user_organization_id=principal.organization_id,
+            status=status,
+            assigned_to=assigned_to,
+            limit=limit,
+            offset=offset,
+        )
+        return [CollaborationAssignmentResponse.model_validate(a) for a in assignments]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+

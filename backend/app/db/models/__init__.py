@@ -162,6 +162,24 @@ from backend.app.services.marketplace.models import (
     MarketplacePackageTag,
     MarketplaceApproval,
 )
+from backend.app.services.collaboration.models import (
+    CollaborationSession,
+    CollaborationParticipant,
+    PresenceState,
+    CollaborationActivity,
+    CollaborationComment,
+    CommentMention,
+    CollaborationAssignment,
+    CollaborationAnnotation,
+    CollaborationDecision,
+    CoExecutionSession,
+    CollaborationLock,
+    CollaborationChange,
+    CollaborationConflict,
+    CollaborativeState,
+    CollaborationSnapshot,
+)
+
 
 __all__ = [
     "Base",
@@ -301,6 +319,21 @@ __all__ = [
     "MarketplaceTag",
     "MarketplacePackageTag",
     "MarketplaceApproval",
+    "CollaborationSession",
+    "CollaborationParticipant",
+    "PresenceState",
+    "CollaborationActivity",
+    "CollaborationComment",
+    "CommentMention",
+    "CollaborationAssignment",
+    "CollaborationAnnotation",
+    "CollaborationDecision",
+    "CoExecutionSession",
+    "CollaborationLock",
+    "CollaborationChange",
+    "CollaborationConflict",
+    "CollaborativeState",
+    "CollaborationSnapshot",
 ]
 
 

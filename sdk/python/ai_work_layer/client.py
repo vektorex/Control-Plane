@@ -273,6 +273,159 @@ class MarketplaceResource:
         return self._client._request("GET", f"/marketplace/packages/{package_id}/usage")
 
 
+class CollaborationCommentsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def list(
+        self,
+        session_id: str,
+        resource_type: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        params = {"resource_type": resource_type, "resource_id": resource_id, "limit": limit, "offset": offset}
+        params = {k: v for k, v in params.items() if v is not None}
+        return self._client._request("GET", f"/collaboration/sessions/{session_id}/comments", params=params)
+
+    def create(
+        self,
+        session_id: str,
+        body: str,
+        resource_type: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        parent_comment_id: Optional[str] = None,
+        is_ai: bool = False,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {
+            "body": body,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "parent_comment_id": parent_comment_id,
+            "is_ai": is_ai,
+        }
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return self._client._request(
+            "POST",
+            f"/collaboration/sessions/{session_id}/comments",
+            json=payload,
+            idempotency_key=idempotency_key,
+        )
+
+
+class CollaborationAssignmentsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def list(
+        self,
+        session_id: str,
+        status: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        params = {"status": status, "assigned_to": assigned_to, "limit": limit, "offset": offset}
+        params = {k: v for k, v in params.items() if v is not None}
+        return self._client._request("GET", f"/collaboration/sessions/{session_id}/assignments", params=params)
+
+    def create(
+        self,
+        session_id: str,
+        assigned_to: str,
+        assignment_type: str,
+        resource_type: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        due_at: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {
+            "assigned_to": assigned_to,
+            "assignment_type": assignment_type,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "due_at": due_at,
+        }
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return self._client._request(
+            "POST",
+            f"/collaboration/sessions/{session_id}/assignments",
+            json=payload,
+            idempotency_key=idempotency_key,
+        )
+
+
+class CollaborationSessionsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+        self.comments = CollaborationCommentsResource(client)
+        self.assignments = CollaborationAssignmentsResource(client)
+
+    def create(
+        self,
+        resource_type: str,
+        resource_id: str,
+        workspace_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        expires_at: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+            "expires_at": expires_at,
+        }
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return self._client._request(
+            "POST",
+            "/collaboration/sessions",
+            json=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def list(
+        self,
+        workspace_id: Optional[str] = None,
+        resource_type: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        params = {
+            "workspace_id": workspace_id,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "status": status,
+            "limit": limit,
+            "offset": offset,
+        }
+        params = {k: v for k, v in params.items() if v is not None}
+        return self._client._request("GET", "/collaboration/sessions", params=params)
+
+    def get(self, session_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/collaboration/sessions/{session_id}")
+
+    def events(self, session_id: str) -> Iterator[str]:
+        """Streams Server-Sent Events line by line."""
+        url = f"{self._client.base_url}/collaboration/sessions/{session_id}/events"
+        headers = {"Authorization": f"Bearer {self._client.api_key}", "Accept": "text/event-stream"}
+        with httpx.stream("GET", url, headers=headers, timeout=60.0) as response:
+            for line in response.iter_lines():
+                if line:
+                    yield line
+
+
+class CollaborationResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+        self.sessions = CollaborationSessionsResource(client)
+
+
 class Client:
     """Official AI Work Layer SDK client for Python applications."""
 
@@ -302,6 +455,8 @@ class Client:
         self.usage = UsageResource(self)
         self.webhooks = WebhooksResource(self)
         self.marketplace = MarketplaceResource(self)
+        self.collaboration = CollaborationResource(self)
+
 
     def _request(
         self,

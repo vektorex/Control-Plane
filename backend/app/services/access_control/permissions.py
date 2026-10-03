@@ -176,8 +176,29 @@ MARKETPLACE_PUBLISH = "marketplace.publish"
 MARKETPLACE_MANAGE = "marketplace.manage"
 MARKETPLACE_ADMIN = "marketplace.admin"
 
+# Collaboration permissions (Step 39)
+COLLABORATION_SESSION_READ = "collaboration.session_read"
+COLLABORATION_SESSION_JOIN = "collaboration.session_join"
+COLLABORATION_COMMENT = "collaboration.comment"
+COLLABORATION_ANNOTATE = "collaboration.annotate"
+COLLABORATION_ASSIGN = "collaboration.assign"
+COLLABORATION_EDIT = "collaboration.edit"
+COLLABORATION_APPROVE = "collaboration.approve"
+COLLABORATION_EXECUTE = "collaboration.execute"
+COLLABORATION_ADMIN = "collaboration.admin"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    COLLABORATION_SESSION_READ,
+    COLLABORATION_SESSION_JOIN,
+    COLLABORATION_COMMENT,
+    COLLABORATION_ANNOTATE,
+    COLLABORATION_ASSIGN,
+    COLLABORATION_EDIT,
+    COLLABORATION_APPROVE,
+    COLLABORATION_EXECUTE,
+    COLLABORATION_ADMIN,
+
     MARKETPLACE_READ,
     MARKETPLACE_INSTALL,
     MARKETPLACE_PUBLISH,

@@ -145,11 +145,18 @@ export const siteConfig = {
       description: "Discover, publish, install, and govern reusable AI workflow packages, templates, and work packs",
     },
     {
+      label: "Collaboration",
+      href: "/app/collaboration",
+      icon: "Users",
+      description: "Shared AI workspaces, live presence, co-execution, threaded comments, and decisions",
+    },
+    {
       label: "Developer Platform",
       href: "/app/developer",
       icon: "Code2",
       description: "Public API, developer applications, scoped API keys, webhooks, rate quotas, and SDKs",
     },
+
     {
       label: "Analytics",
       href: "/app/analytics",

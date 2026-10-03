@@ -119,7 +119,17 @@ class TaskExecutionService:
             raise InvalidStateError("Task has no instructions, description, or title to execute.")
 
         # Resolve workspace context
-        workspace_id = task.project.workspace_id if (task.project and task.project.workspace_id) else None
+        workspace_id = None
+        if task.project_id:
+            try:
+                from backend.app.db.models.project import Project
+                from sqlalchemy import select
+                proj_res = await self.session.execute(
+                    select(Project.workspace_id).where(Project.id == task.project_id)
+                )
+                workspace_id = proj_res.scalar_one_or_none()
+            except Exception:
+                pass
 
         # Step 20: AI Task Intelligence - Resolve Execution Requirements
         prompt_str = prompt_check

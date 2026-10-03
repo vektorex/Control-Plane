@@ -865,9 +865,71 @@ class WorkflowExecutor:
 
         # 6. GENERATE STEP
         elif stype == StepType.GENERATE:
+            prompt_telemetry_meta: Dict[str, Any] = {}
+            prompt_text = None
 
-            prompt_template = cfg.get("prompt_template") or cfg.get("instructions") or "Generate a response."
-            prompt = state.resolve_value(prompt_template)
+            # Step 28: Managed Prompt Resolution (PINNED vs TRACK_RELEASE)
+            p_id = cfg.get("prompt_id")
+            p_key = cfg.get("prompt_key")
+            p_ver_id = cfg.get("prompt_version_id")
+            p_env = cfg.get("prompt_environment", "production")
+
+            if p_id or p_key or p_ver_id:
+                try:
+                    from backend.app.services.prompts.resolver import PromptResolver
+                    from backend.app.services.prompts.renderer import PromptRenderer
+                    resolver = PromptResolver(self.session)
+                    resolved = await resolver.resolve(
+                        workspace_id=workspace_id,
+                        prompt_id=UUID(str(p_id)) if p_id else None,
+                        prompt_key=p_key,
+                        version_id=UUID(str(p_ver_id)) if p_ver_id else None,
+                        environment=p_env,
+                        project_id=project_id,
+                        allocation_key_value=str(user.id),
+                        allow_fallback=True,
+                        fallback_content=cfg.get("prompt_template") or cfg.get("instructions"),
+                    )
+
+                    # Gather safe template variables from state
+                    template_vars = {
+                        "input": state.input,
+                        "task": {"title": cfg.get("task_title", "Workflow Step")},
+                        "workflow": {"input": state.input, "outputs": state.step_outputs},
+                        "context": {"items": [str(c) for c in state.context_items]},
+                    }
+                    if isinstance(cfg.get("variables"), dict):
+                        template_vars.update(state.resolve_value(cfg.get("variables")))
+
+                    rendered = PromptRenderer.render(
+                        content=resolved.content,
+                        variables=template_vars,
+                        schema=resolved.variable_schema,
+                        prompt_id=resolved.prompt_id,
+                        version_id=resolved.version_id,
+                    )
+                    prompt_text = rendered.rendered_content
+                    prompt_telemetry_meta = {
+                        "prompt_id": str(resolved.prompt_id) if resolved.prompt_id else None,
+                        "prompt_key": resolved.prompt_key,
+                        "prompt_version_id": str(resolved.version_id),
+                        "prompt_version_number": resolved.version_number,
+                        "prompt_environment": resolved.environment,
+                        "prompt_content_hash": resolved.content_hash,
+                        "resolution_mode": resolved.resolution_mode,
+                    }
+                    if resolved.model_requirements and not cfg.get("model"):
+                        cfg["model"] = resolved.model_requirements.get("model")
+                        cfg["provider"] = resolved.model_requirements.get("provider")
+                    if resolved.execution_config and "temperature" not in cfg:
+                        cfg["temperature"] = resolved.execution_config.get("temperature", 0.2)
+                except Exception as p_err:
+                    logger.warning(f"[WorkflowExecutor] Managed prompt resolution fallback: {p_err}")
+
+            if not prompt_text:
+                prompt_template = cfg.get("prompt_template") or cfg.get("instructions") or "Generate a response."
+                prompt_text = state.resolve_value(prompt_template)
+
             model_id = cfg.get("model") or getattr(settings, "GENERATION_DEFAULT_MODEL", "gpt-4o-mini")
             provider_id = cfg.get("provider") or getattr(settings, "GENERATION_MODEL_PROVIDER", "openai")
             temp = float(cfg.get("temperature", 0.2))
@@ -875,13 +937,16 @@ class WorkflowExecutor:
             # Route through unified AIGateway (Step 19)
             from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 
+            gw_meta = {"step_id": step.id, "step_name": step.name}
+            gw_meta.update(prompt_telemetry_meta)
+
             gw_req = GatewayRequest(
                 model=model_id,
                 provider=provider_id,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": prompt_text}],
                 temperature=temp,
                 workspace_id=str(workspace_id) if workspace_id else None,
-                metadata={"step_id": step.id, "step_name": step.name},
+                metadata=gw_meta,
             )
 
             try:
@@ -894,8 +959,8 @@ class WorkflowExecutor:
                 step_cost = gen_res.usage.estimated_cost or 0.0
             except Exception as gen_err:
                 logger.warning(f"[WorkflowExecutor] AI Gateway generation failed ({gen_err}), returning fallback text.")
-                text_out = f"Synthesized response for: {prompt[:100]}"
-                tok_in = len(prompt) // 4
+                text_out = f"Synthesized response for: {prompt_text[:100]}"
+                tok_in = len(prompt_text) // 4
                 tok_out = len(text_out) // 4
                 step_cost = 0.0
 
@@ -912,12 +977,38 @@ class WorkflowExecutor:
                 "provider": provider_id,
                 "tokens": tok_in + tok_out,
             }
+            output_data.update(prompt_telemetry_meta)
             state.generated_outputs[step.id] = output_data
             metadata = {"model": model_id, "tokens": tok_in + tok_out}
+            metadata.update(prompt_telemetry_meta)
 
-        # 6. EVALUATE STEP
+        # 7. EVALUATE STEP
         elif stype == StepType.EVALUATE:
             eval_mode = cfg.get("mode") or cfg.get("evaluation_mode") or "standard"
+            prompt_eval_meta: Dict[str, Any] = {}
+            p_id = cfg.get("prompt_id")
+            p_key = cfg.get("prompt_key") or "evaluation.grounding"
+            if p_id or p_key:
+                try:
+                    from backend.app.services.prompts.resolver import PromptResolver
+                    resolver = PromptResolver(self.session)
+                    resolved = await resolver.resolve(
+                        workspace_id=workspace_id,
+                        prompt_id=UUID(str(p_id)) if p_id else None,
+                        prompt_key=p_key,
+                        environment=cfg.get("prompt_environment", "production"),
+                        allow_fallback=True,
+                        fallback_content="Evaluate grounding and completeness.",
+                    )
+                    prompt_eval_meta = {
+                        "prompt_id": str(resolved.prompt_id) if resolved.prompt_id else None,
+                        "prompt_key": resolved.prompt_key,
+                        "prompt_version_id": str(resolved.version_id),
+                        "prompt_version_number": resolved.version_number,
+                    }
+                except Exception:
+                    pass
+
             output_data = {
                 "status": "passed",
                 "mode": eval_mode,
@@ -929,8 +1020,11 @@ class WorkflowExecutor:
                 ],
                 "issues": [],
             }
+            output_data.update(prompt_eval_meta)
             state.evaluations[step.id] = output_data
             metadata = {"evaluation_status": "passed", "mode": eval_mode}
+            metadata.update(prompt_eval_meta)
+
 
         # 7. TRANSFORM STEP
         elif stype == StepType.TRANSFORM:

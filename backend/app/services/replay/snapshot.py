@@ -137,6 +137,18 @@ class ReplaySnapshotService:
             "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         }
 
+        # Safe Prompt configuration (Step 28)
+        prompt_config = input_snap.get("prompt_configuration")
+        if not prompt_config and (input_snap.get("prompt_id") or input_snap.get("prompt_key")):
+            prompt_config = {
+                "prompt_id": input_snap.get("prompt_id"),
+                "prompt_key": input_snap.get("prompt_key"),
+                "prompt_version_id": input_snap.get("prompt_version_id"),
+                "prompt_version_number": input_snap.get("prompt_version_number"),
+                "prompt_environment": input_snap.get("prompt_environment"),
+                "prompt_content_hash": input_snap.get("prompt_content_hash"),
+            }
+
         # Raw snapshot dictionary
         raw_snapshot = {
             "snapshot_version": "1.0",
@@ -159,6 +171,7 @@ class ReplaySnapshotService:
             "evaluation_configuration": evaluation_config,
             "workflow_version": None,
             "relevant_context_metadata": context_metadata,
+            "prompt_configuration": prompt_config,
             "trace_metadata": trace_meta,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -204,6 +217,11 @@ class ReplaySnapshotService:
             "relevant_context_metadata": {
                 "execution_state": workflow_run.execution_state,
             },
+            "prompt_configuration": (
+                workflow_run.input_data.get("prompt_configuration")
+                if isinstance(workflow_run.input_data, dict) and workflow_run.input_data.get("prompt_configuration")
+                else None
+            ),
             "trace_metadata": {
                 "duration_ms": workflow_run.duration_ms,
                 "started_at": workflow_run.started_at.isoformat() if workflow_run.started_at else None,

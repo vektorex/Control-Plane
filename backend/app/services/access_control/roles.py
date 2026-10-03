@@ -65,6 +65,15 @@ from backend.app.services.access_control.permissions import (
     ANALYTICS_READ,
     EVENT_READ,
     AUDIT_READ,
+    PROMPT_READ,
+    PROMPT_CREATE,
+    PROMPT_UPDATE,
+    PROMPT_PUBLISH,
+    PROMPT_RELEASE,
+    PROMPT_ROLLBACK,
+    PROMPT_EXECUTE,
+    PROMPT_EXPERIMENT,
+    PROMPT_ARCHIVE,
 )
 
 # 1. Organization Role Permissions
@@ -129,6 +138,15 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ANALYTICS_READ,
         EVENT_READ,
         AUDIT_READ,
+        PROMPT_READ,
+        PROMPT_CREATE,
+        PROMPT_UPDATE,
+        PROMPT_PUBLISH,
+        PROMPT_RELEASE,
+        PROMPT_ROLLBACK,
+        PROMPT_EXECUTE,
+        PROMPT_EXPERIMENT,
+        PROMPT_ARCHIVE,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -176,6 +194,15 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         APPROVAL_RESPOND,
         ANALYTICS_READ,
         EVENT_READ,
+        PROMPT_READ,
+        PROMPT_CREATE,
+        PROMPT_UPDATE,
+        PROMPT_PUBLISH,
+        PROMPT_RELEASE,
+        PROMPT_ROLLBACK,
+        PROMPT_EXECUTE,
+        PROMPT_EXPERIMENT,
+        PROMPT_ARCHIVE,
     },
 
     # VIEWER: read-only access to granted resources.
@@ -198,6 +225,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         APPROVAL_READ,
         ANALYTICS_READ,
         EVENT_READ,
+        PROMPT_READ,
     },
 }
 
@@ -251,6 +279,15 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ANALYTICS_READ,
         EVENT_READ,
         AUDIT_READ,
+        PROMPT_READ,
+        PROMPT_CREATE,
+        PROMPT_UPDATE,
+        PROMPT_PUBLISH,
+        PROMPT_RELEASE,
+        PROMPT_ROLLBACK,
+        PROMPT_EXECUTE,
+        PROMPT_EXPERIMENT,
+        PROMPT_ARCHIVE,
     },
     WorkspaceRole.MEMBER.value: {
         WORKSPACE_READ,
@@ -294,6 +331,15 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         APPROVAL_RESPOND,
         ANALYTICS_READ,
         EVENT_READ,
+        PROMPT_READ,
+        PROMPT_CREATE,
+        PROMPT_UPDATE,
+        PROMPT_PUBLISH,
+        PROMPT_RELEASE,
+        PROMPT_ROLLBACK,
+        PROMPT_EXECUTE,
+        PROMPT_EXPERIMENT,
+        PROMPT_ARCHIVE,
     },
     WorkspaceRole.VIEWER.value: {
         WORKSPACE_READ,
@@ -311,6 +357,7 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         APPROVAL_READ,
         ANALYTICS_READ,
         EVENT_READ,
+        PROMPT_READ,
     },
 }
 
@@ -354,6 +401,15 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         APPROVAL_RESPOND,
         ANALYTICS_READ,
         EVENT_READ,
+        PROMPT_READ,
+        PROMPT_CREATE,
+        PROMPT_UPDATE,
+        PROMPT_PUBLISH,
+        PROMPT_RELEASE,
+        PROMPT_ROLLBACK,
+        PROMPT_EXECUTE,
+        PROMPT_EXPERIMENT,
+        PROMPT_ARCHIVE,
     },
     ProjectRole.VIEWER.value: {
         PROJECT_READ,
@@ -369,5 +425,6 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         APPROVAL_READ,
         ANALYTICS_READ,
         EVENT_READ,
+        PROMPT_READ,
     },
 }

@@ -23,6 +23,8 @@ class AggregateType(str, Enum):
     APPROVAL = "approval"
     NOTIFICATION = "notification"
     SYSTEM = "system"
+    PROMPT = "prompt"
+    PROMPT_EXPERIMENT = "prompt_experiment"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -131,6 +133,17 @@ class SystemEventType(str, Enum):
     PROJECT_ACCESS_CHANGED = "project.access_changed"
     OWNERSHIP_TRANSFERRED = "ownership.transferred"
 
+    # Step 28 Prompt Management & Experimentation events
+    PROMPT_CREATED = "prompt.created"
+    PROMPT_VERSION_CREATED = "prompt.version_created"
+    PROMPT_VERSION_PUBLISHED = "prompt.version_published"
+    PROMPT_RELEASE_CHANGED = "prompt.release_changed"
+    PROMPT_ROLLED_BACK = "prompt.rolled_back"
+    PROMPT_ARCHIVED = "prompt.archived"
+    PROMPT_EXPERIMENT_STARTED = "prompt.experiment_started"
+    PROMPT_EXPERIMENT_PAUSED = "prompt.experiment_paused"
+    PROMPT_EXPERIMENT_COMPLETED = "prompt.experiment_completed"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
@@ -163,6 +176,14 @@ AUDITABLE_EVENTS = {
     SystemEventType.PROJECT_MEMBER_REMOVED.value,
     SystemEventType.PROJECT_ACCESS_CHANGED.value,
     SystemEventType.OWNERSHIP_TRANSFERRED.value,
+    SystemEventType.PROMPT_CREATED.value,
+    SystemEventType.PROMPT_VERSION_CREATED.value,
+    SystemEventType.PROMPT_VERSION_PUBLISHED.value,
+    SystemEventType.PROMPT_RELEASE_CHANGED.value,
+    SystemEventType.PROMPT_ROLLED_BACK.value,
+    SystemEventType.PROMPT_ARCHIVED.value,
+    SystemEventType.PROMPT_EXPERIMENT_STARTED.value,
+    SystemEventType.PROMPT_EXPERIMENT_COMPLETED.value,
 }
 
 # Sensitive keys scrubbed from all payloads

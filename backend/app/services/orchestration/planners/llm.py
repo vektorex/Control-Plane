@@ -158,8 +158,33 @@ Your goal is to propose an optimal, minimal, safe sequential execution plan to f
             "iteration": context.iteration,
         }
 
+        system_content = self.SYSTEM_PLANNING_PROMPT
+        prompt_telemetry: Dict[str, Any] = {}
+        try:
+            from backend.app.services.prompts.resolver import PromptResolver
+            if hasattr(self, "session") and self.session:
+                ws_id = getattr(task, "workspace_id", None) or uuid.uuid4()
+                resolver = PromptResolver(self.session)
+                resolved = await resolver.resolve(
+                    workspace_id=ws_id,
+                    prompt_key="planner.execution_plan",
+                    environment="production",
+                    allow_fallback=True,
+                    fallback_content=self.SYSTEM_PLANNING_PROMPT,
+                )
+                system_content = resolved.content
+                prompt_telemetry = {
+                    "prompt_id": str(resolved.prompt_id) if resolved.prompt_id else None,
+                    "prompt_key": "planner.execution_plan",
+                    "prompt_version_id": str(resolved.version_id),
+                    "prompt_version_number": resolved.version_number,
+                    "prompt_content_hash": resolved.content_hash,
+                }
+        except Exception as p_err:
+            logger.debug(f"[LLMPlanningProvider] Managed prompt fallback: {p_err}")
+
         messages = [
-            ChatMessage(role="system", content=self.SYSTEM_PLANNING_PROMPT),
+            ChatMessage(role="system", content=system_content),
             ChatMessage(
                 role="user",
                 content=f"Plan this task using only available capabilities:\n{json.dumps(user_prompt_data, indent=2)}",
@@ -196,13 +221,16 @@ Your goal is to propose an optimal, minimal, safe sequential execution plan to f
         # Route planning through unified AIGateway (Step 19)
         from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 
+        gw_meta = {"task_id": str(task.id), "stage": "planning"}
+        gw_meta.update(prompt_telemetry)
+
         gw_req = GatewayRequest(
             model=self.planner_model,
-            provider=self.planner_provider,
             messages=[{"role": m.role, "content": m.content} for m in messages],
             temperature=0.0,
             max_tokens=1000,
-            metadata={"purpose": "planning"},
+            workspace_id=str(task.workspace_id) if hasattr(task, "workspace_id") and task.workspace_id else None,
+            metadata=gw_meta,
         )
 
         resp = await default_ai_gateway.execute(gw_req)

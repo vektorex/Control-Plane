@@ -23,6 +23,7 @@ import {
   Layers,
   Bell,
   Building2,
+  FileCode2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -35,6 +36,7 @@ const iconMap = {
   LayoutDashboard,
   ListTodo,
   Workflow,
+  FileCode2,
   Layers,
   RotateCcw,
   FlaskConical,

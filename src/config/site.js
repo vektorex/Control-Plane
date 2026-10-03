@@ -31,6 +31,12 @@ export const siteConfig = {
       description: "Build, validate, publish, and execute multi-step AI orchestration pipelines",
     },
     {
+      label: "Prompts",
+      href: "/app/prompts",
+      icon: "FileCode2",
+      description: "Prompt registry, versioning, safe rendering, environments, releases, and A/B experiments",
+    },
+    {
       label: "Jobs",
       href: "/app/jobs",
       icon: "Layers",

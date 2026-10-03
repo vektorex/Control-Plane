@@ -186,6 +186,52 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* STEP 28: Governed Prompt Assets Widget */}
+      <Card className="border-indigo-900/30 bg-slate-900/40">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <CardTitle className="text-sm">Governed Prompt Assets & Releases</CardTitle>
+                <CardDescription className="text-xs">
+                  Centralized prompt registry, immutable versioning, staging/production releases, and safe templates
+                </CardDescription>
+              </div>
+            </div>
+            <Link
+              href="/app/prompts"
+              className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+            >
+              <span>Open Prompt Registry</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+              <span className="text-[11px] text-slate-400 block mb-1">Standard Prompts</span>
+              <span className="text-sm font-bold font-mono text-slate-200">planner, eval, task</span>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+              <span className="text-[11px] text-slate-400 block mb-1">Release Environments</span>
+              <span className="text-sm font-bold text-emerald-400">Dev · Staging · Prod</span>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+              <span className="text-[11px] text-slate-400 block mb-1">Template Safety</span>
+              <span className="text-sm font-bold text-indigo-400">Single-pass · No Eval</span>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+              <span className="text-[11px] text-slate-400 block mb-1">Experimentation</span>
+              <span className="text-sm font-bold text-amber-400">Deterministic A/B</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Modals */}
       <CreateTaskModal
         isOpen={isTaskModalOpen}

@@ -105,13 +105,13 @@ class ReplayRunner:
                 await session.refresh(replay_run)
                 return replay_run
 
-            # 2. Execution Modes: dry_run, replay, compare
             orig_run: Run = replay_run.original_run
             snapshot = replay_run.snapshot or {}
             task_cfg = snapshot.get("task_configuration", {})
             model_cfg = snapshot.get("model_configuration", {})
             retrieval_cfg = snapshot.get("retrieval_configuration", {})
             eval_cfg = snapshot.get("evaluation_configuration", {})
+            prompt_cfg = snapshot.get("prompt_configuration") or {}
 
             # Apply safe user overrides
             safe_overrides = overrides or {}
@@ -120,6 +120,29 @@ class ReplayRunner:
             eval_mode = safe_overrides.get("evaluation_mode") or eval_cfg.get("evaluation_mode") or "standard"
             retrieval_strategy = safe_overrides.get("retrieval_strategy") or retrieval_cfg.get("retrieval_strategy")
             planner_mode = safe_overrides.get("planner_mode") or "hybrid"
+
+            # Replay Prompt Resolution (Step 28):
+            # Preserves original snapshot version unless explicitly replaced. Never silently substitute production version.
+            prompt_version_override = safe_overrides.get("prompt_version_id")
+            if prompt_version_override:
+                resolved_prompt_meta = {
+                    "prompt_id": safe_overrides.get("prompt_id") or prompt_cfg.get("prompt_id"),
+                    "prompt_version_id": str(prompt_version_override),
+                    "is_replacement_version": True,
+                    "original_version_id": prompt_cfg.get("prompt_version_id"),
+                }
+            elif prompt_cfg.get("prompt_version_id"):
+                resolved_prompt_meta = {
+                    "prompt_id": prompt_cfg.get("prompt_id"),
+                    "prompt_key": prompt_cfg.get("prompt_key"),
+                    "prompt_version_id": prompt_cfg.get("prompt_version_id"),
+                    "prompt_version_number": prompt_cfg.get("prompt_version_number"),
+                    "prompt_content_hash": prompt_cfg.get("prompt_content_hash"),
+                    "prompt_environment": prompt_cfg.get("release_environment") or prompt_cfg.get("prompt_environment"),
+                    "is_replacement_version": False,
+                }
+            else:
+                resolved_prompt_meta = None
 
             # Load Task
             task_obj = orig_run.task
@@ -183,6 +206,7 @@ class ReplayRunner:
                 "tools_used": [s.tool_name for s in exec_state.step_records if s.tool_name],
                 "side_effects_blocked_count": blocked_side_effects_count,
                 "overrides": safe_overrides,
+                "prompt_configuration": resolved_prompt_meta,
                 "duration_ms": int((datetime.now(timezone.utc) - (replay_run.started_at.replace(tzinfo=timezone.utc) if replay_run.started_at and replay_run.started_at.tzinfo is None else (replay_run.started_at or datetime.now(timezone.utc)))).total_seconds() * 1000),
             })
 

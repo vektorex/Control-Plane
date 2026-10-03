@@ -34,6 +34,7 @@ class JobType(str, Enum):
     REPLAY_RUN = "replay_run"
     CONNECTOR_OPERATION = "connector_operation"
     NOTIFICATION_DELIVERY = "notification_delivery"
+    PROMPT_EXPERIMENT = "prompt_experiment"
 
 
 class JobEventType(str, Enum):

@@ -156,8 +156,21 @@ Your job is to determine whether the accumulated context and intermediate eviden
             f"Evaluate if more information is needed or if ready to generate response."
         )
 
+        system_content = self.EVALUATOR_PROMPT
+        try:
+            from backend.app.services.prompts.resolver import default_prompt_resolver
+            from backend.app.services.prompts.constants import PromptEnvironment
+            res_result = await default_prompt_resolver.resolve_by_key(
+                prompt_key="evaluation.completeness",
+                environment=PromptEnvironment.PRODUCTION.value,
+            )
+            if res_result and res_result.version and res_result.version.content:
+                system_content = res_result.version.content
+        except Exception:
+            pass
+
         messages = [
-            ChatMessage(role="system", content=self.EVALUATOR_PROMPT),
+            ChatMessage(role="system", content=system_content),
             ChatMessage(role="user", content=user_content),
         ]
 

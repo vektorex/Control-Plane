@@ -61,6 +61,14 @@ from backend.app.services.access_control.models import (
     WorkspaceMember,
     ProjectMember,
 )
+from backend.app.services.prompts.models import (
+    Prompt,
+    PromptVersion,
+    PromptRelease,
+    PromptExperiment,
+    PromptExperimentVariant,
+    PromptExperimentAssignment,
+)
 
 __all__ = [
     "Base",
@@ -119,7 +127,14 @@ __all__ = [
     "JobEvent",
     "Event",
     "EventDelivery",
+    "Prompt",
+    "PromptVersion",
+    "PromptRelease",
+    "PromptExperiment",
+    "PromptExperimentVariant",
+    "PromptExperimentAssignment",
 ]
+
 
 
 

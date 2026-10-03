@@ -64,6 +64,15 @@ from backend.app.services.access_control.permissions import (
     ANALYTICS_READ,
     EVENT_READ,
     AUDIT_READ,
+    PROMPT_READ,
+    PROMPT_CREATE,
+    PROMPT_UPDATE,
+    PROMPT_PUBLISH,
+    PROMPT_RELEASE,
+    PROMPT_ROLLBACK,
+    PROMPT_EXECUTE,
+    PROMPT_EXPERIMENT,
+    PROMPT_ARCHIVE,
 )
 
 # Workspace-scoped permissions (subject to workspace role restrictions)
@@ -115,6 +124,15 @@ WORKSPACE_SCOPED_PERMISSIONS: Set[str] = {
     ANALYTICS_READ,
     EVENT_READ,
     AUDIT_READ,
+    PROMPT_READ,
+    PROMPT_CREATE,
+    PROMPT_UPDATE,
+    PROMPT_PUBLISH,
+    PROMPT_RELEASE,
+    PROMPT_ROLLBACK,
+    PROMPT_EXECUTE,
+    PROMPT_EXPERIMENT,
+    PROMPT_ARCHIVE,
 }
 
 # Project-scoped permissions (subject to project restrictions if restricted)
@@ -154,6 +172,15 @@ PROJECT_SCOPED_PERMISSIONS: Set[str] = {
     REPLAY_CREATE,
     APPROVAL_READ,
     APPROVAL_RESPOND,
+    PROMPT_READ,
+    PROMPT_CREATE,
+    PROMPT_UPDATE,
+    PROMPT_PUBLISH,
+    PROMPT_RELEASE,
+    PROMPT_ROLLBACK,
+    PROMPT_EXECUTE,
+    PROMPT_EXPERIMENT,
+    PROMPT_ARCHIVE,
 }
 
 
@@ -233,7 +260,7 @@ class PolicyEngine:
 
         # 2. Viewers can NEVER execute, run, or write, regardless of ownership
         if organization_role == OrganizationRole.VIEWER.value:
-            if any(action in permission for action in ["run", "create", "update", "delete", "execute", "cancel", "retry", "publish", "configure"]):
+            if any(action in permission for action in ["run", "create", "update", "delete", "execute", "cancel", "retry", "publish", "configure", "release", "rollback", "experiment", "archive"]):
                 return False
 
         # 3. Resource ownership rules (where applicable)
@@ -244,7 +271,7 @@ class PolicyEngine:
             is_admin = organization_role in {OrganizationRole.OWNER.value, OrganizationRole.ADMIN.value}
             if owner_id and owner_id != user_id and not is_admin:
                 # Disallow modifying another user's private resources unless member has admin permission
-                if permission in {TASK_DELETE, WORKFLOW_DELETE, TRIGGER_DELETE}:
+                if permission in {TASK_DELETE, WORKFLOW_DELETE, TRIGGER_DELETE, PROMPT_ARCHIVE}:
                     return False
 
         return True

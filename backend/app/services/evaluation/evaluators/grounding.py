@@ -149,9 +149,23 @@ Your task is to analyze whether the factual claims in the provided response are 
             f"Evaluate the grounding of the candidate answer against the evidence."
         )
 
+        # Resolve managed evaluator prompt if available
+        system_prompt = self.GROUNDING_SYSTEM_PROMPT
+        try:
+            from backend.app.services.prompts.resolver import default_prompt_resolver
+            from backend.app.services.prompts.constants import PromptEnvironment
+            res_result = await default_prompt_resolver.resolve_by_key(
+                prompt_key="evaluation.grounding",
+                environment=PromptEnvironment.PRODUCTION.value,
+            )
+            if res_result and res_result.version and res_result.version.content:
+                system_prompt = res_result.version.content
+        except Exception:
+            pass
+
         try:
             llm_result: GroundingLLMOutput = await self._call_structured_llm(
-                system_prompt=self.GROUNDING_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 response_model=GroundingLLMOutput,
                 temperature=0.0,

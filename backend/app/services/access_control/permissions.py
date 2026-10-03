@@ -94,6 +94,17 @@ EVENT_READ = "event.read"
 # Audit permissions
 AUDIT_READ = "audit.read"
 
+# Prompt permissions (Step 28)
+PROMPT_READ = "prompt.read"
+PROMPT_CREATE = "prompt.create"
+PROMPT_UPDATE = "prompt.update"
+PROMPT_PUBLISH = "prompt.publish"
+PROMPT_RELEASE = "prompt.release"
+PROMPT_ROLLBACK = "prompt.rollback"
+PROMPT_EXECUTE = "prompt.execute"
+PROMPT_EXPERIMENT = "prompt.experiment"
+PROMPT_ARCHIVE = "prompt.archive"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
     ORGANIZATION_READ,
@@ -151,4 +162,14 @@ ALL_PERMISSIONS = {
     ANALYTICS_READ,
     EVENT_READ,
     AUDIT_READ,
+    PROMPT_READ,
+    PROMPT_CREATE,
+    PROMPT_UPDATE,
+    PROMPT_PUBLISH,
+    PROMPT_RELEASE,
+    PROMPT_ROLLBACK,
+    PROMPT_EXECUTE,
+    PROMPT_EXPERIMENT,
+    PROMPT_ARCHIVE,
 }
+

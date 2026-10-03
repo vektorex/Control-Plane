@@ -106,9 +106,23 @@ Your task is to determine whether the candidate response has fulfilled the expli
             f"Evaluate whether the candidate answer covers all explicit task directives."
         )
 
+        # Resolve managed evaluator prompt if available
+        system_prompt = self.COMPLETENESS_SYSTEM_PROMPT
+        try:
+            from backend.app.services.prompts.resolver import default_prompt_resolver
+            from backend.app.services.prompts.constants import PromptEnvironment
+            res_result = await default_prompt_resolver.resolve_by_key(
+                prompt_key="evaluation.completeness",
+                environment=PromptEnvironment.PRODUCTION.value,
+            )
+            if res_result and res_result.version and res_result.version.content:
+                system_prompt = res_result.version.content
+        except Exception:
+            pass
+
         try:
             llm_result: CompletenessLLMOutput = await self._call_structured_llm(
-                system_prompt=self.COMPLETENESS_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 response_model=CompletenessLLMOutput,
                 temperature=0.0,

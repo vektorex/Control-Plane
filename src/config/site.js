@@ -67,6 +67,12 @@ export const siteConfig = {
       description: "Persistent knowledge, user preferences, suggestions, and conflicts",
     },
     {
+      label: "Organizations",
+      href: "/app/organizations",
+      icon: "Building2",
+      description: "Manage multi-tenant organizations, teams, and access control",
+    },
+    {
       label: "Projects",
       href: "/app/projects",
       icon: "FolderKanban",

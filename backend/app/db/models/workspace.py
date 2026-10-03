@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,11 +12,13 @@ if TYPE_CHECKING:
     from backend.app.db.models.project import Project
     from backend.app.db.models.document import Document
     from backend.app.db.models.workflow import Workflow, WorkflowRun
+    from backend.app.services.access_control.models import Organization, WorkspaceMember
 
 
 class Workspace(Base):
     """
     Workspace entity representing an isolated multi-project organizational boundary owned by a User.
+    Extended with Organization tenancy for Step 27.
     """
     __tablename__ = "workspaces"
     __table_args__ = (
@@ -35,8 +37,21 @@ class Workspace(Base):
         nullable=False,
         index=True,
     )
+    organization_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        GUID(),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="active",
+        server_default="active",
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -53,6 +68,17 @@ class Workspace(Base):
     owner: Mapped["User"] = relationship(
         "User",
         back_populates="workspaces",
+    )
+    organization: Mapped[Optional["Organization"]] = relationship(
+        "Organization",
+        back_populates="workspaces",
+        foreign_keys=[organization_id],
+    )
+    members: Mapped[List["WorkspaceMember"]] = relationship(
+        "WorkspaceMember",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     projects: Mapped[List["Project"]] = relationship(
         "Project",
@@ -84,4 +110,5 @@ class Workspace(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Workspace(id={self.id}, name='{self.name}', slug='{self.slug}', owner_user_id={self.owner_user_id})>"
+        return f"<Workspace(id={self.id}, name='{self.name}', slug='{self.slug}', owner_user_id={self.owner_user_id}, org_id={self.organization_id})>"
+

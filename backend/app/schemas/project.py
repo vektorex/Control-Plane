@@ -27,13 +27,14 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
-    pass
+    access_mode: Optional[str] = Field("workspace", description="Access mode: 'workspace' or 'restricted'")
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     slug: Optional[str] = Field(default=None, min_length=1, max_length=255)
     description: Optional[str] = Field(default=None)
+    access_mode: Optional[str] = Field(default=None, description="Access mode: 'workspace' or 'restricted'")
 
     @field_validator("slug", mode="before")
     @classmethod
@@ -54,6 +55,7 @@ class ProjectResponse(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
+    access_mode: Optional[str] = "workspace"
     created_at: datetime
     updated_at: datetime
     task_count: Optional[int] = 0

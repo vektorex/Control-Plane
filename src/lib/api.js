@@ -55,10 +55,26 @@ export async function apiClient(endpoint, options = {}) {
 
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
+  // Tenant context injection from localStorage if available in browser
+  let orgHeader = headers["X-Organization-Id"] || headers["x-organization-id"];
+  let wsHeader = headers["X-Workspace-Id"] || headers["x-workspace-id"];
+  if (typeof window !== "undefined") {
+    if (!orgHeader) {
+      const storedOrg = localStorage.getItem("ai_layer_active_org_id");
+      if (storedOrg) orgHeader = storedOrg;
+    }
+    if (!wsHeader) {
+      const storedWs = localStorage.getItem("ai_layer_active_workspace_id");
+      if (storedWs) wsHeader = storedWs;
+    }
+  }
+
   const defaultHeaders = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
     Accept: "application/json",
     ...(authHeader ? { Authorization: authHeader } : {}),
+    ...(orgHeader ? { "X-Organization-Id": orgHeader } : {}),
+    ...(wsHeader ? { "X-Workspace-Id": wsHeader } : {}),
     ...headers,
   };
 

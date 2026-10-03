@@ -18,16 +18,61 @@ class ProjectRepository:
         self.session = session
 
     async def get_by_id_and_owner(self, project_id: UUID, owner_user_id: UUID) -> Optional[Project]:
-        stmt = (
-            select(Project)
-            .join(Workspace, Project.workspace_id == Workspace.id)
-            .where(
-                Project.id == project_id,
-                Workspace.owner_user_id == owner_user_id,
-            )
-        )
+        stmt = select(Project).where(Project.id == project_id)
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        project = result.scalar_one_or_none()
+        if not project:
+            return None
+
+        # Verify access to parent workspace
+        from backend.app.repositories.workspace import WorkspaceRepository
+        ws_repo = WorkspaceRepository(self.session)
+        ws = await ws_repo.get_by_id_and_owner(project.workspace_id, owner_user_id)
+        if not ws:
+            return None
+
+        # If project is restricted, verify project membership or admin privileges
+        if getattr(project, "access_mode", "workspace") == "restricted":
+            from backend.app.services.access_control.models import ProjectMember, WorkspaceMember, OrganizationMember
+            from backend.app.services.access_control.constants import MemberStatus, OrganizationRole, WorkspaceRole
+
+            # 1. Project member
+            pm_stmt = select(ProjectMember).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == owner_user_id,
+            )
+            if (await self.session.execute(pm_stmt)).scalar_one_or_none():
+                return project
+
+            # 2. Workspace admin
+            wm_stmt = select(WorkspaceMember).where(
+                WorkspaceMember.workspace_id == project.workspace_id,
+                WorkspaceMember.user_id == owner_user_id,
+                WorkspaceMember.role == WorkspaceRole.ADMIN.value,
+                WorkspaceMember.status == MemberStatus.ACTIVE.value,
+            )
+            if (await self.session.execute(wm_stmt)).scalar_one_or_none():
+                return project
+
+            # 3. Workspace direct owner
+            if ws.owner_user_id == owner_user_id:
+                return project
+
+            # 4. Org owner/admin
+            if ws.organization_id:
+                om_stmt = select(OrganizationMember).where(
+                    OrganizationMember.organization_id == ws.organization_id,
+                    OrganizationMember.user_id == owner_user_id,
+                    OrganizationMember.role.in_([OrganizationRole.OWNER.value, OrganizationRole.ADMIN.value]),
+                    OrganizationMember.status == MemberStatus.ACTIVE.value,
+                )
+                if (await self.session.execute(om_stmt)).scalar_one_or_none():
+                    return project
+
+            # Restricted and unauthorized
+            return None
+
+        return project
 
     async def get_by_id_and_owner_or_raise(self, project_id: UUID, owner_user_id: UUID) -> Project:
         project = await self.get_by_id_and_owner(project_id, owner_user_id)
@@ -46,13 +91,10 @@ class ProjectRepository:
     async def list_by_workspace(
         self, workspace_id: UUID, owner_user_id: UUID, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Project], int]:
-        # Verify workspace exists and belongs to owner
-        ws_stmt = select(Workspace.id).where(
-            Workspace.id == workspace_id,
-            Workspace.owner_user_id == owner_user_id,
-        )
-        ws_res = await self.session.execute(ws_stmt)
-        if not ws_res.scalar_one_or_none():
+        from backend.app.repositories.workspace import WorkspaceRepository
+        ws_repo = WorkspaceRepository(self.session)
+        ws = await ws_repo.get_by_id_and_owner(workspace_id, owner_user_id)
+        if not ws:
             raise NotFoundError(f"Workspace with id '{workspace_id}' not found.")
 
         # Count
@@ -69,47 +111,58 @@ class ProjectRepository:
             .limit(limit)
         )
         res = await self.session.execute(stmt)
-        projects = list(res.scalars().all())
-        return projects, total
+        all_projects = list(res.scalars().all())
+
+        # Filter out restricted projects if user is not authorized
+        visible = []
+        for p in all_projects:
+            if getattr(p, "access_mode", "workspace") == "restricted":
+                authorized = await self.get_by_id_and_owner(p.id, owner_user_id)
+                if authorized:
+                    visible.append(p)
+            else:
+                visible.append(p)
+
+        return visible, len(visible)
 
     async def list_by_owner(
         self, owner_user_id: UUID, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Project], int]:
-        # Count all projects in workspaces owned by user
-        count_stmt = (
-            select(func.count(Project.id))
-            .join(Workspace, Project.workspace_id == Workspace.id)
-            .where(Workspace.owner_user_id == owner_user_id)
-        )
-        count_res = await self.session.execute(count_stmt)
-        total = count_res.scalar_one() or 0
+        from backend.app.repositories.workspace import WorkspaceRepository
+        ws_repo = WorkspaceRepository(self.session)
+        workspaces, _ = await ws_repo.list_by_owner(owner_user_id, skip=0, limit=1000)
+        ws_ids = [w.id for w in workspaces]
+        if not ws_ids:
+            return [], 0
 
         stmt = (
             select(Project)
-            .join(Workspace, Project.workspace_id == Workspace.id)
-            .where(Workspace.owner_user_id == owner_user_id)
+            .where(Project.workspace_id.in_(ws_ids))
             .order_by(Project.created_at.desc())
             .offset(skip)
             .limit(limit)
         )
         res = await self.session.execute(stmt)
-        return list(res.scalars().all()), total
+        all_projs = list(res.scalars().all())
+        visible = []
+        for p in all_projs:
+            authorized = await self.get_by_id_and_owner(p.id, owner_user_id)
+            if authorized:
+                visible.append(p)
+
+        return visible, len(visible)
 
     async def create(self, workspace_id: UUID, owner_user_id: UUID, data: ProjectCreate) -> Project:
-        # Check workspace exists and is owned by user
-        ws_stmt = select(Workspace.id).where(
-            Workspace.id == workspace_id,
-            Workspace.owner_user_id == owner_user_id,
-        )
-        ws_res = await self.session.execute(ws_stmt)
-        if not ws_res.scalar_one_or_none():
+        from backend.app.repositories.workspace import WorkspaceRepository
+        ws_repo = WorkspaceRepository(self.session)
+        ws = await ws_repo.get_by_id_and_owner(workspace_id, owner_user_id)
+        if not ws:
             raise NotFoundError(f"Workspace with id '{workspace_id}' not found.")
 
         slug = data.slug or slugify(data.name)
         if not slug:
             slug = "default-project"
 
-        # Check existing slug in same workspace
         existing = await self.get_by_slug(workspace_id, slug)
         if existing:
             raise ConflictError(f"A project with slug '{slug}' already exists in this workspace.")
@@ -119,6 +172,7 @@ class ProjectRepository:
             name=data.name.strip(),
             slug=slug,
             description=data.description.strip() if data.description else None,
+            access_mode=getattr(data, "access_mode", "workspace") or "workspace",
         )
         self.session.add(project)
         try:
@@ -148,6 +202,9 @@ class ProjectRepository:
                 if existing and existing.id != project.id:
                     raise ConflictError(f"A project with slug '{new_slug}' already exists in this workspace.")
                 project.slug = new_slug
+
+        if data.access_mode is not None:
+            project.access_mode = data.access_mode
 
         try:
             await self.session.flush()

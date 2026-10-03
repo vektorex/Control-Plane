@@ -54,6 +54,13 @@ from backend.app.db.models.event import (
     Event,
     EventDelivery,
 )
+from backend.app.services.access_control.models import (
+    Organization,
+    OrganizationMember,
+    OrganizationInvitation,
+    WorkspaceMember,
+    ProjectMember,
+)
 
 __all__ = [
     "Base",
@@ -63,8 +70,13 @@ __all__ = [
     "RunStatus",
     "DocumentStatus",
     "User",
+    "Organization",
+    "OrganizationMember",
+    "OrganizationInvitation",
     "Workspace",
+    "WorkspaceMember",
     "Project",
+    "ProjectMember",
     "Task",
     "Run",
     "TaskContext",

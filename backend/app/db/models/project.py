@@ -12,11 +12,13 @@ if TYPE_CHECKING:
     from backend.app.db.models.task import Task
     from backend.app.db.models.document import Document
     from backend.app.db.models.workflow import Workflow, WorkflowRun
+    from backend.app.services.access_control.models import ProjectMember
 
 
 class Project(Base):
     """
     Project entity representing a distinct workspace stream or knowledge context.
+    Extended with access_mode for fine-grained restricted project access in Step 27.
     """
     __tablename__ = "projects"
     __table_args__ = (
@@ -38,6 +40,13 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    access_mode: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="workspace",
+        server_default="workspace",
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -54,6 +63,12 @@ class Project(Base):
     workspace: Mapped["Workspace"] = relationship(
         "Workspace",
         back_populates="projects",
+    )
+    members: Mapped[List["ProjectMember"]] = relationship(
+        "ProjectMember",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     tasks: Mapped[List["Task"]] = relationship(
         "Task",

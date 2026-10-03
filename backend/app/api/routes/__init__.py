@@ -28,11 +28,14 @@ from backend.app.api.routes.evaluation_lab import router as evaluation_lab_route
 from backend.app.api.routes.triggers import router as triggers_router
 from backend.app.api.routes.jobs import router as jobs_router
 from backend.app.api.routes.events import events_router
+from backend.app.api.routes.organizations import organizations_router, invitations_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
 api_router.include_router(models_router)
 api_router.include_router(auth_router)
+api_router.include_router(organizations_router)
+api_router.include_router(invitations_router)
 api_router.include_router(llm_router)
 api_router.include_router(workspaces_router)
 api_router.include_router(projects_router)

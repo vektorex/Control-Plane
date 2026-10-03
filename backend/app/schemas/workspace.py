@@ -33,8 +33,11 @@ class WorkspaceBase(BaseModel):
         return None
 
 
+from typing import Dict, List, Optional
+
+
 class WorkspaceCreate(WorkspaceBase):
-    pass
+    organization_id: Optional[UUID] = Field(default=None, description="Parent organization ID")
 
 
 class WorkspaceUpdate(BaseModel):
@@ -57,12 +60,14 @@ class WorkspaceResponse(BaseModel):
 
     id: UUID
     owner_user_id: Optional[UUID] = None
+    organization_id: Optional[UUID] = None
     name: str
     slug: str
+    status: Optional[str] = "active"
     created_at: datetime
     updated_at: datetime
     project_count: Optional[int] = 0
-
+    capabilities: Dict[str, bool] = Field(default_factory=dict)
 
 
 class WorkspaceListResponse(BaseModel):

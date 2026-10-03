@@ -22,9 +22,11 @@ import {
   FlaskConical,
   Layers,
   Bell,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
+import { OrganizationSelector } from "./OrganizationSelector";
 import { WorkspaceSelector } from "./WorkspaceSelector";
 import { hitlService } from "@/services/hitl";
 import { notificationService } from "@/services/notifications";
@@ -46,6 +48,7 @@ const iconMap = {
   Terminal,
   Bell,
   Settings,
+  Building2,
 };
 
 export function AppSidebar({ className = "", onCloseMobile }) {
@@ -107,8 +110,9 @@ export function AppSidebar({ className = "", onCloseMobile }) {
         </Link>
       </div>
 
-      {/* Workspace Switcher */}
-      <div className="p-3 border-b border-slate-850/60">
+      {/* Organization & Workspace Switchers */}
+      <div className="p-3 border-b border-slate-850/60 space-y-2">
+        <OrganizationSelector />
         <WorkspaceSelector />
       </div>
 

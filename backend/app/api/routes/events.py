@@ -25,14 +25,15 @@ from backend.app.services.events.stream import EventStreamService
 events_router = APIRouter(prefix="/events", tags=["Events & Real-Time Bus"])
 
 
-def _resolve_and_verify_workspace(
+async def _resolve_and_verify_workspace(
     user: User,
+    session: AsyncSession,
     header_ws_id: Optional[str] = None,
     query_ws_id: Optional[UUID] = None,
 ) -> UUID:
     """
-    Resolves the workspace and asserts the authenticated user is a legitimate member.
-    Rejects unauthorized access to other workspaces.
+    Resolves the workspace and asserts the authenticated user is an authorized member via DB.
+    Rejects unauthorized cross-tenant access with 403.
     """
     resolved_id = None
     if query_ws_id:
@@ -43,11 +44,13 @@ def _resolve_and_verify_workspace(
         except ValueError:
             pass
 
+    from backend.app.repositories.workspace import WorkspaceRepository
+    ws_repo = WorkspaceRepository(session)
+
     if not resolved_id:
-        if getattr(user, "default_workspace_id", None):
-            resolved_id = user.default_workspace_id
-        elif getattr(user, "workspaces", None) and len(user.workspaces) > 0:
-            resolved_id = user.workspaces[0].id
+        workspaces, _ = await ws_repo.list_by_owner(user.id, limit=1)
+        if workspaces:
+            resolved_id = workspaces[0].id
 
     if not resolved_id:
         raise HTTPException(
@@ -56,15 +59,8 @@ def _resolve_and_verify_workspace(
         )
 
     # Multi-tenant isolation verification
-    allowed_ids = []
-    if getattr(user, "default_workspace_id", None):
-        allowed_ids.append(user.default_workspace_id)
-    if getattr(user, "workspaces", None):
-        allowed_ids.extend([w.id for w in user.workspaces])
-
-    # Allow if superuser/admin or matched
-    is_admin = getattr(user, "is_superuser", False) or getattr(user, "role", "") == "admin"
-    if not is_admin and allowed_ids and resolved_id not in allowed_ids:
+    ws = await ws_repo.get_by_id_and_owner(resolved_id, user.id)
+    if not ws:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: You are not authorized to access events in this workspace.",
@@ -84,13 +80,14 @@ async def stream_events(
     last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
     x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
     user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Server-Sent Events (SSE) real-time stream.
     Emits events matching authorized filters and provides keepalive heartbeats.
     Resumes automatically via Last-Event-ID header or 'after' parameter.
     """
-    ws_id = _resolve_and_verify_workspace(user, x_workspace_id, workspace_id)
+    ws_id = await _resolve_and_verify_workspace(user, session, x_workspace_id, workspace_id)
 
     # Validate event filter pattern to prevent SQL injection or regex DoS
     cleaned_pattern = None
@@ -101,6 +98,7 @@ async def stream_events(
 
     generator = EventStreamService.create_event_stream(
         workspace_id=ws_id,
+        user_id=user.id,
         project_id=project_id,
         event_type_pattern=cleaned_pattern,
         aggregate_type=aggregate_type,
@@ -136,7 +134,7 @@ async def list_events(
     """
     Queries historical events with rich multi-tenant filtering.
     """
-    ws_id = _resolve_and_verify_workspace(user, x_workspace_id, workspace_id)
+    ws_id = await _resolve_and_verify_workspace(user, session, x_workspace_id, workspace_id)
     cleaned_pattern = EventFilterValidator.validate_event_type_pattern(event_type) if event_type else None
 
     repo = EventRepository(session)
@@ -167,7 +165,7 @@ async def replay_events(
     """
     Fetches a bounded batch of chronological events for replay / reconnection.
     """
-    ws_id = _resolve_and_verify_workspace(user, x_workspace_id, workspace_id)
+    ws_id = await _resolve_and_verify_workspace(user, session, x_workspace_id, workspace_id)
     cleaned_pattern = EventFilterValidator.validate_event_type_pattern(event_type) if event_type else None
 
     repo = EventRepository(session)
@@ -200,7 +198,7 @@ async def get_event(
     """
     Retrieves details for a single event record by ID with workspace authorization.
     """
-    ws_id = _resolve_and_verify_workspace(user, x_workspace_id, workspace_id)
+    ws_id = await _resolve_and_verify_workspace(user, session, x_workspace_id, workspace_id)
     repo = EventRepository(session)
     event = await repo.get_by_id(event_id, workspace_id=ws_id)
     if not event:

@@ -127,3 +127,117 @@ async def list_project_tasks(
         item.run_count = len(t.runs) if hasattr(t, "runs") and t.runs is not None else 0
         response_items.append(item)
     return TaskListResponse(tasks=response_items, total=total)
+
+
+# --- Project Members Routes (Step 27) ---
+
+from backend.app.services.access_control.schemas import (
+    ProjectMemberCreate,
+    ProjectMemberUpdate,
+    ProjectMemberResponse,
+    ProjectMemberListResponse,
+)
+from backend.app.services.access_control.service import AccessControlService
+
+
+@router.get("/{project_id}/members", response_model=ProjectMemberListResponse)
+async def list_project_members(
+    project_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> ProjectMemberListResponse:
+    """
+    List explicit members for a restricted project.
+    """
+    service = AccessControlService(session)
+    members = await service.membership.list_project_members(project_id=project_id, current_user=user)
+    items = []
+    for m in members:
+        email = m.user.email if hasattr(m, "user") and m.user else None
+        items.append(
+            ProjectMemberResponse(
+                id=m.id,
+                project_id=m.project_id,
+                user_id=m.user_id,
+                email=email,
+                role=m.role,
+                created_at=m.created_at,
+            )
+        )
+    return ProjectMemberListResponse(members=items, total=len(items))
+
+
+@router.post("/{project_id}/members", response_model=ProjectMemberResponse, status_code=status.HTTP_201_CREATED)
+async def add_project_member(
+    project_id: UUID,
+    payload: ProjectMemberCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> ProjectMemberResponse:
+    """
+    Add a user to a project's access list.
+    """
+    service = AccessControlService(session)
+    member = await service.membership.add_project_member(
+        project_id=project_id,
+        target_user_id=payload.user_id,
+        role=payload.role,
+        current_user=user,
+    )
+    email = member.user.email if hasattr(member, "user") and member.user else None
+    return ProjectMemberResponse(
+        id=member.id,
+        project_id=member.project_id,
+        user_id=member.user_id,
+        email=email,
+        role=member.role,
+        created_at=member.created_at,
+    )
+
+
+@router.patch("/{project_id}/members/{member_id}", response_model=ProjectMemberResponse)
+async def update_project_member(
+    project_id: UUID,
+    member_id: UUID,
+    payload: ProjectMemberUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> ProjectMemberResponse:
+    """
+    Update a project member's role (editor vs viewer).
+    """
+    service = AccessControlService(session)
+    member = await service.membership.update_project_member(
+        project_id=project_id,
+        member_id=member_id,
+        role=payload.role,
+        current_user=user,
+    )
+    email = member.user.email if hasattr(member, "user") and member.user else None
+    return ProjectMemberResponse(
+        id=member.id,
+        project_id=member.project_id,
+        user_id=member.user_id,
+        email=email,
+        role=member.role,
+        created_at=member.created_at,
+    )
+
+
+@router.delete("/{project_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_project_member(
+    project_id: UUID,
+    member_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Remove a user from the restricted project member list.
+    """
+    service = AccessControlService(session)
+    await service.membership.remove_project_member(
+        project_id=project_id,
+        member_id=member_id,
+        current_user=user,
+    )
+    return None

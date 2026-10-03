@@ -32,6 +32,12 @@ class Task(Base):
         nullable=False,
         index=True,
     )
+    owner_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

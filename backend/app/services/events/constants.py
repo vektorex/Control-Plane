@@ -110,6 +110,27 @@ class SystemEventType(str, Enum):
     SYSTEM_WARNING = "system.warning"
     SYSTEM_ERROR = "system.error"
 
+    # Step 27 Access Control & Organization events
+    ORGANIZATION_CREATED = "organization.created"
+    ORGANIZATION_UPDATED = "organization.updated"
+    ORGANIZATION_ARCHIVED = "organization.archived"
+    MEMBER_INVITED = "member.invited"
+    MEMBER_JOINED = "member.joined"
+    MEMBER_ROLE_CHANGED = "member.role_changed"
+    MEMBER_SUSPENDED = "member.suspended"
+    MEMBER_REMOVED = "member.removed"
+    WORKSPACE_CREATED = "workspace.created"
+    WORKSPACE_UPDATED = "workspace.updated"
+    WORKSPACE_ARCHIVED = "workspace.archived"
+    WORKSPACE_MEMBER_ADDED = "workspace.member_added"
+    WORKSPACE_MEMBER_UPDATED = "workspace.member_updated"
+    WORKSPACE_MEMBER_REMOVED = "workspace.member_removed"
+    PROJECT_MEMBER_ADDED = "project.member_added"
+    PROJECT_MEMBER_UPDATED = "project.member_updated"
+    PROJECT_MEMBER_REMOVED = "project.member_removed"
+    PROJECT_ACCESS_CHANGED = "project.access_changed"
+    OWNERSHIP_TRANSFERRED = "ownership.transferred"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
@@ -123,6 +144,25 @@ AUDITABLE_EVENTS = {
     SystemEventType.WORKFLOW_FAILED.value,
     SystemEventType.SYSTEM_WARNING.value,
     SystemEventType.SYSTEM_ERROR.value,
+    SystemEventType.ORGANIZATION_CREATED.value,
+    SystemEventType.ORGANIZATION_UPDATED.value,
+    SystemEventType.ORGANIZATION_ARCHIVED.value,
+    SystemEventType.MEMBER_INVITED.value,
+    SystemEventType.MEMBER_JOINED.value,
+    SystemEventType.MEMBER_ROLE_CHANGED.value,
+    SystemEventType.MEMBER_SUSPENDED.value,
+    SystemEventType.MEMBER_REMOVED.value,
+    SystemEventType.WORKSPACE_CREATED.value,
+    SystemEventType.WORKSPACE_UPDATED.value,
+    SystemEventType.WORKSPACE_ARCHIVED.value,
+    SystemEventType.WORKSPACE_MEMBER_ADDED.value,
+    SystemEventType.WORKSPACE_MEMBER_UPDATED.value,
+    SystemEventType.WORKSPACE_MEMBER_REMOVED.value,
+    SystemEventType.PROJECT_MEMBER_ADDED.value,
+    SystemEventType.PROJECT_MEMBER_UPDATED.value,
+    SystemEventType.PROJECT_MEMBER_REMOVED.value,
+    SystemEventType.PROJECT_ACCESS_CHANGED.value,
+    SystemEventType.OWNERSHIP_TRANSFERRED.value,
 }
 
 # Sensitive keys scrubbed from all payloads

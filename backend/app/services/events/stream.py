@@ -24,6 +24,7 @@ class SSEClientConnection:
         self,
         client_id: str,
         workspace_id: UUID,
+        user_id: Optional[UUID] = None,
         project_id: Optional[UUID] = None,
         event_type_pattern: Optional[str] = None,
         aggregate_type: Optional[str] = None,
@@ -32,6 +33,7 @@ class SSEClientConnection:
     ):
         self.client_id = client_id
         self.workspace_id = workspace_id
+        self.user_id = user_id
         self.project_id = project_id
         self.event_type_pattern = event_type_pattern
         self.aggregate_type = aggregate_type
@@ -133,6 +135,24 @@ class SSEConnectionManager:
                 await self.unregister(dead)
 
 
+    async def disconnect_user(self, user_id: UUID) -> int:
+        """
+        Immediately disconnects all active SSE streams for a user (e.g. on member removal/suspension).
+        """
+        to_disconnect = []
+        async with self._lock:
+            for clients in self._connections.values():
+                for client in clients:
+                    if client.user_id == user_id:
+                        to_disconnect.append(client)
+
+        for client in to_disconnect:
+            await self.unregister(client)
+        if to_disconnect:
+            logger.info(f"[SSEManager] Forcefully disconnected {len(to_disconnect)} stream(s) for user {user_id}.")
+        return len(to_disconnect)
+
+
 # Global singleton SSE manager
 sse_connection_manager = SSEConnectionManager()
 
@@ -146,6 +166,7 @@ class EventStreamService:
     async def create_event_stream(
         cls,
         workspace_id: UUID,
+        user_id: Optional[UUID] = None,
         project_id: Optional[UUID] = None,
         event_type_pattern: Optional[str] = None,
         aggregate_type: Optional[str] = None,
@@ -163,6 +184,7 @@ class EventStreamService:
         connection = SSEClientConnection(
             client_id=client_id,
             workspace_id=workspace_id,
+            user_id=user_id,
             project_id=project_id,
             event_type_pattern=event_type_pattern,
             aggregate_type=aggregate_type,

@@ -42,6 +42,7 @@ from backend.app.api.routes.recovery import router as recovery_router
 from backend.app.api.routes.developer import developer_router
 from backend.app.api.routes.marketplace import router as marketplace_router
 from backend.app.api.routes.collaboration import router as collaboration_router
+from backend.app.api.routes.agents import agents_router, teams_router, runs_router
 from backend.app.api.routes.public_v1 import public_v1_router
 
 api_router = APIRouter(prefix="/api")
@@ -88,6 +89,9 @@ api_router.include_router(knowledge_graph_router)
 api_router.include_router(developer_router)
 api_router.include_router(marketplace_router)
 api_router.include_router(collaboration_router)
+api_router.include_router(agents_router)
+api_router.include_router(teams_router)
+api_router.include_router(runs_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

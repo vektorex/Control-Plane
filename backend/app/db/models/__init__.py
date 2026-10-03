@@ -179,6 +179,18 @@ from backend.app.services.collaboration.models import (
     CollaborativeState,
     CollaborationSnapshot,
 )
+from backend.app.services.agents.models import (
+    Agent,
+    AgentVersion,
+    AgentRun,
+    AgentDelegation,
+    AgentTeam,
+    AgentTeamVersion,
+    AgentTeamMember,
+    AgentTeamRun,
+    AgentMessage,
+    AgentConflict,
+)
 
 
 __all__ = [
@@ -334,6 +346,16 @@ __all__ = [
     "CollaborationConflict",
     "CollaborativeState",
     "CollaborationSnapshot",
+    "Agent",
+    "AgentVersion",
+    "AgentRun",
+    "AgentDelegation",
+    "AgentTeam",
+    "AgentTeamVersion",
+    "AgentTeamMember",
+    "AgentTeamRun",
+    "AgentMessage",
+    "AgentConflict",
 ]
 
 

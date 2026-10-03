@@ -31,6 +31,18 @@ export const siteConfig = {
       description: "Build, validate, publish, and execute multi-step AI orchestration pipelines",
     },
     {
+      label: "AI Agents",
+      href: "/app/agents",
+      icon: "Bot",
+      description: "Governed autonomous AI agents with bounded policies, capability limits, and execution safety",
+    },
+    {
+      label: "Agent Teams",
+      href: "/app/agent-teams",
+      icon: "Boxes",
+      description: "Multi-agent teams, coordinated role execution, cross-agent context, and conflict resolution",
+    },
+    {
       label: "Prompts",
       href: "/app/prompts",
       icon: "FileCode2",

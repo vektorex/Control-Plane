@@ -187,8 +187,38 @@ COLLABORATION_APPROVE = "collaboration.approve"
 COLLABORATION_EXECUTE = "collaboration.execute"
 COLLABORATION_ADMIN = "collaboration.admin"
 
+# Agent & Agent Team permissions (Step 40)
+AGENT_READ = "agent.read"
+AGENT_CREATE = "agent.create"
+AGENT_UPDATE = "agent.update"
+AGENT_DELETE = "agent.delete"
+AGENT_PUBLISH = "agent.publish"
+AGENT_ACTIVATE = "agent.activate"
+AGENT_PAUSE = "agent.pause"
+AGENT_RUN = "agent.run"
+AGENT_DELEGATE = "agent.delegate"
+AGENT_TEAM_READ = "agent_team.read"
+AGENT_TEAM_CREATE = "agent_team.create"
+AGENT_TEAM_UPDATE = "agent_team.update"
+AGENT_TEAM_DELETE = "agent_team.delete"
+AGENT_TEAM_RUN = "agent_team.run"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    AGENT_READ,
+    AGENT_CREATE,
+    AGENT_UPDATE,
+    AGENT_DELETE,
+    AGENT_PUBLISH,
+    AGENT_ACTIVATE,
+    AGENT_PAUSE,
+    AGENT_RUN,
+    AGENT_DELEGATE,
+    AGENT_TEAM_READ,
+    AGENT_TEAM_CREATE,
+    AGENT_TEAM_UPDATE,
+    AGENT_TEAM_DELETE,
+    AGENT_TEAM_RUN,
     COLLABORATION_SESSION_READ,
     COLLABORATION_SESSION_JOIN,
     COLLABORATION_COMMENT,

@@ -76,6 +76,10 @@ class JobType(str, Enum):
     MARKETPLACE_UPDATE = "marketplace_update"
     MARKETPLACE_ROLLBACK = "marketplace_rollback"
     MARKETPLACE_EVALUATION = "marketplace_evaluation"
+    AGENT_RUN = "agent_run"
+    AGENT_DELEGATION = "agent_delegation"
+    AGENT_TEAM_RUN = "agent_team_run"
+    AGENT_EVALUATION = "agent_evaluation"
 
 
 class JobEventType(str, Enum):

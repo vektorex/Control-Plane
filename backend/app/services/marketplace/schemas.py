@@ -16,6 +16,8 @@ class PackageType(str, Enum):
     CONNECTOR_TEMPLATE = "connector_template"
     TASK_TEMPLATE = "task_template"
     WORK_PACK = "work_pack"
+    AGENT_TEMPLATE = "agent_template"
+    AGENT_TEAM_TEMPLATE = "agent_team_template"
 
 
 class PackageVisibility(str, Enum):

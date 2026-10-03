@@ -426,6 +426,97 @@ class CollaborationResource:
         self.sessions = CollaborationSessionsResource(client)
 
 
+class AgentsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def list(self, project_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        params = {}
+        if project_id:
+            params["project_id"] = project_id
+        if status:
+            params["status"] = status
+        return self._client._request("GET", "/agents", params=params)
+
+    def get(self, agent_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/agents/{agent_id}")
+
+    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", "/agents", json=payload)
+
+    def update(self, agent_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("PATCH", f"/agents/{agent_id}", json=payload)
+
+    def delete(self, agent_id: str) -> None:
+        return self._client._request("DELETE", f"/agents/{agent_id}")
+
+    def create_version(self, agent_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", f"/agents/{agent_id}/versions", json=payload)
+
+    def publish(self, agent_id: str, version_id: Optional[str] = None) -> Dict[str, Any]:
+        params = {"version_id": version_id} if version_id else None
+        return self._client._request("POST", f"/agents/{agent_id}/publish", params=params)
+
+    def activate(self, agent_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/agents/{agent_id}/activate")
+
+    def pause(self, agent_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/agents/{agent_id}/pause")
+
+    def run(self, agent_id: str, input_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        payload = {"input": input_data, **kwargs}
+        return self._client._request("POST", f"/agents/{agent_id}/runs", json=payload)
+
+    def list_runs(self, agent_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        params = {"status": status} if status else None
+        return self._client._request("GET", f"/agents/{agent_id}/runs", params=params)
+
+    def get_run(self, run_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/agent-runs/{run_id}")
+
+    def delegate(self, agent_id: str, child_agent_id: str, reason: str, **kwargs) -> Dict[str, Any]:
+        payload = {"child_agent_id": child_agent_id, "reason": reason, **kwargs}
+        return self._client._request("POST", f"/agents/{agent_id}/delegate", json=payload)
+
+    def trace(self, run_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/agent-runs/{run_id}/trace")
+
+    def replay(self, run_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/agent-runs/{run_id}/replay")
+
+
+class AgentTeamsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def list(self, project_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        params = {}
+        if project_id:
+            params["project_id"] = project_id
+        if status:
+            params["status"] = status
+        return self._client._request("GET", "/agent-teams", params=params)
+
+    def get(self, team_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/agent-teams/{team_id}")
+
+    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", "/agent-teams", json=payload)
+
+    def update(self, team_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("PATCH", f"/agent-teams/{team_id}", json=payload)
+
+    def run(self, team_id: str, input_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        payload = {"input": input_data, **kwargs}
+        return self._client._request("POST", f"/agent-teams/{team_id}/runs", json=payload)
+
+    def list_runs(self, team_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/agent-teams/{team_id}/runs")
+
+    def get_run(self, run_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/agent-team-runs/{run_id}")
+
+
 class Client:
     """Official AI Work Layer SDK client for Python applications."""
 
@@ -456,6 +547,8 @@ class Client:
         self.webhooks = WebhooksResource(self)
         self.marketplace = MarketplaceResource(self)
         self.collaboration = CollaborationResource(self)
+        self.agents = AgentsResource(self)
+        self.agent_teams = AgentTeamsResource(self)
 
 
     def _request(

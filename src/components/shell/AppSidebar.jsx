@@ -34,6 +34,8 @@ import {
   Code2,
   Store,
   Users,
+  Bot,
+  Boxes,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -73,6 +75,8 @@ const iconMap = {
   Code2,
   Store,
   Users,
+  Bot,
+  Boxes,
 };
 
 

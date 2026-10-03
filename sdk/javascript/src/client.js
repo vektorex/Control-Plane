@@ -31,6 +31,8 @@ export class AIWorkLayerClient {
     this.webhooks = new WebhooksResource(this);
     this.marketplace = new MarketplaceResource(this);
     this.collaboration = new CollaborationResource(this);
+    this.agents = new AgentsResource(this);
+    this.agentTeams = new AgentTeamsResource(this);
   }
 
 
@@ -470,6 +472,152 @@ export class CollaborationResource {
   constructor(client) {
     this.client = client;
     this.sessions = new CollaborationSessionsResource(client);
+  }
+}
+
+export class AgentsResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.projectId) query.set("project_id", params.projectId);
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/agents${qs ? `?${qs}` : ""}`);
+  }
+
+  async get(agentId) {
+    return this.client.request("GET", `/agents/${agentId}`);
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/agents", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async update(agentId, data, options = {}) {
+    return this.client.request("PATCH", `/agents/${agentId}`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async delete(agentId) {
+    return this.client.request("DELETE", `/agents/${agentId}`);
+  }
+
+  async createVersion(agentId, data, options = {}) {
+    return this.client.request("POST", `/agents/${agentId}/versions`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async publish(agentId, versionId = null) {
+    const query = versionId ? `?version_id=${encodeURIComponent(versionId)}` : "";
+    return this.client.request("POST", `/agents/${agentId}/publish${query}`);
+  }
+
+  async activate(agentId) {
+    return this.client.request("POST", `/agents/${agentId}/activate`);
+  }
+
+  async pause(agentId) {
+    return this.client.request("POST", `/agents/${agentId}/pause`);
+  }
+
+  async run(agentId, data = {}, options = {}) {
+    return this.client.request("POST", `/agents/${agentId}/runs`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async listRuns(agentId, params = {}) {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/agents/${agentId}/runs${qs ? `?${qs}` : ""}`);
+  }
+
+  async getRun(runId) {
+    return this.client.request("GET", `/agent-runs/${runId}`);
+  }
+
+  async delegate(agentId, data, options = {}) {
+    return this.client.request("POST", `/agents/${agentId}/delegate`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async trace(runId) {
+    return this.client.request("GET", `/agent-runs/${runId}/trace`);
+  }
+
+  async replay(runId) {
+    return this.client.request("GET", `/agent-runs/${runId}/replay`);
+  }
+}
+
+export class AgentTeamsResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.projectId) query.set("project_id", params.projectId);
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/agent-teams${qs ? `?${qs}` : ""}`);
+  }
+
+  async get(teamId) {
+    return this.client.request("GET", `/agent-teams/${teamId}`);
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/agent-teams", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async update(teamId, data, options = {}) {
+    return this.client.request("PATCH", `/agent-teams/${teamId}`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async run(teamId, data = {}, options = {}) {
+    return this.client.request("POST", `/agent-teams/${teamId}/runs`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async listRuns(teamId, params = {}) {
+    const query = new URLSearchParams();
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/agent-teams/${teamId}/runs${qs ? `?${qs}` : ""}`);
+  }
+
+  async getRun(runId) {
+    return this.client.request("GET", `/agent-team-runs/${runId}`);
   }
 }
 

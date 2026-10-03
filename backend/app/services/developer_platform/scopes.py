@@ -32,6 +32,12 @@ VALID_API_SCOPES: Set[str] = {
     "collaboration:read",
     "collaboration:write",
     "collaboration:execute",
+    "agents:read",
+    "agents:write",
+    "agents:execute",
+    "agent_teams:read",
+    "agent_teams:write",
+    "agent_teams:execute",
 }
 PUBLIC_SCOPES = VALID_API_SCOPES
 
@@ -63,6 +69,12 @@ SCOPE_TO_PERMISSION_MAP: Dict[str, str] = {
     "collaboration:read": "collaboration.session_read",
     "collaboration:write": "collaboration.comment",
     "collaboration:execute": "collaboration.execute",
+    "agents:read": "agent.read",
+    "agents:write": "agent.create",
+    "agents:execute": "agent.run",
+    "agent_teams:read": "agent_team.read",
+    "agent_teams:write": "agent_team.create",
+    "agent_teams:execute": "agent_team.run",
 }
 
 # Sensitive scopes that require explicit organization admin privileges
@@ -76,6 +88,10 @@ SENSITIVE_SCOPES: Set[str] = {
     "memory:write",
     "webhooks:manage",
     "applications:manage",
+    "agents:write",
+    "agents:execute",
+    "agent_teams:write",
+    "agent_teams:execute",
 }
 
 

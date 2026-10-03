@@ -1587,3 +1587,506 @@ async def public_list_collaboration_assignments(
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)
 
+
+# =============================================================================
+# STEP 40: AGENT & MULTI-AGENT TEAM PUBLIC APIS
+# =============================================================================
+
+@public_v1_router.post("/agents", status_code=status.HTTP_201_CREATED)
+async def public_create_agent(
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Creates a new governed AI Agent (requires agents:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentCreate, AgentResponse
+
+        svc = AgentService(db)
+        req = AgentCreate(**payload)
+        agent, _ = await svc.create_agent(principal.workspace_id, principal.user_id, req)
+        return AgentResponse.model_validate(agent)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agents")
+async def public_list_agents(
+    project_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists workspace agents (requires agents:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentResponse
+
+        svc = AgentService(db)
+        agents, _ = await svc.list_agents(principal.workspace_id, project_id, status, limit, offset)
+        return [AgentResponse.model_validate(a) for a in agents]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agents/{agent_id}")
+async def public_get_agent(
+    agent_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gets agent detail (requires agents:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentDetailResponse, AgentVersionResponse
+
+        svc = AgentService(db)
+        agent = await svc.get_agent(agent_id, principal.workspace_id)
+        current_ver = None
+        if agent.current_version_id:
+            ver = await svc.repo.get_version(agent.current_version_id)
+            if ver:
+                current_ver = AgentVersionResponse.model_validate(ver)
+
+        vers = await svc.repo.list_versions(agent_id)
+        runs, run_count = await svc.repo.list_runs(principal.workspace_id, agent_id=agent_id, limit=1)
+
+        resp = AgentDetailResponse.model_validate(agent)
+        resp.current_version = current_ver
+        resp.versions_count = len(vers)
+        resp.runs_count = run_count
+        return resp
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/agents/{agent_id}")
+async def public_update_agent(
+    agent_id: str,
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates an agent (requires agents:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentUpdate, AgentResponse
+
+        svc = AgentService(db)
+        req = AgentUpdate(**payload)
+        updated = await svc.update_agent(agent_id, principal.workspace_id, req)
+        return AgentResponse.model_validate(updated)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.delete("/agents/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def public_delete_agent(
+    agent_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Deletes an agent (requires agents:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:write")
+        from backend.app.services.agents.service import AgentService
+
+        svc = AgentService(db)
+        agent = await svc.get_agent(agent_id, principal.workspace_id)
+        await svc.repo.delete_agent(agent)
+        await db.commit()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agents/{agent_id}/versions", status_code=status.HTTP_201_CREATED)
+async def public_create_agent_version(
+    agent_id: str,
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Creates a new version for an agent (requires agents:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentVersionCreate, AgentVersionResponse
+
+        svc = AgentService(db)
+        req = AgentVersionCreate(**payload)
+        ver = await svc.create_agent_version(agent_id, principal.workspace_id, principal.user_id, req)
+        return AgentVersionResponse.model_validate(ver)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agents/{agent_id}/publish")
+async def public_publish_agent_version(
+    agent_id: str,
+    version_id: Optional[str] = Query(None),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Publishes an agent version (requires agents:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentVersionResponse
+
+        svc = AgentService(db)
+        target_version_id = version_id
+        if not target_version_id:
+            agent = await svc.get_agent(agent_id, principal.workspace_id)
+            target_version_id = agent.current_version_id
+        if not target_version_id:
+            raise HTTPException(status_code=400, detail="No version found to publish.")
+
+        ver = await svc.publish_version(agent_id, target_version_id, principal.workspace_id, principal.user_id)
+        return AgentVersionResponse.model_validate(ver)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agents/{agent_id}/activate")
+async def public_activate_agent(
+    agent_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Activates an agent (requires agents:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentResponse
+
+        svc = AgentService(db)
+        agent = await svc.activate_agent(agent_id, principal.workspace_id, principal.user_id)
+        return AgentResponse.model_validate(agent)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agents/{agent_id}/pause")
+async def public_pause_agent(
+    agent_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pauses an agent (requires agents:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentResponse
+
+        svc = AgentService(db)
+        agent = await svc.pause_agent(agent_id, principal.workspace_id, principal.user_id)
+        return AgentResponse.model_validate(agent)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agents/{agent_id}/runs", status_code=status.HTTP_201_CREATED)
+async def public_run_agent(
+    agent_id: str,
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Executes a bounded agent run (requires agents:execute scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:execute")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentRunCreate, AgentRunResponse
+
+        svc = AgentService(db)
+        req = AgentRunCreate(**payload)
+        run = await svc.run_agent(agent_id, principal.workspace_id, principal.user_id, req)
+        return AgentRunResponse.model_validate(run)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agents/{agent_id}/runs")
+async def public_list_agent_runs(
+    agent_id: str,
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists runs for an agent (requires agents:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentRunResponse
+
+        svc = AgentService(db)
+        runs, _ = await svc.list_runs(principal.workspace_id, agent_id=agent_id, status=status, limit=limit, offset=offset)
+        return [AgentRunResponse.model_validate(r) for r in runs]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-runs/{run_id}")
+async def public_get_agent_run(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gets details of an agent run (requires agents:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentRunResponse
+
+        svc = AgentService(db)
+        run = await svc.get_run(run_id, principal.workspace_id)
+        return AgentRunResponse.model_validate(run)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agents/{agent_id}/delegate", status_code=status.HTTP_201_CREATED)
+async def public_delegate_agent(
+    agent_id: str,
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delegates work from an agent to another permitted agent (requires agents:execute scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:execute")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentDelegationCreate, AgentDelegationResponse
+
+        svc = AgentService(db)
+        req = AgentDelegationCreate(**payload)
+        delg = await svc.delegate_agent(agent_id, principal.workspace_id, principal.user_id, req)
+        return AgentDelegationResponse.model_validate(delg)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agent-teams", status_code=status.HTTP_201_CREATED)
+async def public_create_agent_team(
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Creates a governed multi-agent team (requires agent_teams:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agent_teams:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentTeamCreate, AgentTeamResponse
+
+        svc = AgentService(db)
+        req = AgentTeamCreate(**payload)
+        team, _ = await svc.create_team(principal.workspace_id, principal.user_id, req)
+        return AgentTeamResponse.model_validate(team)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-teams")
+async def public_list_agent_teams(
+    project_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists multi-agent teams (requires agent_teams:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agent_teams:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentTeamResponse
+
+        svc = AgentService(db)
+        teams, _ = await svc.list_teams(principal.workspace_id, project_id, status, limit, offset)
+        return [AgentTeamResponse.model_validate(t) for t in teams]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-teams/{team_id}")
+async def public_get_agent_team(
+    team_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gets team detail (requires agent_teams:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agent_teams:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentTeamDetailResponse
+
+        svc = AgentService(db)
+        team = await svc.get_team(team_id, principal.workspace_id)
+        current_ver = None
+        members_count = 0
+        if team.current_version_id:
+            ver = await svc.repo.get_team_version(team.current_version_id)
+            if ver:
+                current_ver = ver
+                members_count = len(ver.members)
+
+        runs, run_count = await svc.repo.list_team_runs(principal.workspace_id, team_id=team_id, limit=1)
+        resp = AgentTeamDetailResponse.model_validate(team)
+        resp.current_version = current_ver
+        resp.members_count = members_count
+        resp.runs_count = run_count
+        return resp
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/agent-teams/{team_id}")
+async def public_update_agent_team(
+    team_id: str,
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates team metadata (requires agent_teams:write scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agent_teams:write")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentTeamUpdate, AgentTeamResponse
+
+        svc = AgentService(db)
+        req = AgentTeamUpdate(**payload)
+        updated = await svc.update_team(team_id, principal.workspace_id, req)
+        return AgentTeamResponse.model_validate(updated)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/agent-teams/{team_id}/runs", status_code=status.HTTP_201_CREATED)
+async def public_run_agent_team(
+    team_id: str,
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Executes a governed multi-agent team run (requires agent_teams:execute scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agent_teams:execute")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentTeamRunCreate, AgentTeamRunResponse
+
+        svc = AgentService(db)
+        req = AgentTeamRunCreate(**payload)
+        team_run = await svc.run_team(team_id, principal.workspace_id, principal.user_id, req)
+        return AgentTeamRunResponse.model_validate(team_run)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-teams/{team_id}/runs")
+async def public_list_team_runs(
+    team_id: str,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists runs for a team (requires agent_teams:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agent_teams:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentTeamRunResponse
+
+        svc = AgentService(db)
+        runs, _ = await svc.list_team_runs(principal.workspace_id, team_id=team_id, limit=limit, offset=offset)
+        return [AgentTeamRunResponse.model_validate(r) for r in runs]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-team-runs/{run_id}")
+async def public_get_team_run(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gets team run details with messages and conflicts (requires agent_teams:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agent_teams:read")
+        from backend.app.services.agents.service import AgentService
+        from backend.app.services.agents.schemas import AgentTeamRunResponse
+
+        svc = AgentService(db)
+        run = await svc.get_team_run(run_id, principal.workspace_id)
+        resp = AgentTeamRunResponse.model_validate(run)
+        resp.messages_count = len(run.messages)
+        resp.conflicts_count = len(run.conflicts)
+        return resp
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-runs/{run_id}/trace")
+async def public_get_agent_run_trace(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gets execution trace for an agent run (requires agents:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:read")
+        from backend.app.services.agents.service import AgentService
+
+        svc = AgentService(db)
+        return await svc.get_run_trace(run_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-runs/{run_id}/evaluation")
+async def public_get_agent_run_evaluation(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gets evaluation results for an agent run (requires agents:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:read")
+        from backend.app.services.agents.service import AgentService
+
+        svc = AgentService(db)
+        run = await svc.get_run(run_id, principal.workspace_id)
+        return {
+            "run_id": run.id,
+            "status": run.status,
+            "evaluation_summary": run.reproducibility_metadata.get("evaluation_summary", {}),
+            "reproducibility_metadata": run.reproducibility_metadata,
+        }
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/agent-runs/{run_id}/replay")
+async def public_replay_agent_run(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Replays an agent run safely in dry-run mode (requires agents:execute scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "agents:execute")
+        from backend.app.services.agents.service import AgentService
+
+        svc = AgentService(db)
+        return await svc.replay_run(run_id, principal.workspace_id, principal.user_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+

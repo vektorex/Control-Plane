@@ -10,6 +10,7 @@ class ActorType(str, Enum):
     WORKER = "worker"
     CONNECTOR = "connector"
     SCHEDULER = "scheduler"
+    AGENT = "agent"
 
 
 class AggregateType(str, Enum):
@@ -36,6 +37,10 @@ class AggregateType(str, Enum):
     DEVELOPER = "developer"
     MARKETPLACE = "marketplace"
     COLLABORATION = "collaboration"
+    AGENT = "agent"
+    AGENT_TEAM = "agent_team"
+    AGENT_RUN = "agent_run"
+    AGENT_TEAM_RUN = "agent_team_run"
 
 
 
@@ -307,9 +312,40 @@ class SystemEventType(str, Enum):
     COLLABORATION_RUN_COMPLETED = "collaboration.run.completed"
     COLLABORATION_RUN_FAILED = "collaboration.run.failed"
 
+    # Step 40 Governed AI Agent Runtime and Multi-Agent Teams events
+    AGENT_CREATED = "agent.created"
+    AGENT_UPDATED = "agent.updated"
+    AGENT_VERSION_PUBLISHED = "agent.version.published"
+    AGENT_ACTIVATED = "agent.activated"
+    AGENT_PAUSED = "agent.paused"
+    AGENT_DISABLED = "agent.disabled"
+    AGENT_RUN_CREATED = "agent.run.created"
+    AGENT_RUN_STARTED = "agent.run.started"
+    AGENT_RUN_STEP = "agent.run.step"
+    AGENT_RUN_WAITING_FOR_APPROVAL = "agent.run.waiting_for_approval"
+    AGENT_RUN_COMPLETED = "agent.run.completed"
+    AGENT_RUN_FAILED = "agent.run.failed"
+    AGENT_DELEGATED = "agent.delegated"
+    AGENT_TEAM_CREATED = "agent.team.created"
+    AGENT_TEAM_RUN_STARTED = "agent.team.run.started"
+    AGENT_TEAM_ASSIGNMENT_CREATED = "agent.team.assignment.created"
+    AGENT_TEAM_ASSIGNMENT_COMPLETED = "agent.team.assignment.completed"
+    AGENT_TEAM_CONFLICT_DETECTED = "agent.team.conflict.detected"
+    AGENT_TEAM_RUN_COMPLETED = "agent.team.run.completed"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
+    SystemEventType.AGENT_CREATED.value,
+    SystemEventType.AGENT_VERSION_PUBLISHED.value,
+    SystemEventType.AGENT_ACTIVATED.value,
+    SystemEventType.AGENT_DISABLED.value,
+    SystemEventType.AGENT_DELEGATED.value,
+    SystemEventType.AGENT_RUN_COMPLETED.value,
+    SystemEventType.AGENT_RUN_FAILED.value,
+    SystemEventType.AGENT_TEAM_CREATED.value,
+    SystemEventType.AGENT_TEAM_RUN_COMPLETED.value,
+    SystemEventType.AGENT_TEAM_CONFLICT_DETECTED.value,
     SystemEventType.COLLABORATION_DECISION_CREATED.value,
     SystemEventType.COLLABORATION_CONFLICT_DETECTED.value,
 

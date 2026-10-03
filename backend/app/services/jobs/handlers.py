@@ -731,6 +731,92 @@ class MultimodalExtractionJobHandler(JobHandler):
         return await ArtifactProcessingJobHandler().execute(job, context, cancellation_token)
 
 
+class CacheRefreshJobHandler(JobHandler):
+    """
+    Executes background revalidation for stale-while-revalidate candidates.
+    Does not recursively cache refresh jobs.
+    """
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.cache.constants import CacheNamespace
+        from backend.app.services.cache.schemas import CacheAdmissionCandidate
+        from backend.app.services.cache.service import CacheService
+
+        session = context.session
+        payload = job.payload
+        cache_entry_id = payload.get("cache_entry_id")
+        prompt_text = payload.get("prompt_text")
+
+        await context.update_progress(10, "Starting cache refresh", 1, 3, "Validating stale entry")
+        if cancellation_token.is_set():
+            raise JobCancellationError("Cache refresh cancelled.")
+
+        cache_svc = CacheService()
+        if cache_entry_id:
+            entry = await cache_svc.get_entry(session, uuid.UUID(str(cache_entry_id)))
+            if entry and not prompt_text:
+                prompt_text = entry.normalized_request
+
+        if not prompt_text:
+            return {"status": "skipped", "reason": "No prompt text to refresh"}
+
+        await context.update_progress(50, "Executing recomputation", 2, 3, "Running AI recomputation")
+        from backend.app.services.ai_gateway.schemas import GatewayRequest
+        from backend.app.services.ai_gateway.service import AIGatewayService
+
+        gateway = AIGatewayService()
+        gw_res = await gateway.execute(
+            session=session,
+            request=GatewayRequest(
+                prompt=prompt_text,
+                workspace_id=job.workspace_id,
+            ),
+        )
+
+        await context.update_progress(90, "Admitting refreshed entry", 3, 3, "Updating cache")
+        candidate = CacheAdmissionCandidate(
+            organization_id=job.workspace_id,
+            workspace_id=job.workspace_id,
+            namespace=CacheNamespace.WORKSPACE,
+            normalized_request=prompt_text,
+            request_fingerprint=str(uuid.uuid4()),
+            cache_key=payload.get("cache_key", str(uuid.uuid4())),
+            response_content=gw_res.content if hasattr(gw_res, "content") else str(gw_res),
+        )
+        new_entry, _ = await cache_svc.admit(session, candidate)
+        return {
+            "status": "completed",
+            "refreshed_entry_id": str(new_entry.id) if new_entry else None,
+        }
+
+
+class CacheCleanupJobHandler(JobHandler):
+    """
+    Evicts expired entries and enforces namespace capacity bounds.
+    """
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.cache.service import CacheService
+
+        session = context.session
+        await context.update_progress(20, "Scanning expired cache entries", 1, 2, "Eviction sweep")
+        if cancellation_token.is_set():
+            raise JobCancellationError("Cache cleanup cancelled.")
+
+        cache_svc = CacheService()
+        evicted = await cache_svc.handle_cleanup_job(session, job.workspace_id)
+        await context.update_progress(100, f"Evicted {evicted} expired entries", 2, 2, "Cleanup complete")
+        return {"status": "completed", "evicted_count": evicted}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -758,6 +844,8 @@ class JobHandlerRegistry:
         self.register(JobType.VIDEO_PROCESSING.value, VideoProcessingJobHandler())
         self.register(JobType.TABLE_PROCESSING.value, TableProcessingJobHandler())
         self.register(JobType.MULTIMODAL_EXTRACTION.value, MultimodalExtractionJobHandler())
+        self.register(JobType.CACHE_REFRESH.value, CacheRefreshJobHandler())
+        self.register(JobType.CACHE_CLEANUP.value, CacheCleanupJobHandler())
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

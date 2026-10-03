@@ -62,7 +62,7 @@ async def create_prompt(
         ws_res = await db.execute(
             select(Workspace).where(Workspace.owner_user_id == user.id).order_by(Workspace.created_at.desc())
         )
-        ws = ws_res.scalar_one_or_none()
+        ws = ws_res.scalars().first()
         if not ws:
             ws = Workspace(
                 name="Default Workspace",

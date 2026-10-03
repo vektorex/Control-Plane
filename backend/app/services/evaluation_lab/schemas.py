@@ -61,6 +61,9 @@ class AssertionType(str, Enum):
     SOURCE_TIMESTAMP_EXISTS = "source_timestamp_exists"
     VISUAL_EVIDENCE_PRESENT = "visual_evidence_present"
     ARTIFACT_REFERENCE_EXISTS = "artifact_reference_exists"
+    CACHE_HIT = "cache_hit"
+    CACHE_MATCH_TYPE = "cache_match_type"
+    CACHE_ELIGIBILITY = "cache_eligibility"
 
 
 class AssertionDefinition(BaseModel):

@@ -121,8 +121,18 @@ ARTIFACT_DELETE = "artifact.delete"
 ARTIFACT_PROCESS = "artifact.process"
 ARTIFACT_ANALYZE = "artifact.analyze"
 
+# Cache permissions (Step 31)
+CACHE_READ = "cache.read"
+CACHE_CONFIGURE = "cache.configure"
+CACHE_INVALIDATE = "cache.invalidate"
+CACHE_DELETE = "cache.delete"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    CACHE_READ,
+    CACHE_CONFIGURE,
+    CACHE_INVALIDATE,
+    CACHE_DELETE,
     ORGANIZATION_READ,
     ORGANIZATION_UPDATE,
     ORGANIZATION_DELETE,

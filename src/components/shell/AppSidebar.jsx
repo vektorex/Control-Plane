@@ -26,6 +26,7 @@ import {
   FileCode2,
   Network,
   FileImage,
+  DatabaseZap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -49,6 +50,7 @@ const iconMap = {
   FolderKanban,
   Files,
   FileImage,
+  DatabaseZap,
   BarChart3,
   Cpu,
   Terminal,

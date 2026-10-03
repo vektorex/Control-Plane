@@ -303,6 +303,99 @@ class TaskExecutionService:
                 metadata={"task_title": task.title, "model_mode": model_mode},
             )
 
+        # Step 31: Semantic Cache & Intelligent Reuse Check
+        user_cache_mode = getattr(request, "cache_mode", None) or getattr(task, "cache_mode", None) or "auto"
+        cache_hit_result = None
+        if workspace_id and user_cache_mode != "disabled":
+            try:
+                from backend.app.services.cache.service import CacheService
+                from backend.app.services.cache.schemas import CacheLookupRequest
+                from backend.app.services.cache.constants import CacheMode, CacheNamespace
+
+                cache_svc = CacheService()
+                is_eligible, _ = cache_svc.eligibility.is_cacheable(
+                    task_type=resolved_reqs.task_type,
+                    parameters={"prompt": prompt_check},
+                    has_side_effects=bool(tools_planned or request.tool_mode == "enabled"),
+                    requires_hitl=False,
+                    cache_mode=CacheMode(user_cache_mode) if user_cache_mode in ("auto", "enabled", "disabled", "refresh") else CacheMode.AUTO,
+                )
+
+                if is_eligible:
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.CACHE_LOOKUP,
+                            status=TraceEventStatus.STARTED,
+                            metadata={"prompt": prompt_check[:100], "cache_mode": user_cache_mode},
+                        )
+
+                    lookup_req = CacheLookupRequest(
+                        organization_id=workspace_id,
+                        workspace_id=workspace_id,
+                        project_id=task.project_id,
+                        user_id=user.id,
+                        prompt_text=prompt_check,
+                        task_type=resolved_reqs.task_type,
+                        model_id=model_selection.model_id,
+                        model_provider=model_selection.provider,
+                        cache_mode=CacheMode(user_cache_mode) if user_cache_mode in ("auto", "enabled", "disabled", "refresh") else CacheMode.AUTO,
+                        namespace=CacheNamespace.WORKSPACE,
+                    )
+                    lookup_res = await cache_svc.lookup(self.session, lookup_req)
+                    if lookup_res.hit and lookup_res.response_content:
+                        cache_hit_result = lookup_res
+                        if tracer:
+                            tracer.record_event(
+                                TraceEventType.CACHE_HIT,
+                                status=TraceEventStatus.COMPLETED,
+                                metadata={
+                                    "entry_id": lookup_res.cache_entry_id,
+                                    "match_type": lookup_res.match_type,
+                                    "similarity": lookup_res.similarity_score,
+                                    "fresh": lookup_res.fresh,
+                                },
+                            )
+                    else:
+                        if tracer:
+                            tracer.record_event(
+                                TraceEventType.CACHE_MISS,
+                                status=TraceEventStatus.COMPLETED,
+                                metadata={"cache_mode": user_cache_mode},
+                            )
+            except Exception as cache_lookup_err:
+                logger.warning(f"Cache lookup failed gracefully: {cache_lookup_err}")
+
+        if cache_hit_result:
+            run.status = RunStatus.COMPLETED.value
+            run.output_content = cache_hit_result.response_content
+            run.latency_ms = int((time.perf_counter() - start_time) * 1000)
+            run.completed_at = datetime.now(timezone.utc)
+            snap = dict(run.input_snapshot) if run.input_snapshot else {}
+            snap["cache"] = {
+                "source": "cache",
+                "cache_entry_id": cache_hit_result.cache_entry_id,
+                "match_type": cache_hit_result.match_type,
+                "fresh": cache_hit_result.fresh,
+                "created_at": str(cache_hit_result.created_at) if cache_hit_result.created_at else None,
+                "expires_at": str(cache_hit_result.expires_at) if cache_hit_result.expires_at else None,
+            }
+            run.input_snapshot = snap
+            if task.status != TaskStatus.DRAFT.value:
+                task.status = TaskStatus.COMPLETED.value
+                self.session.add(task)
+            await self.session.flush()
+            await self.session.refresh(run)
+            if tracer:
+                tracer.record_event(
+                    TraceEventType.RUN_COMPLETED,
+                    status=TraceEventStatus.COMPLETED,
+                    completed_at=run.completed_at,
+                    duration_ms=run.latency_ms,
+                    metadata={"source": "cache", "cache_entry_id": cache_hit_result.cache_entry_id},
+                )
+                await tracer.flush_to_db(self.session)
+            return run
+
         # 5. Execute Orchestration Plan with bounded agentic loop
         try:
             state = await self.orchestrator.execute_task(
@@ -460,6 +553,49 @@ class TaskExecutionService:
                 "sources": run.context_sources,
             }
             run.input_snapshot = snap
+
+            # Step 31: Semantic Cache Admission Gate
+            if workspace_id and run.status == RunStatus.COMPLETED.value and user_cache_mode != "disabled":
+                try:
+                    from backend.app.services.cache.service import CacheService
+                    from backend.app.services.cache.schemas import CacheAdmissionCandidate
+                    from backend.app.services.cache.constants import CacheNamespace
+                    from backend.app.services.cache.lookup import compute_request_fingerprint
+
+                    cache_svc = CacheService()
+                    rfp = compute_request_fingerprint(
+                        normalized_request=prompt_check,
+                        model_id=run.final_model,
+                    )
+                    candidate = CacheAdmissionCandidate(
+                        organization_id=workspace_id,
+                        workspace_id=workspace_id,
+                        project_id=task.project_id,
+                        user_id=user.id,
+                        namespace=CacheNamespace.WORKSPACE,
+                        normalized_request=prompt_check,
+                        request_fingerprint=rfp,
+                        cache_key=rfp,
+                        response_content=run.output_content,
+                        response_metadata={"run_id": str(run.id), "model": run.final_model},
+                        model_id=run.final_model,
+                        model_provider=run.model_provider,
+                    )
+                    admitted_entry, reason = await cache_svc.admit(
+                        db=self.session,
+                        candidate=candidate,
+                        task_type=resolved_reqs.task_type,
+                        execution_success=True,
+                        evaluation_passed=(run.evaluation_status != "failed"),
+                    )
+                    if admitted_entry and tracer:
+                        tracer.record_event(
+                            TraceEventType.CACHE_ADMITTED,
+                            status=TraceEventStatus.COMPLETED,
+                            metadata={"entry_id": str(admitted_entry.id)},
+                        )
+                except Exception as cache_err:
+                    logger.warning(f"Cache admission failed gracefully: {cache_err}")
 
             # Auto-mark task completed if not draft
             if task.status != TaskStatus.DRAFT.value:

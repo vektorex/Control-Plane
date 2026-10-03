@@ -103,6 +103,12 @@ export const siteConfig = {
       description: "Unified multimodal artifacts, images, PDFs, audio, video frames, and structured tables",
     },
     {
+      label: "Semantic Cache",
+      href: "/app/cache",
+      icon: "DatabaseZap",
+      description: "Intelligent reuse layer, exact & semantic matching, invalidation, and metrics",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

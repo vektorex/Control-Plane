@@ -83,6 +83,7 @@ from backend.app.services.multimodal.models import (
     ArtifactPart,
     ArtifactEvidence,
 )
+from backend.app.services.cache.models import CacheEntry
 
 __all__ = [
     "Base",
@@ -157,6 +158,7 @@ __all__ = [
     "Artifact",
     "ArtifactPart",
     "ArtifactEvidence",
+    "CacheEntry",
 ]
 
 

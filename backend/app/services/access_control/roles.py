@@ -86,6 +86,10 @@ from backend.app.services.access_control.permissions import (
     ARTIFACT_DELETE,
     ARTIFACT_PROCESS,
     ARTIFACT_ANALYZE,
+    CACHE_READ,
+    CACHE_CONFIGURE,
+    CACHE_INVALIDATE,
+    CACHE_DELETE,
 )
 
 # 1. Organization Role Permissions
@@ -171,6 +175,10 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_DELETE,
         ARTIFACT_PROCESS,
         ARTIFACT_ANALYZE,
+        CACHE_READ,
+        CACHE_CONFIGURE,
+        CACHE_INVALIDATE,
+        CACHE_DELETE,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -238,6 +246,8 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_UPDATE,
         ARTIFACT_PROCESS,
         ARTIFACT_ANALYZE,
+        CACHE_READ,
+        CACHE_INVALIDATE,
     },
 
     # VIEWER: read-only access to granted resources.
@@ -263,6 +273,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_READ,
         GRAPH_READ,
         ARTIFACT_READ,
+        CACHE_READ,
     },
 }
 
@@ -337,6 +348,10 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_DELETE,
         ARTIFACT_PROCESS,
         ARTIFACT_ANALYZE,
+        CACHE_READ,
+        CACHE_CONFIGURE,
+        CACHE_INVALIDATE,
+        CACHE_DELETE,
     },
     WorkspaceRole.MEMBER.value: {
         WORKSPACE_READ,
@@ -400,6 +415,8 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_UPDATE,
         ARTIFACT_PROCESS,
         ARTIFACT_ANALYZE,
+        CACHE_READ,
+        CACHE_INVALIDATE,
     },
     WorkspaceRole.VIEWER.value: {
         WORKSPACE_READ,
@@ -420,6 +437,7 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_READ,
         GRAPH_READ,
         ARTIFACT_READ,
+        CACHE_READ,
     },
 }
 
@@ -483,6 +501,8 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_UPDATE,
         ARTIFACT_PROCESS,
         ARTIFACT_ANALYZE,
+        CACHE_READ,
+        CACHE_INVALIDATE,
     },
     ProjectRole.VIEWER.value: {
         PROJECT_READ,
@@ -501,5 +521,6 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_READ,
         GRAPH_READ,
         ARTIFACT_READ,
+        CACHE_READ,
     },
 }

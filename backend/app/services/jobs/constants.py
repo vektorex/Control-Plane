@@ -44,6 +44,8 @@ class JobType(str, Enum):
     VIDEO_PROCESSING = "video_processing"
     TABLE_PROCESSING = "table_processing"
     MULTIMODAL_EXTRACTION = "multimodal_extraction"
+    CACHE_REFRESH = "cache_refresh"
+    CACHE_CLEANUP = "cache_cleanup"
 
 
 class JobEventType(str, Enum):

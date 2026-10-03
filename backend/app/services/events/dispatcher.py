@@ -2,15 +2,19 @@
 EventDispatcher for Step 26: Unified Event Bus.
 Routes persisted events to registered consumers with failure isolation and retry tracking.
 """
+from __future__ import annotations
+
 import asyncio
-from typing import Any, List, Optional
+from typing import Any, List, Optional, TYPE_CHECKING
 from uuid import UUID
 
 from backend.app.core.logging import logger
 from backend.app.services.events.constants import EventDeliveryStatus
 from backend.app.services.events.consumer import EventConsumer, consumer_registry
-from backend.app.services.events.repository import EventRepository
 from backend.app.services.events.schemas import EventContract
+
+if TYPE_CHECKING:
+    from backend.app.services.events.repository import EventRepository
 
 
 class EventDispatcher:

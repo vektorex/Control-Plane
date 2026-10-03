@@ -63,6 +63,13 @@ class TraceEventType(str, Enum):
     TRIGGER_FAILED = "trigger_failed"
     TRIGGER_RETRY = "trigger_retry"
     TRIGGER_RATE_LIMITED = "trigger_rate_limited"
+    CACHE_LOOKUP = "cache_lookup"
+    CACHE_HIT = "cache_hit"
+    CACHE_MISS = "cache_miss"
+    CACHE_BYPASS = "cache_bypass"
+    CACHE_ADMITTED = "cache_admitted"
+    CACHE_INVALIDATED = "cache_invalidated"
+    CACHE_REFRESH = "cache_refresh"
     RUN_COMPLETED = "run_completed"
     RUN_FAILED = "run_failed"
 

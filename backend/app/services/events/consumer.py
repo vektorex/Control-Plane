@@ -191,6 +191,52 @@ class RealtimeEventConsumer(EventConsumer):
         return True
 
 
+class CacheInvalidationEventConsumer(EventConsumer):
+    """
+    Consumes domain events to execute surgical cache invalidation sweeps.
+    Does not flush entire cache for every event.
+    """
+    @property
+    def consumer_name(self) -> str:
+        return "cache_invalidation_consumer"
+
+    @property
+    def supported_event_types(self) -> List[str]:
+        return [
+            "prompt.release_changed",
+            "prompt.rolled_back",
+            "artifact.processing_completed",
+            "document.updated",
+            "graph.entity_updated",
+            "graph.relationship_created",
+            "graph.relationship_removed",
+            "memory.updated",
+            "workflow.updated",
+            "connector.updated",
+            "model.configuration_changed",
+        ]
+
+    async def process(self, event: EventContract) -> bool:
+        from backend.app.db.database import get_db_context
+        from backend.app.services.cache.service import CacheService
+
+        try:
+            async with get_db_context() as session:
+                cache_svc = CacheService()
+                await cache_svc.invalidation_svc.handle_domain_event(
+                    db=session,
+                    event_name=event.type,
+                    payload={
+                        "workspace_id": event.workspace_id,
+                        **event.payload,
+                    },
+                )
+            return True
+        except Exception as err:
+            logger.warning(f"[CacheInvalidationEventConsumer] Event processing failed gracefully: {err}")
+            return True
+
+
 class EventConsumerRegistry:
     """
     Registry for trusted internal event consumers.
@@ -218,6 +264,7 @@ class EventConsumerRegistry:
         self.register(ObservabilityEventConsumer())
         self.register(AuditEventConsumer())
         self.register(RealtimeEventConsumer())
+        self.register(CacheInvalidationEventConsumer())
 
 
 # Global consumer registry singleton

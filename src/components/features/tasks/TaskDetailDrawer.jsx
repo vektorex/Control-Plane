@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Cpu, Clock, CheckCircle2, AlertCircle, Zap, Trash2, Loader2, Play } from "lucide-react";
+import { X, Cpu, Clock, CheckCircle2, AlertCircle, Zap, Trash2, Loader2, Play, DatabaseZap } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
@@ -185,6 +185,20 @@ export function TaskDetailDrawer({ task, onClose, onTaskUpdated, onTaskDeleted }
                         {formatDate(run.created_at)}
                       </span>
                     </div>
+
+                    {run.input_snapshot?.cache && (
+                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px]">
+                        <DatabaseZap className="w-3.5 h-3.5 shrink-0" />
+                        <span className="font-medium">
+                          Reused cached result ({run.input_snapshot.cache.match_type || "exact"})
+                        </span>
+                        {run.input_snapshot.cache.created_at && (
+                          <span className="text-slate-400 ml-auto text-[10px]">
+                            cached {new Date(run.input_snapshot.cache.created_at).toLocaleTimeString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300 font-mono pt-1">
                       {run.model_name && (

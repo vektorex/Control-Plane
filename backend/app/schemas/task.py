@@ -24,6 +24,8 @@ class TaskBase(BaseModel):
     task_type: Optional[str] = Field(default=None, description="Optional task category classification")
     # Step 30: Multimodal Artifacts
     artifact_ids: Optional[List[UUID]] = Field(default=None, description="Optional referenced multimodal artifact IDs")
+    # Step 31: Semantic Cache
+    cache_mode: Optional[str] = Field(default="auto", description="Cache mode: auto | enabled | disabled | refresh")
 
 
 class TaskCreate(TaskBase):
@@ -43,6 +45,7 @@ class TaskUpdate(BaseModel):
     expected_format: Optional[str] = Field(default=None)
     execution_mode: Optional[str] = Field(default=None)
     task_type: Optional[str] = Field(default=None)
+    cache_mode: Optional[str] = Field(default=None)
 
 
 class TaskRunRequest(BaseModel):
@@ -87,6 +90,9 @@ class TaskRunRequest(BaseModel):
 
     # Step 30: Multimodal Artifacts
     artifact_ids: Optional[List[UUID]] = Field(default=None, description="Optional referenced multimodal artifact IDs")
+
+    # Step 31: Semantic Cache
+    cache_mode: Optional[str] = Field(default="auto", description="Cache mode: auto | enabled | disabled | refresh")
 
 
 class TaskResponse(BaseModel):

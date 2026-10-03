@@ -577,6 +577,66 @@ class WorkflowExecutor:
             metadata={"step_id": step.id, "name": step.name},
         )
 
+        # Step 31: Workflow Step Cache Lookup
+        cacheable_types = (StepType.GENERATE, StepType.TRANSFORM, StepType.EVALUATE)
+        step_cache_hit = False
+        step_cache_data = None
+        if step.type in cacheable_types and step.cache_mode != "disabled":
+            try:
+                from backend.app.services.cache.service import CacheService
+                from backend.app.services.cache.schemas import CacheLookupRequest
+                from backend.app.services.cache.constants import CacheMode, CacheNamespace
+                from backend.app.services.cache.lookup import compute_request_fingerprint
+
+                cache_svc = CacheService()
+                resolved_cfg = state.resolve_value(step.config or {})
+                step_str = json.dumps(resolved_cfg, sort_keys=True)
+                step_fp = compute_request_fingerprint(
+                    normalized_request=f"workflow_step:{step.id}:{step_str}",
+                    model_id=(step.config or {}).get("model"),
+                )
+                lookup_req = CacheLookupRequest(
+                    organization_id=workspace_id,
+                    workspace_id=workspace_id,
+                    project_id=project_id,
+                    user_id=user.id,
+                    prompt_text=f"workflow_step:{step.id}:{step_str}",
+                    model_id=(step.config or {}).get("model"),
+                    cache_mode=CacheMode(step.cache_mode) if step.cache_mode in ("auto", "enabled", "disabled", "refresh") else CacheMode.AUTO,
+                    namespace=CacheNamespace.WORKSPACE,
+                )
+                c_res = await cache_svc.lookup(self.session, lookup_req)
+                if c_res.hit and c_res.response_content:
+                    step_cache_hit = True
+                    try:
+                        step_cache_data = json.loads(c_res.response_content)
+                    except Exception:
+                        step_cache_data = c_res.response_content
+            except Exception as wfc_err:
+                logger.debug(f"[WorkflowExecutor] Step cache lookup skipped: {wfc_err}")
+
+        if step_cache_hit:
+            duration_ms = int((time.perf_counter() - step_start) * 1000)
+            state.step_outputs[step.id] = step_cache_data
+            res = WorkflowStepRunResult(
+                step_id=step.id,
+                step_name=step.name,
+                step_type=step.type.value,
+                status="completed",
+                duration_ms=duration_ms,
+                output_summary=str(step_cache_data)[:200] if step_cache_data else None,
+                output_data=step_cache_data,
+                metadata={"source": "cache", "cache_hit": True},
+            )
+            tracer.record_event(
+                TraceEventType.GENERATION_COMPLETED if step.type == StepType.GENERATE else TraceEventType.PLANNING_COMPLETED,
+                step_type=step.type.value,
+                status=TraceEventStatus.COMPLETED,
+                duration_ms=duration_ms,
+                metadata={"step_id": step.id, "status": "completed", "source": "cache"},
+            )
+            return None, res
+
         while attempt <= retries_allowed:
             try:
                 jump_target, output_data, metadata = await self._dispatch_step(
@@ -589,6 +649,42 @@ class WorkflowExecutor:
 
                 duration_ms = int((time.perf_counter() - step_start) * 1000)
                 state.step_outputs[step.id] = output_data
+
+                # Step 31: Cache Admission for Step Output
+                if step.type in cacheable_types and step.cache_mode != "disabled":
+                    try:
+                        from backend.app.services.cache.service import CacheService
+                        from backend.app.services.cache.schemas import CacheAdmissionCandidate
+                        from backend.app.services.cache.constants import CacheNamespace
+                        from backend.app.services.cache.lookup import compute_request_fingerprint
+
+                        cache_svc = CacheService()
+                        resolved_cfg = state.resolve_value(step.config or {})
+                        step_str = json.dumps(resolved_cfg, sort_keys=True)
+                        step_fp = compute_request_fingerprint(
+                            normalized_request=f"workflow_step:{step.id}:{step_str}",
+                            model_id=(step.config or {}).get("model"),
+                        )
+                        candidate = CacheAdmissionCandidate(
+                            organization_id=workspace_id,
+                            workspace_id=workspace_id,
+                            project_id=project_id,
+                            user_id=user.id,
+                            namespace=CacheNamespace.WORKSPACE,
+                            normalized_request=f"workflow_step:{step.id}:{step_str}",
+                            request_fingerprint=step_fp,
+                            cache_key=step_fp,
+                            response_content=json.dumps(output_data) if isinstance(output_data, (dict, list)) else str(output_data),
+                            model_id=(step.config or {}).get("model"),
+                        )
+                        await cache_svc.admit(
+                            db=self.session,
+                            candidate=candidate,
+                            task_type="workflow_step",
+                            execution_success=True,
+                        )
+                    except Exception as adm_err:
+                        logger.debug(f"[WorkflowExecutor] Step cache admission failed: {adm_err}")
 
                 res = WorkflowStepRunResult(
                     step_id=step.id,
@@ -608,7 +704,6 @@ class WorkflowExecutor:
                     duration_ms=duration_ms,
                     metadata={"step_id": step.id, "status": "completed"},
                 )
-
                 return jump_target, res
 
             except Exception as exc:

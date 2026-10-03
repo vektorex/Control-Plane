@@ -27,6 +27,7 @@ class AggregateType(str, Enum):
     PROMPT_EXPERIMENT = "prompt_experiment"
     GRAPH = "graph"
     ARTIFACT = "artifact"
+    CACHE = "cache"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -166,6 +167,15 @@ class SystemEventType(str, Enum):
     ARTIFACT_ANALYSIS_STARTED = "artifact.analysis_started"
     ARTIFACT_ANALYSIS_COMPLETED = "artifact.analysis_completed"
     ARTIFACT_ANALYSIS_FAILED = "artifact.analysis_failed"
+
+    # Step 31 Semantic Cache events
+    CACHE_ENTRY_CREATED = "cache.entry_created"
+    CACHE_HIT = "cache.hit"
+    CACHE_MISS = "cache.miss"
+    CACHE_INVALIDATED = "cache.invalidated"
+    CACHE_REFRESH_STARTED = "cache.refresh_started"
+    CACHE_REFRESH_COMPLETED = "cache.refresh_completed"
+    CACHE_REFRESH_FAILED = "cache.refresh_failed"
 
 
 # Auditable event types

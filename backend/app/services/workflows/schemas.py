@@ -76,6 +76,7 @@ class WorkflowStepDefinition(BaseModel):
     enabled: bool = True
     on_failure: str = Field(default="fail", description="Action on failure: 'fail' | 'skip' | 'retry'")
     max_retries: int = Field(default=0, ge=0, le=2, description="Maximum retry attempts (0-2)")
+    cache_mode: Optional[str] = Field(default=None, description="Optional step-level cache mode: 'auto' | 'enabled' | 'disabled' | 'refresh'")
 
 
 class WorkflowDefinition(BaseModel):
@@ -86,6 +87,7 @@ class WorkflowDefinition(BaseModel):
     input_schema: Dict[str, Any] = Field(default_factory=dict)
     output_schema: Optional[Dict[str, Any]] = None
     configuration: Dict[str, Any] = Field(default_factory=dict)
+    cache_policy: Optional[str] = Field(default="safe", description="Workflow cache policy: 'disabled' | 'safe' | 'aggressive'")
     steps: List[WorkflowStepDefinition] = Field(default_factory=list)
 
 

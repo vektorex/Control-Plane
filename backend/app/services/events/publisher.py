@@ -10,7 +10,6 @@ from backend.app.core.logging import logger
 from backend.app.services.events.consumer import consumer_registry
 from backend.app.services.events.dispatcher import EventDispatcher
 from backend.app.services.events.policies import EventPolicyEngine
-from backend.app.services.events.repository import EventRepository
 from backend.app.services.events.sanitizer import EventSanitizer
 from backend.app.services.events.schemas import EventContract, EventPublishRequest
 
@@ -28,6 +27,7 @@ class EventPublisher:
     """
 
     def __init__(self, session: AsyncSession):
+        from backend.app.services.events.repository import EventRepository
         self.session = session
         self.repository = EventRepository(session)
 

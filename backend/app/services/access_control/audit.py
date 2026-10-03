@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.logging import logger
 from backend.app.services.access_control.constants import AccessControlAuditEvent
 from backend.app.services.events.constants import ActorType, AggregateType
-from backend.app.services.events.publisher import EventPublisher
 from backend.app.services.events.schemas import EventPublishRequest
 
 
@@ -48,6 +47,7 @@ class AccessControlAudit:
         # If a workspace_id is present, publish via Unified Event Bus (Step 26)
         if workspace_id:
             try:
+                from backend.app.services.events.publisher import EventPublisher
                 publisher = EventPublisher(session)
                 req = EventPublishRequest(
                     workspace_id=workspace_id,

@@ -139,6 +139,12 @@ export const siteConfig = {
       description: "Application-level backups, cryptographic integrity, restore orchestration, recovery objectives, and continuity plans",
     },
     {
+      label: "Developer Platform",
+      href: "/app/developer",
+      icon: "Code2",
+      description: "Public API, developer applications, scoped API keys, webhooks, rate quotas, and SDKs",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

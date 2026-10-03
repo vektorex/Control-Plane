@@ -138,6 +138,18 @@ from backend.app.services.disaster_recovery.models import (
     RecoveryExercise,
     RecoveryExerciseObservation,
 )
+from backend.app.services.developer_platform.models import (
+    DeveloperApplication,
+    APICredential,
+    APIScopeAssignment,
+    APIResourceScope,
+    APIQuota,
+    APIIdempotencyRecord,
+    APIUsageRecord,
+    WebhookSubscription,
+    ApplicationApproval,
+    APIEnvironmentConfig,
+)
 
 __all__ = [
     "Base",
@@ -257,6 +269,16 @@ __all__ = [
     "ContinuityPlan",
     "RecoveryExercise",
     "RecoveryExerciseObservation",
+    "DeveloperApplication",
+    "APICredential",
+    "APIScopeAssignment",
+    "APIResourceScope",
+    "APIQuota",
+    "APIIdempotencyRecord",
+    "APIUsageRecord",
+    "WebhookSubscription",
+    "ApplicationApproval",
+    "APIEnvironmentConfig",
 ]
 
 

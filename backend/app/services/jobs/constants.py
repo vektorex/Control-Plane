@@ -68,6 +68,7 @@ class JobType(str, Enum):
     RECOVERY_RESTORE_RUN = "recovery_restore_run"
     RECOVERY_RESTORE_VERIFICATION = "recovery_restore_verification"
     RECOVERY_EXERCISE = "recovery_exercise"
+    PUBLIC_WEBHOOK_DELIVERY = "public_webhook_delivery"
 
 
 class JobEventType(str, Enum):

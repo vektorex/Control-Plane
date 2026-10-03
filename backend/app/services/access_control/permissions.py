@@ -163,8 +163,20 @@ RECOVERY_RESTORE = "recovery.restore"
 RECOVERY_EXERCISE = "recovery.exercise"
 RECOVERY_ADMIN = "recovery.admin"
 
+# Developer Platform permissions (Step 37)
+DEVELOPER_READ = "developer.read"
+DEVELOPER_MANAGE = "developer.manage"
+DEVELOPER_CREDENTIAL_CREATE = "developer.credential_create"
+DEVELOPER_CREDENTIAL_REVOKE = "developer.credential_revoke"
+DEVELOPER_ADMIN = "developer.admin"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    DEVELOPER_READ,
+    DEVELOPER_MANAGE,
+    DEVELOPER_CREDENTIAL_CREATE,
+    DEVELOPER_CREDENTIAL_REVOKE,
+    DEVELOPER_ADMIN,
     RECOVERY_READ,
     RECOVERY_BACKUP,
     RECOVERY_RESTORE,

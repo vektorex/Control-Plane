@@ -33,6 +33,7 @@ class AggregateType(str, Enum):
     SECURITY = "security"
     RELIABILITY = "reliability"
     RECOVERY = "recovery"
+    DEVELOPER = "developer"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -256,6 +257,18 @@ class SystemEventType(str, Enum):
     RECOVERY_EXERCISE_COMPLETED = "recovery.exercise.completed"
     RECOVERY_EXERCISE_FAILED = "recovery.exercise.failed"
     RECOVERY_READINESS_CHANGED = "recovery.readiness.changed"
+
+    # Step 37 Developer Platform & Public API events
+    DEVELOPER_APPLICATION_CREATED = "developer.application.created"
+    DEVELOPER_APPLICATION_UPDATED = "developer.application.updated"
+    DEVELOPER_APPLICATION_SUSPENDED = "developer.application.suspended"
+    DEVELOPER_CREDENTIAL_CREATED = "developer.credential.created"
+    DEVELOPER_CREDENTIAL_ROTATED = "developer.credential.rotated"
+    DEVELOPER_CREDENTIAL_REVOKED = "developer.credential.revoked"
+    DEVELOPER_WEBHOOK_CREATED = "developer.webhook.created"
+    DEVELOPER_WEBHOOK_FAILED = "developer.webhook.failed"
+    DEVELOPER_API_RATE_LIMITED = "developer.api.rate_limited"
+    DEVELOPER_API_POLICY_DENIED = "developer.api.policy_denied"
 
 
 # Auditable event types

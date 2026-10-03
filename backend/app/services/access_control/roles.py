@@ -118,6 +118,11 @@ from backend.app.services.access_control.permissions import (
     RECOVERY_RESTORE,
     RECOVERY_EXERCISE,
     RECOVERY_ADMIN,
+    DEVELOPER_READ,
+    DEVELOPER_MANAGE,
+    DEVELOPER_CREDENTIAL_CREATE,
+    DEVELOPER_CREDENTIAL_REVOKE,
+    DEVELOPER_ADMIN,
 )
 
 # 1. Organization Role Permissions
@@ -233,6 +238,11 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         RECOVERY_RESTORE,
         RECOVERY_EXERCISE,
         RECOVERY_ADMIN,
+        DEVELOPER_READ,
+        DEVELOPER_MANAGE,
+        DEVELOPER_CREDENTIAL_CREATE,
+        DEVELOPER_CREDENTIAL_REVOKE,
+        DEVELOPER_ADMIN,
     },
 
     # MEMBER: normal workspace/project execution and authoring

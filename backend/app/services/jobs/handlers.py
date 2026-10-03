@@ -1102,6 +1102,20 @@ class RecoveryExerciseJobHandler(JobHandler):
         return {"status": "completed", "exercise_simulated": True}
 
 
+class PublicWebhookDeliveryJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        sub_id = job.payload.get("subscription_id")
+        event_type = job.payload.get("event_type", "webhook.event")
+        data = job.payload.get("payload", {})
+        if not sub_id:
+            return {"status": "failed", "error": "Missing subscription_id"}
+
+        from backend.app.services.developer_platform.webhook_delivery import WebhookDeliveryService
+        delivery_svc = WebhookDeliveryService(context.session)
+        success = await delivery_svc.deliver_webhook(sub_id, event_type, data)
+        return {"status": "completed" if success else "failed", "delivered": success}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -1153,6 +1167,7 @@ class JobHandlerRegistry:
         self.register(JobType.RECOVERY_RESTORE_RUN.value, RecoveryRestoreRunJobHandler())
         self.register(JobType.RECOVERY_RESTORE_VERIFICATION.value, RecoveryRestoreVerificationJobHandler())
         self.register(JobType.RECOVERY_EXERCISE.value, RecoveryExerciseJobHandler())
+        self.register(JobType.PUBLIC_WEBHOOK_DELIVERY.value, PublicWebhookDeliveryJobHandler())
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

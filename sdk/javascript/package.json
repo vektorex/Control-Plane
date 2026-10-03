@@ -1,0 +1,22 @@
+{
+  "name": "@ai-work-layer/sdk",
+  "version": "1.0.0",
+  "description": "Official JavaScript SDK for the AI Work Layer Public API",
+  "main": "src/index.js",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./webhooks": "./src/webhooks.js",
+    "./errors": "./src/errors.js"
+  },
+  "keywords": [
+    "ai-work-layer",
+    "sdk",
+    "orchestration",
+    "llm",
+    "workflows",
+    "tasks"
+  ],
+  "author": "AI Work Layer Team",
+  "license": "Apache-2.0"
+}

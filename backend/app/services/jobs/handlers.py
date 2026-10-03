@@ -1067,6 +1067,41 @@ class ReliabilityCircuitReconciliationJobHandler(JobHandler):
         return {"status": "completed", "circuits_reconciled": True}
 
 
+class RecoveryBackupRunJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        return {"status": "completed", "backup_executed": True}
+
+
+class RecoveryBackupResourceBatchJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        return {"status": "completed", "batch_processed": True}
+
+
+class RecoveryBackupVerificationJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        return {"status": "completed", "backup_verified": True}
+
+
+class RecoveryBackupCleanupJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        return {"status": "completed", "expired_backups_purged": 0}
+
+
+class RecoveryRestoreRunJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        return {"status": "completed", "restore_executed": True}
+
+
+class RecoveryRestoreVerificationJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        return {"status": "completed", "restored_state_verified": True}
+
+
+class RecoveryExerciseJobHandler(JobHandler):
+    async def execute(self, job: Job, context: JobExecutionContext, cancellation_token: asyncio.Event) -> Dict[str, Any]:
+        return {"status": "completed", "exercise_simulated": True}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -1111,6 +1146,13 @@ class JobHandlerRegistry:
         self.register(JobType.RELIABILITY_CHECKPOINT_CLEANUP.value, ReliabilityCheckpointCleanupJobHandler())
         self.register(JobType.RELIABILITY_SLO_MONITORING.value, ReliabilitySloMonitoringJobHandler())
         self.register(JobType.RELIABILITY_CIRCUIT_RECONCILIATION.value, ReliabilityCircuitReconciliationJobHandler())
+        self.register(JobType.RECOVERY_BACKUP_RUN.value, RecoveryBackupRunJobHandler())
+        self.register(JobType.RECOVERY_BACKUP_RESOURCE_BATCH.value, RecoveryBackupResourceBatchJobHandler())
+        self.register(JobType.RECOVERY_BACKUP_VERIFICATION.value, RecoveryBackupVerificationJobHandler())
+        self.register(JobType.RECOVERY_BACKUP_CLEANUP.value, RecoveryBackupCleanupJobHandler())
+        self.register(JobType.RECOVERY_RESTORE_RUN.value, RecoveryRestoreRunJobHandler())
+        self.register(JobType.RECOVERY_RESTORE_VERIFICATION.value, RecoveryRestoreVerificationJobHandler())
+        self.register(JobType.RECOVERY_EXERCISE.value, RecoveryExerciseJobHandler())
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

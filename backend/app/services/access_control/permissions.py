@@ -156,8 +156,20 @@ RELIABILITY_RECOVER = "reliability.recover"
 CHAOS_EXECUTE = "chaos.execute"
 RELIABILITY_ADMIN = "reliability.admin"
 
+# Disaster Recovery, Backup & Continuity permissions (Step 36)
+RECOVERY_READ = "recovery.read"
+RECOVERY_BACKUP = "recovery.backup"
+RECOVERY_RESTORE = "recovery.restore"
+RECOVERY_EXERCISE = "recovery.exercise"
+RECOVERY_ADMIN = "recovery.admin"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    RECOVERY_READ,
+    RECOVERY_BACKUP,
+    RECOVERY_RESTORE,
+    RECOVERY_EXERCISE,
+    RECOVERY_ADMIN,
     RELIABILITY_READ,
     RELIABILITY_MANAGE,
     RELIABILITY_RECOVER,

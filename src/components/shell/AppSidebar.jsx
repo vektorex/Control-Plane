@@ -30,6 +30,7 @@ import {
   ShieldAlert,
   FileCheck2,
   Siren,
+  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -64,6 +65,7 @@ const iconMap = {
   Bell,
   Settings,
   Building2,
+  LifeBuoy,
 };
 
 export function AppSidebar({ className = "", onCloseMobile }) {

@@ -124,6 +124,20 @@ from backend.app.services.reliability.models import (
     ChaosRun,
     ChaosObservation,
 )
+from backend.app.services.disaster_recovery.models import (
+    BackupResource,
+    BackupPolicy,
+    BackupRun,
+    BackupManifest,
+    BackupVerification,
+    RestorePlan,
+    RestoreRun,
+    RecoveryObjective,
+    RecoveryReadiness,
+    ContinuityPlan,
+    RecoveryExercise,
+    RecoveryExerciseObservation,
+)
 
 __all__ = [
     "Base",
@@ -231,6 +245,18 @@ __all__ = [
     "ChaosExperiment",
     "ChaosRun",
     "ChaosObservation",
+    "BackupResource",
+    "BackupPolicy",
+    "BackupRun",
+    "BackupManifest",
+    "BackupVerification",
+    "RestorePlan",
+    "RestoreRun",
+    "RecoveryObjective",
+    "RecoveryReadiness",
+    "ContinuityPlan",
+    "RecoveryExercise",
+    "RecoveryExerciseObservation",
 ]
 
 

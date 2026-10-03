@@ -32,6 +32,7 @@ class AggregateType(str, Enum):
     DATA_GOVERNANCE = "data_governance"
     SECURITY = "security"
     RELIABILITY = "reliability"
+    RECOVERY = "recovery"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -239,6 +240,22 @@ class SystemEventType(str, Enum):
     RELIABILITY_RESUME_FAILED = "reliability.resume.failed"
     RELIABILITY_CIRCUIT_OPENED = "reliability.circuit.opened"
     RELIABILITY_CIRCUIT_CLOSED = "reliability.circuit.closed"
+
+    # Step 36 Disaster Recovery & Business Continuity events
+    RECOVERY_BACKUP_STARTED = "recovery.backup.started"
+    RECOVERY_BACKUP_COMPLETED = "recovery.backup.completed"
+    RECOVERY_BACKUP_FAILED = "recovery.backup.failed"
+    RECOVERY_BACKUP_VERIFIED = "recovery.backup.verified"
+    RECOVERY_BACKUP_INVALID = "recovery.backup.invalid"
+    RECOVERY_RESTORE_PLANNED = "recovery.restore.planned"
+    RECOVERY_RESTORE_APPROVED = "recovery.restore.approved"
+    RECOVERY_RESTORE_STARTED = "recovery.restore.started"
+    RECOVERY_RESTORE_COMPLETED = "recovery.restore.completed"
+    RECOVERY_RESTORE_FAILED = "recovery.restore.failed"
+    RECOVERY_EXERCISE_STARTED = "recovery.exercise.started"
+    RECOVERY_EXERCISE_COMPLETED = "recovery.exercise.completed"
+    RECOVERY_EXERCISE_FAILED = "recovery.exercise.failed"
+    RECOVERY_READINESS_CHANGED = "recovery.readiness.changed"
 
 
 # Auditable event types

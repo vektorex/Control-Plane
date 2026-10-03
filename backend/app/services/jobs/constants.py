@@ -61,6 +61,13 @@ class JobType(str, Enum):
     RELIABILITY_CHECKPOINT_CLEANUP = "reliability_checkpoint_cleanup"
     RELIABILITY_SLO_MONITORING = "reliability_slo_monitoring"
     RELIABILITY_CIRCUIT_RECONCILIATION = "reliability_circuit_reconciliation"
+    RECOVERY_BACKUP_RUN = "recovery_backup_run"
+    RECOVERY_BACKUP_RESOURCE_BATCH = "recovery_backup_resource_batch"
+    RECOVERY_BACKUP_VERIFICATION = "recovery_backup_verification"
+    RECOVERY_BACKUP_CLEANUP = "recovery_backup_cleanup"
+    RECOVERY_RESTORE_RUN = "recovery_restore_run"
+    RECOVERY_RESTORE_VERIFICATION = "recovery_restore_verification"
+    RECOVERY_EXERCISE = "recovery_exercise"
 
 
 class JobEventType(str, Enum):

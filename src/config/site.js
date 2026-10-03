@@ -133,6 +133,12 @@ export const siteConfig = {
       description: "Component health, dependency monitoring, execution checkpoints, circuit breakers, and chaos experiments",
     },
     {
+      label: "Disaster Recovery",
+      href: "/app/recovery",
+      icon: "LifeBuoy",
+      description: "Application-level backups, cryptographic integrity, restore orchestration, recovery objectives, and continuity plans",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

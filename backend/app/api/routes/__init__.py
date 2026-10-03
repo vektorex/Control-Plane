@@ -38,6 +38,7 @@ from backend.app.api.routes.governance import router as governance_router
 from backend.app.api.routes.data_governance import router as data_governance_router
 from backend.app.api.routes.security import router as security_router
 from backend.app.api.routes.reliability import router as reliability_router
+from backend.app.api.routes.recovery import router as recovery_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -58,6 +59,7 @@ api_router.include_router(governance_router)
 api_router.include_router(data_governance_router)
 api_router.include_router(security_router)
 api_router.include_router(reliability_router)
+api_router.include_router(recovery_router)
 api_router.include_router(tools_router)
 api_router.include_router(evaluation_router)
 api_router.include_router(analytics_router)

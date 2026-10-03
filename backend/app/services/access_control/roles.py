@@ -103,6 +103,11 @@ from backend.app.services.access_control.permissions import (
     DATA_GOVERNANCE_DELETE,
     DATA_GOVERNANCE_LEGAL_HOLD,
     DATA_GOVERNANCE_AUDIT,
+    SECURITY_READ,
+    SECURITY_MANAGE,
+    SECURITY_CONTAIN,
+    SECURITY_INVESTIGATE,
+    SECURITY_ADMIN,
 )
 
 # 1. Organization Role Permissions
@@ -203,6 +208,11 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         DATA_GOVERNANCE_DELETE,
         DATA_GOVERNANCE_LEGAL_HOLD,
         DATA_GOVERNANCE_AUDIT,
+        SECURITY_READ,
+        SECURITY_MANAGE,
+        SECURITY_CONTAIN,
+        SECURITY_INVESTIGATE,
+        SECURITY_ADMIN,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -392,6 +402,10 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         DATA_GOVERNANCE_DELETE,
         DATA_GOVERNANCE_LEGAL_HOLD,
         DATA_GOVERNANCE_AUDIT,
+        SECURITY_READ,
+        SECURITY_MANAGE,
+        SECURITY_CONTAIN,
+        SECURITY_INVESTIGATE,
     },
     WorkspaceRole.MEMBER.value: {
         WORKSPACE_READ,

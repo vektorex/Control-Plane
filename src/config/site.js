@@ -121,6 +121,12 @@ export const siteConfig = {
       description: "Data inventory, classification, provenance lineage, retention lifecycle, legal holds, and immutable compliance evidence",
     },
     {
+      label: "Security Operations",
+      href: "/app/security",
+      icon: "Siren",
+      description: "Threat detection, deterministic signal ingestion, incident correlation, containment, and response playbooks",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

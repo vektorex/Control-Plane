@@ -30,6 +30,7 @@ class AggregateType(str, Enum):
     CACHE = "cache"
     GOVERNANCE = "governance"
     DATA_GOVERNANCE = "data_governance"
+    SECURITY = "security"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -211,6 +212,13 @@ class SystemEventType(str, Enum):
     DATA_LEGAL_HOLD_RELEASED = "data.legal_hold.released"
     DATA_EVIDENCE_CREATED = "data.evidence.created"
 
+    # Step 34 Security Operations events
+    SECURITY_SIGNAL_CREATED = "security.signal.created"
+    SECURITY_INCIDENT_CREATED = "security.incident.created"
+    SECURITY_INCIDENT_UPDATED = "security.incident.updated"
+    SECURITY_CONTAINMENT_REQUESTED = "security.containment.requested"
+    SECURITY_CONTAINMENT_COMPLETED = "security.containment.completed"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
@@ -275,6 +283,12 @@ AUDITABLE_EVENTS = {
     SystemEventType.DATA_LEGAL_HOLD_CREATED.value,
     SystemEventType.DATA_LEGAL_HOLD_RELEASED.value,
     SystemEventType.DATA_EVIDENCE_CREATED.value,
+    # Step 34 Security Operations auditable events
+    SystemEventType.SECURITY_SIGNAL_CREATED.value,
+    SystemEventType.SECURITY_INCIDENT_CREATED.value,
+    SystemEventType.SECURITY_INCIDENT_UPDATED.value,
+    SystemEventType.SECURITY_CONTAINMENT_REQUESTED.value,
+    SystemEventType.SECURITY_CONTAINMENT_COMPLETED.value,
 }
 
 # Sensitive keys scrubbed from all payloads

@@ -13,7 +13,7 @@ PATTERNS = {
     "ip_address": re.compile(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"),
     "credit_card": re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"),
     "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
-    "api_key_openai": re.compile(r"sk-[a-zA-Z0-9]{20,}"),
+    "api_key_openai": re.compile(r"sk-[a-zA-Z0-9_-]{20,}"),
     "api_key_anthropic": re.compile(r"sk-ant-[a-zA-Z0-9_-]{20,}"),
     "api_key_aws": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "api_key_github": re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{36,}\b"),

@@ -142,6 +142,13 @@ DATA_GOVERNANCE_DELETE = "data_governance.delete"
 DATA_GOVERNANCE_LEGAL_HOLD = "data_governance.legal_hold"
 DATA_GOVERNANCE_AUDIT = "data_governance.audit"
 
+# Security Operations permissions (Step 34)
+SECURITY_READ = "security.read"
+SECURITY_MANAGE = "security.manage"
+SECURITY_CONTAIN = "security.contain"
+SECURITY_INVESTIGATE = "security.investigate"
+SECURITY_ADMIN = "security.admin"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
     CACHE_READ,
@@ -159,6 +166,11 @@ ALL_PERMISSIONS = {
     DATA_GOVERNANCE_DELETE,
     DATA_GOVERNANCE_LEGAL_HOLD,
     DATA_GOVERNANCE_AUDIT,
+    SECURITY_READ,
+    SECURITY_MANAGE,
+    SECURITY_CONTAIN,
+    SECURITY_INVESTIGATE,
+    SECURITY_ADMIN,
     ORGANIZATION_READ,
     ORGANIZATION_UPDATE,
     ORGANIZATION_DELETE,

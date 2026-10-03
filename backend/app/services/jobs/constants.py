@@ -53,6 +53,10 @@ class JobType(str, Enum):
     DATA_ANONYMIZATION = "data_anonymization"
     DATA_ARCHIVE = "data_archive"
     PRIVACY_REQUEST = "privacy_request"
+    SECURITY_SIGNAL_PROCESSING = "security_signal_processing"
+    SECURITY_CORRELATION = "security_correlation"
+    SECURITY_RETENTION = "security_retention"
+    SECURITY_INDICATOR_CLEANUP = "security_indicator_cleanup"
 
 
 class JobEventType(str, Enum):

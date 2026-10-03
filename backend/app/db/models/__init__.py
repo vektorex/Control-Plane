@@ -105,6 +105,15 @@ from backend.app.services.data_governance.models import (
     ComplianceEvidence,
     DataAccessRecord,
 )
+from backend.app.services.security.models import (
+    SecuritySignal,
+    SecurityIncident,
+    IncidentSignal,
+    IncidentTimelineEvent,
+    SecurityIndicator,
+    SecurityPlaybook,
+    ContainmentAction,
+)
 
 __all__ = [
     "Base",
@@ -197,6 +206,13 @@ __all__ = [
     "LegalHoldAsset",
     "ComplianceEvidence",
     "DataAccessRecord",
+    "SecuritySignal",
+    "SecurityIncident",
+    "IncidentSignal",
+    "IncidentTimelineEvent",
+    "SecurityIndicator",
+    "SecurityPlaybook",
+    "ContainmentAction",
 ]
 
 

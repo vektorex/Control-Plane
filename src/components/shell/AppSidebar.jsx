@@ -29,6 +29,7 @@ import {
   DatabaseZap,
   ShieldAlert,
   FileCheck2,
+  Siren,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -48,6 +49,7 @@ const iconMap = {
   ShieldCheck,
   ShieldAlert,
   FileCheck2,
+  Siren,
   Plug,
   Brain,
   Network,

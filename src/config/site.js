@@ -127,6 +127,12 @@ export const siteConfig = {
       description: "Threat detection, deterministic signal ingestion, incident correlation, containment, and response playbooks",
     },
     {
+      label: "Reliability & Resilience",
+      href: "/app/reliability",
+      icon: "Activity",
+      description: "Component health, dependency monitoring, execution checkpoints, circuit breakers, and chaos experiments",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

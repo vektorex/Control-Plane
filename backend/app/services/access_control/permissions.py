@@ -149,8 +149,20 @@ SECURITY_CONTAIN = "security.contain"
 SECURITY_INVESTIGATE = "security.investigate"
 SECURITY_ADMIN = "security.admin"
 
+# Reliability, Resilience & Chaos permissions (Step 35)
+RELIABILITY_READ = "reliability.read"
+RELIABILITY_MANAGE = "reliability.manage"
+RELIABILITY_RECOVER = "reliability.recover"
+CHAOS_EXECUTE = "chaos.execute"
+RELIABILITY_ADMIN = "reliability.admin"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    RELIABILITY_READ,
+    RELIABILITY_MANAGE,
+    RELIABILITY_RECOVER,
+    CHAOS_EXECUTE,
+    RELIABILITY_ADMIN,
     CACHE_READ,
     CACHE_CONFIGURE,
     CACHE_INVALIDATE,

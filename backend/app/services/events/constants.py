@@ -31,6 +31,7 @@ class AggregateType(str, Enum):
     GOVERNANCE = "governance"
     DATA_GOVERNANCE = "data_governance"
     SECURITY = "security"
+    RELIABILITY = "reliability"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -219,9 +220,33 @@ class SystemEventType(str, Enum):
     SECURITY_CONTAINMENT_REQUESTED = "security.containment.requested"
     SECURITY_CONTAINMENT_COMPLETED = "security.containment.completed"
 
+    # Step 35 Reliability & Resilience events
+    RELIABILITY_COMPONENT_DEGRADED = "reliability.component.degraded"
+    RELIABILITY_COMPONENT_RECOVERED = "reliability.component.recovered"
+    RELIABILITY_DEPENDENCY_FAILED = "reliability.dependency.failed"
+    RELIABILITY_DEPENDENCY_RECOVERED = "reliability.dependency.recovered"
+    RELIABILITY_JOB_RETRYING = "reliability.job.retrying"
+    RELIABILITY_JOB_RECOVERED = "reliability.job.recovered"
+    RELIABILITY_JOB_FAILED = "reliability.job.failed"
+    RELIABILITY_WORKFLOW_PAUSED = "reliability.workflow.paused"
+    RELIABILITY_WORKFLOW_RESUMED = "reliability.workflow.resumed"
+    RELIABILITY_FALLBACK_USED = "reliability.fallback.used"
+    RELIABILITY_DEGRADATION_APPLIED = "reliability.degradation.applied"
+    RELIABILITY_CHECKPOINT_CREATED = "reliability.checkpoint.created"
+    RELIABILITY_CHECKPOINT_INVALIDATED = "reliability.checkpoint.invalidated"
+    RELIABILITY_RESUME_STARTED = "reliability.resume.started"
+    RELIABILITY_RESUME_COMPLETED = "reliability.resume.completed"
+    RELIABILITY_RESUME_FAILED = "reliability.resume.failed"
+    RELIABILITY_CIRCUIT_OPENED = "reliability.circuit.opened"
+    RELIABILITY_CIRCUIT_CLOSED = "reliability.circuit.closed"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
+    SystemEventType.RELIABILITY_COMPONENT_DEGRADED.value,
+    SystemEventType.RELIABILITY_COMPONENT_RECOVERED.value,
+    SystemEventType.RELIABILITY_RESUME_COMPLETED.value,
+    SystemEventType.RELIABILITY_CIRCUIT_OPENED.value,
     SystemEventType.APPROVAL_APPROVED.value,
     SystemEventType.APPROVAL_REJECTED.value,
     SystemEventType.GRAPH_PROPOSAL_APPROVED.value,

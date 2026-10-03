@@ -57,6 +57,10 @@ class JobType(str, Enum):
     SECURITY_CORRELATION = "security_correlation"
     SECURITY_RETENTION = "security_retention"
     SECURITY_INDICATOR_CLEANUP = "security_indicator_cleanup"
+    RELIABILITY_HEALTH_CHECK = "reliability_health_check"
+    RELIABILITY_CHECKPOINT_CLEANUP = "reliability_checkpoint_cleanup"
+    RELIABILITY_SLO_MONITORING = "reliability_slo_monitoring"
+    RELIABILITY_CIRCUIT_RECONCILIATION = "reliability_circuit_reconciliation"
 
 
 class JobEventType(str, Enum):

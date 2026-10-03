@@ -114,6 +114,16 @@ from backend.app.services.security.models import (
     SecurityPlaybook,
     ContainmentAction,
 )
+from backend.app.services.reliability.models import (
+    ReliabilityComponent,
+    DependencyHealth,
+    ExecutionCheckpoint,
+    ReliabilityObjective,
+    ReliabilityBudget,
+    ChaosExperiment,
+    ChaosRun,
+    ChaosObservation,
+)
 
 __all__ = [
     "Base",
@@ -213,6 +223,14 @@ __all__ = [
     "SecurityIndicator",
     "SecurityPlaybook",
     "ContainmentAction",
+    "ReliabilityComponent",
+    "DependencyHealth",
+    "ExecutionCheckpoint",
+    "ReliabilityObjective",
+    "ReliabilityBudget",
+    "ChaosExperiment",
+    "ChaosRun",
+    "ChaosObservation",
 ]
 
 

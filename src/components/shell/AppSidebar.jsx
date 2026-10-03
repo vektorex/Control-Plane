@@ -50,6 +50,7 @@ const iconMap = {
   ShieldAlert,
   FileCheck2,
   Siren,
+  Activity,
   Plug,
   Brain,
   Network,

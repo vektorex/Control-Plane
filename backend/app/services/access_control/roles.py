@@ -108,6 +108,11 @@ from backend.app.services.access_control.permissions import (
     SECURITY_CONTAIN,
     SECURITY_INVESTIGATE,
     SECURITY_ADMIN,
+    RELIABILITY_READ,
+    RELIABILITY_MANAGE,
+    RELIABILITY_RECOVER,
+    CHAOS_EXECUTE,
+    RELIABILITY_ADMIN,
 )
 
 # 1. Organization Role Permissions
@@ -213,6 +218,11 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         SECURITY_CONTAIN,
         SECURITY_INVESTIGATE,
         SECURITY_ADMIN,
+        RELIABILITY_READ,
+        RELIABILITY_MANAGE,
+        RELIABILITY_RECOVER,
+        CHAOS_EXECUTE,
+        RELIABILITY_ADMIN,
     },
 
     # MEMBER: normal workspace/project execution and authoring

@@ -8,7 +8,7 @@ import json
 import time
 from typing import Any, Dict, List, Optional
 import uuid
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1064,5 +1064,264 @@ async def get_usage(
             period_hours=period_hours,
         )
         return summary
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+# ---------------------------------------------------------------------------
+# Marketplace API (Step 38)
+# ---------------------------------------------------------------------------
+
+@public_v1_router.get("/marketplace/packages")
+async def public_list_marketplace_packages(
+    query: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Discovers published marketplace packages (requires marketplace:read scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:read")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import MarketplaceSearchQuery, MarketplacePackageResponse
+
+        svc = MarketplaceService(db)
+        search_q = MarketplaceSearchQuery(query=query, category=category, limit=limit, offset=offset)
+        items, total = await svc.list_packages(search_q, organization_id=principal.organization_id)
+        return {
+            "items": [MarketplacePackageResponse.model_validate(p) for p in items],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/marketplace/packages/{slug}")
+async def public_get_marketplace_package(
+    slug: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieves public marketplace package metadata by slug or ID."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:read")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import MarketplacePackageDetailResponse, MarketplacePackageVersionResponse
+
+        svc = MarketplaceService(db)
+        pkg = await svc.get_package_by_slug(slug, organization_id=principal.organization_id)
+        if not pkg:
+            pkg = await svc.get_package(slug)
+        if not pkg:
+            raise ResourceNotFoundError("MarketplacePackage", slug)
+
+        avg_rating = await svc.get_average_rating(pkg.id)
+        usage = await svc.get_package_usage(pkg.id)
+
+        resp = MarketplacePackageDetailResponse.model_validate(pkg)
+        resp.average_rating = avg_rating
+        resp.total_installations = usage.get("total_installations", 0)
+        resp.versions = [MarketplacePackageVersionResponse.model_validate(v) for v in (pkg.versions or [])]
+        return resp
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/marketplace/packages/{slug}/versions")
+async def public_list_marketplace_package_versions(
+    slug: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists published versions for a marketplace package."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:read")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import MarketplacePackageVersionResponse
+
+        svc = MarketplaceService(db)
+        pkg = await svc.get_package_by_slug(slug, organization_id=principal.organization_id)
+        if not pkg:
+            pkg = await svc.get_package(slug)
+        if not pkg:
+            raise ResourceNotFoundError("MarketplacePackage", slug)
+
+        return [MarketplacePackageVersionResponse.model_validate(v) for v in (pkg.versions or [])]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/marketplace/packages/{package_id}/installations", status_code=status.HTTP_201_CREATED)
+async def public_install_marketplace_package(
+    package_id: str,
+    payload: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Installs a published marketplace package into the authenticated scope (requires marketplace:install scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:install")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import PackageInstallationResponse
+
+        svc = MarketplaceService(db)
+        inst = await svc.install_package(
+            package_id=package_id,
+            organization_id=principal.organization_id,
+            workspace_id=principal.workspace_id,
+            project_id=principal.project_id,
+            version_id=payload.get("version_id"),
+            configuration=payload.get("configuration", {}),
+            user_id=principal.application_id,
+        )
+        return PackageInstallationResponse.model_validate(inst)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/marketplace/installations")
+async def public_list_marketplace_installations(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lists installed marketplace packages in authorized scope."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:read")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import PackageInstallationResponse
+
+        svc = MarketplaceService(db)
+        items, total = await svc.list_installations(
+            organization_id=principal.organization_id,
+            workspace_id=principal.workspace_id,
+            limit=limit,
+            offset=offset,
+        )
+        return {
+            "items": [PackageInstallationResponse.model_validate(i) for i in items],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/marketplace/installations/{installation_id}")
+async def public_get_marketplace_installation(
+    installation_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieves metadata of a specific package installation."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:read")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import PackageInstallationResponse
+
+        svc = MarketplaceService(db)
+        inst = await svc.get_installation(installation_id)
+        if not inst or inst.organization_id != principal.organization_id:
+            raise ResourceNotFoundError("PackageInstallation", installation_id)
+
+        return PackageInstallationResponse.model_validate(inst)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/marketplace/installations/{installation_id}/update")
+async def public_update_marketplace_installation(
+    installation_id: str,
+    payload: Dict[str, Any] = Body(default_factory=dict),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates a package installation to a newer compatible version (requires marketplace:install scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:install")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import PackageInstallationResponse
+
+        svc = MarketplaceService(db)
+        updated = await svc.update_installation(
+            installation_id=installation_id,
+            target_version_id=payload.get("target_version_id"),
+            user_id=principal.application_id,
+        )
+        return PackageInstallationResponse.model_validate(updated)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/marketplace/installations/{installation_id}/rollback")
+async def public_rollback_marketplace_installation(
+    installation_id: str,
+    payload: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Safely rolls back a package installation to a specified previous version (requires marketplace:install scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:install")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import PackageInstallationResponse
+
+        svc = MarketplaceService(db)
+        rolled_back = await svc.rollback_installation(
+            installation_id=installation_id,
+            target_version_id=payload["target_version_id"],
+            user_id=principal.application_id,
+        )
+        return PackageInstallationResponse.model_validate(rolled_back)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/marketplace/packages/{package_id}/fork", status_code=status.HTTP_201_CREATED)
+async def public_fork_marketplace_package(
+    package_id: str,
+    payload: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Forks a marketplace package into caller organization (requires marketplace:manage scope)."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:manage")
+        from backend.app.services.marketplace.service import MarketplaceService
+        from backend.app.services.marketplace.schemas import MarketplacePackageResponse
+
+        svc = MarketplaceService(db)
+        forked = await svc.fork_package(
+            source_package_id=package_id,
+            target_org_id=principal.organization_id,
+            new_slug=payload["new_slug"],
+            new_name=payload["new_name"],
+            description=payload.get("description"),
+            user_id=principal.application_id,
+        )
+        return MarketplacePackageResponse.model_validate(forked)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/marketplace/packages/{package_id}/usage")
+async def public_get_marketplace_package_usage(
+    package_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieves factual usage and installation statistics for a package."""
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "marketplace:read")
+        from backend.app.services.marketplace.service import MarketplaceService
+
+        svc = MarketplaceService(db)
+        return await svc.get_package_usage(package_id)
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)

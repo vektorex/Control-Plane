@@ -34,6 +34,7 @@ class AggregateType(str, Enum):
     RELIABILITY = "reliability"
     RECOVERY = "recovery"
     DEVELOPER = "developer"
+    MARKETPLACE = "marketplace"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -269,6 +270,19 @@ class SystemEventType(str, Enum):
     DEVELOPER_WEBHOOK_FAILED = "developer.webhook.failed"
     DEVELOPER_API_RATE_LIMITED = "developer.api.rate_limited"
     DEVELOPER_API_POLICY_DENIED = "developer.api.policy_denied"
+
+    # Step 38 Marketplace events
+    MARKETPLACE_PACKAGE_CREATED = "marketplace.package.created"
+    MARKETPLACE_PACKAGE_VERSION_CREATED = "marketplace.package.version.created"
+    MARKETPLACE_PACKAGE_PUBLISHED = "marketplace.package.published"
+    MARKETPLACE_PACKAGE_SUSPENDED = "marketplace.package.suspended"
+    MARKETPLACE_PACKAGE_REVOKED = "marketplace.package.revoked"
+    MARKETPLACE_PACKAGE_INSTALLED = "marketplace.package.installed"
+    MARKETPLACE_PACKAGE_UPDATED = "marketplace.package.updated"
+    MARKETPLACE_PACKAGE_ROLLED_BACK = "marketplace.package.rolled_back"
+    MARKETPLACE_PACKAGE_FORKED = "marketplace.package.forked"
+    MARKETPLACE_REVIEW_CREATED = "marketplace.review.created"
+    MARKETPLACE_SECURITY_WARNING = "marketplace.security.warning"
 
 
 # Auditable event types

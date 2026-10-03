@@ -150,6 +150,18 @@ from backend.app.services.developer_platform.models import (
     ApplicationApproval,
     APIEnvironmentConfig,
 )
+from backend.app.services.marketplace.models import (
+    MarketplacePackage,
+    MarketplacePackageVersion,
+    MarketplaceDependency,
+    PackageInstallation,
+    MarketplaceReview,
+    MarketplaceUsageRecord,
+    PackageProvenance,
+    MarketplaceTag,
+    MarketplacePackageTag,
+    MarketplaceApproval,
+)
 
 __all__ = [
     "Base",
@@ -279,6 +291,16 @@ __all__ = [
     "WebhookSubscription",
     "ApplicationApproval",
     "APIEnvironmentConfig",
+    "MarketplacePackage",
+    "MarketplacePackageVersion",
+    "MarketplaceDependency",
+    "PackageInstallation",
+    "MarketplaceReview",
+    "MarketplaceUsageRecord",
+    "PackageProvenance",
+    "MarketplaceTag",
+    "MarketplacePackageTag",
+    "MarketplaceApproval",
 ]
 
 

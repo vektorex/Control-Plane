@@ -169,9 +169,20 @@ DEVELOPER_MANAGE = "developer.manage"
 DEVELOPER_CREDENTIAL_CREATE = "developer.credential_create"
 DEVELOPER_CREDENTIAL_REVOKE = "developer.credential_revoke"
 DEVELOPER_ADMIN = "developer.admin"
+# Marketplace & Extension Ecosystem permissions (Step 38)
+MARKETPLACE_READ = "marketplace.read"
+MARKETPLACE_INSTALL = "marketplace.install"
+MARKETPLACE_PUBLISH = "marketplace.publish"
+MARKETPLACE_MANAGE = "marketplace.manage"
+MARKETPLACE_ADMIN = "marketplace.admin"
 
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    MARKETPLACE_READ,
+    MARKETPLACE_INSTALL,
+    MARKETPLACE_PUBLISH,
+    MARKETPLACE_MANAGE,
+    MARKETPLACE_ADMIN,
     DEVELOPER_READ,
     DEVELOPER_MANAGE,
     DEVELOPER_CREDENTIAL_CREATE,

@@ -139,6 +139,12 @@ export const siteConfig = {
       description: "Application-level backups, cryptographic integrity, restore orchestration, recovery objectives, and continuity plans",
     },
     {
+      label: "Marketplace",
+      href: "/app/marketplace",
+      icon: "Store",
+      description: "Discover, publish, install, and govern reusable AI workflow packages, templates, and work packs",
+    },
+    {
       label: "Developer Platform",
       href: "/app/developer",
       icon: "Code2",

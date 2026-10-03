@@ -69,6 +69,13 @@ class JobType(str, Enum):
     RECOVERY_RESTORE_VERIFICATION = "recovery_restore_verification"
     RECOVERY_EXERCISE = "recovery_exercise"
     PUBLIC_WEBHOOK_DELIVERY = "public_webhook_delivery"
+    MARKETPLACE_VALIDATION = "marketplace_validation"
+    MARKETPLACE_SECURITY_SCAN = "marketplace_security_scan"
+    MARKETPLACE_PUBLISH = "marketplace_publish"
+    MARKETPLACE_INSTALL = "marketplace_install"
+    MARKETPLACE_UPDATE = "marketplace_update"
+    MARKETPLACE_ROLLBACK = "marketplace_rollback"
+    MARKETPLACE_EVALUATION = "marketplace_evaluation"
 
 
 class JobEventType(str, Enum):

@@ -1116,6 +1116,31 @@ class PublicWebhookDeliveryJobHandler(JobHandler):
         return {"status": "completed" if success else "failed", "delivered": success}
 
 
+class MarketplaceJobHandler(JobHandler):
+    """Generic handler for asynchronous marketplace operations."""
+
+    def __init__(self, action: str):
+        self.action = action
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        await context.update_progress(10, f"Starting marketplace {self.action}", 1, 3, "Started")
+        if cancellation_token.is_set():
+            raise JobCancellationError(f"Marketplace {self.action} cancelled.")
+
+        # Simulate or execute step
+        await context.update_progress(60, f"Processing marketplace {self.action}", 2, 3, "Processing")
+        if cancellation_token.is_set():
+            raise JobCancellationError(f"Marketplace {self.action} cancelled.")
+
+        await context.update_progress(100, f"Marketplace {self.action} completed successfully", 3, 3, "Completed")
+        return {"action": self.action, "status": "completed", "package_id": (job.payload or {}).get("package_id")}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -1168,6 +1193,13 @@ class JobHandlerRegistry:
         self.register(JobType.RECOVERY_RESTORE_VERIFICATION.value, RecoveryRestoreVerificationJobHandler())
         self.register(JobType.RECOVERY_EXERCISE.value, RecoveryExerciseJobHandler())
         self.register(JobType.PUBLIC_WEBHOOK_DELIVERY.value, PublicWebhookDeliveryJobHandler())
+        self.register(JobType.MARKETPLACE_VALIDATION.value, MarketplaceJobHandler("validation"))
+        self.register(JobType.MARKETPLACE_SECURITY_SCAN.value, MarketplaceJobHandler("security_scan"))
+        self.register(JobType.MARKETPLACE_PUBLISH.value, MarketplaceJobHandler("publish"))
+        self.register(JobType.MARKETPLACE_INSTALL.value, MarketplaceJobHandler("install"))
+        self.register(JobType.MARKETPLACE_UPDATE.value, MarketplaceJobHandler("update"))
+        self.register(JobType.MARKETPLACE_ROLLBACK.value, MarketplaceJobHandler("rollback"))
+        self.register(JobType.MARKETPLACE_EVALUATION.value, MarketplaceJobHandler("evaluation"))
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

@@ -26,6 +26,9 @@ VALID_API_SCOPES: Set[str] = {
     "usage:read",
     "webhooks:manage",
     "applications:manage",
+    "marketplace:read",
+    "marketplace:install",
+    "marketplace:manage",
 }
 PUBLIC_SCOPES = VALID_API_SCOPES
 
@@ -51,6 +54,9 @@ SCOPE_TO_PERMISSION_MAP: Dict[str, str] = {
     "usage:read": "analytics.read",
     "webhooks:manage": "webhook.configure",
     "applications:manage": "developer.manage",
+    "marketplace:read": "marketplace.read",
+    "marketplace:install": "marketplace.install",
+    "marketplace:manage": "marketplace.manage",
 }
 
 # Sensitive scopes that require explicit organization admin privileges
@@ -58,6 +64,8 @@ SENSITIVE_SCOPES: Set[str] = {
     "tasks:run",
     "workflows:run",
     "artifacts:create",
+    "marketplace:install",
+    "marketplace:manage",
     "memory:write",
     "webhooks:manage",
     "applications:manage",

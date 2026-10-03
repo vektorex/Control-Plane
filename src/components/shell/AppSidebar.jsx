@@ -32,6 +32,7 @@ import {
   Siren,
   LifeBuoy,
   Code2,
+  Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -68,6 +69,7 @@ const iconMap = {
   Building2,
   LifeBuoy,
   Code2,
+  Store,
 };
 
 export function AppSidebar({ className = "", onCloseMobile }) {

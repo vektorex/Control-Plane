@@ -40,6 +40,7 @@ from backend.app.api.routes.security import router as security_router
 from backend.app.api.routes.reliability import router as reliability_router
 from backend.app.api.routes.recovery import router as recovery_router
 from backend.app.api.routes.developer import developer_router
+from backend.app.api.routes.marketplace import router as marketplace_router
 from backend.app.api.routes.public_v1 import public_v1_router
 
 api_router = APIRouter(prefix="/api")
@@ -84,6 +85,7 @@ api_router.include_router(prompts_router)
 api_router.include_router(prompt_experiments_router)
 api_router.include_router(knowledge_graph_router)
 api_router.include_router(developer_router)
+api_router.include_router(marketplace_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

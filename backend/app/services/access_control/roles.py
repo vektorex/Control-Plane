@@ -123,6 +123,11 @@ from backend.app.services.access_control.permissions import (
     DEVELOPER_CREDENTIAL_CREATE,
     DEVELOPER_CREDENTIAL_REVOKE,
     DEVELOPER_ADMIN,
+    MARKETPLACE_READ,
+    MARKETPLACE_INSTALL,
+    MARKETPLACE_PUBLISH,
+    MARKETPLACE_MANAGE,
+    MARKETPLACE_ADMIN,
 )
 
 # 1. Organization Role Permissions
@@ -243,6 +248,11 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         DEVELOPER_CREDENTIAL_CREATE,
         DEVELOPER_CREDENTIAL_REVOKE,
         DEVELOPER_ADMIN,
+        MARKETPLACE_READ,
+        MARKETPLACE_INSTALL,
+        MARKETPLACE_PUBLISH,
+        MARKETPLACE_MANAGE,
+        MARKETPLACE_ADMIN,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -315,6 +325,9 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GOVERNANCE_READ,
         GOVERNANCE_SIMULATE,
         DATA_GOVERNANCE_READ,
+        MARKETPLACE_READ,
+        MARKETPLACE_INSTALL,
+        MARKETPLACE_PUBLISH,
     },
 
     # VIEWER: read-only access to granted resources.
@@ -323,6 +336,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ORGANIZATION_READ,
         MEMBER_READ,
         WORKSPACE_READ,
+        MARKETPLACE_READ,
         PROJECT_READ,
         TASK_READ,
         WORKFLOW_READ,

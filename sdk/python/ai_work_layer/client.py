@@ -160,6 +160,119 @@ class WebhooksResource:
         self._client._request("DELETE", f"/webhooks/{subscription_id}")
 
 
+class MarketplaceResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def list(
+        self,
+        query: Optional[str] = None,
+        category: Optional[str] = None,
+        package_type: Optional[str] = None,
+        visibility: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        params = {
+            "query": query,
+            "category": category,
+            "package_type": package_type,
+            "visibility": visibility,
+            "status": status,
+            "limit": limit,
+            "offset": offset,
+        }
+        params = {k: v for k, v in params.items() if v is not None}
+        return self._client._request("GET", "/marketplace/packages", params=params)
+
+    def get(self, slug: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/marketplace/packages/{slug}")
+
+    def versions(self, slug: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/marketplace/packages/{slug}/versions")
+
+    def install(
+        self,
+        package_id: str,
+        package_version_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+        configuration: Optional[Dict[str, Any]] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {
+            "package_version_id": package_version_id,
+            "workspace_id": workspace_id,
+            "configuration": configuration or {},
+        }
+        return self._client._request(
+            "POST",
+            f"/marketplace/packages/{package_id}/installations",
+            json=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def list_installations(
+        self,
+        workspace_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        params = {"workspace_id": workspace_id, "status": status}
+        params = {k: v for k, v in params.items() if v is not None}
+        return self._client._request("GET", "/marketplace/installations", params=params)
+
+    def get_installation(self, installation_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/marketplace/installations/{installation_id}")
+
+    def update(
+        self,
+        installation_id: str,
+        target_version_id: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {"target_version_id": target_version_id} if target_version_id else {}
+        return self._client._request(
+            "POST",
+            f"/marketplace/installations/{installation_id}/update",
+            json=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def rollback(
+        self,
+        installation_id: str,
+        target_version_id: Optional[str] = None,
+        reason: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {"target_version_id": target_version_id, "reason": reason}
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return self._client._request(
+            "POST",
+            f"/marketplace/installations/{installation_id}/rollback",
+            json=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def fork(
+        self,
+        package_id: str,
+        new_name: str,
+        new_slug: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {"new_name": new_name, "new_slug": new_slug}
+        return self._client._request(
+            "POST",
+            f"/marketplace/packages/{package_id}/fork",
+            json=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def usage(self, package_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/marketplace/packages/{package_id}/usage")
+
+
 class Client:
     """Official AI Work Layer SDK client for Python applications."""
 
@@ -188,6 +301,7 @@ class Client:
         self.knowledge = KnowledgeResource(self)
         self.usage = UsageResource(self)
         self.webhooks = WebhooksResource(self)
+        self.marketplace = MarketplaceResource(self)
 
     def _request(
         self,

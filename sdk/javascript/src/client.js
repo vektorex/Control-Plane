@@ -29,6 +29,7 @@ export class AIWorkLayerClient {
     this.knowledge = new KnowledgeResource(this);
     this.usage = new UsageResource(this);
     this.webhooks = new WebhooksResource(this);
+    this.marketplace = new MarketplaceResource(this);
   }
 
   async request(method, path, options = {}) {
@@ -294,5 +295,76 @@ class WebhooksResource {
 
   async delete(subscriptionId) {
     return this.client.request("DELETE", `/webhooks/${subscriptionId}`);
+  }
+}
+
+class MarketplaceResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.query) query.set("query", params.query);
+    if (params.category) query.set("category", params.category);
+    if (params.packageType) query.set("package_type", params.packageType);
+    if (params.visibility) query.set("visibility", params.visibility);
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/marketplace/packages${qs ? `?${qs}` : ""}`);
+  }
+
+  async get(slug) {
+    return this.client.request("GET", `/marketplace/packages/${slug}`);
+  }
+
+  async versions(slug) {
+    return this.client.request("GET", `/marketplace/packages/${slug}/versions`);
+  }
+
+  async install(packageId, data = {}, options = {}) {
+    return this.client.request("POST", `/marketplace/packages/${packageId}/installations`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async listInstallations(params = {}) {
+    const query = new URLSearchParams();
+    if (params.workspaceId) query.set("workspace_id", params.workspaceId);
+    if (params.status) query.set("status", params.status);
+    const qs = query.toString();
+    return this.client.request("GET", `/marketplace/installations${qs ? `?${qs}` : ""}`);
+  }
+
+  async getInstallation(installationId) {
+    return this.client.request("GET", `/marketplace/installations/${installationId}`);
+  }
+
+  async update(installationId, data = {}, options = {}) {
+    return this.client.request("POST", `/marketplace/installations/${installationId}/update`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async rollback(installationId, data = {}, options = {}) {
+    return this.client.request("POST", `/marketplace/installations/${installationId}/rollback`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async fork(packageId, data = {}, options = {}) {
+    return this.client.request("POST", `/marketplace/packages/${packageId}/fork`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async usage(packageId) {
+    return this.client.request("GET", `/marketplace/packages/${packageId}/usage`);
   }
 }

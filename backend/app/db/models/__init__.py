@@ -84,6 +84,13 @@ from backend.app.services.multimodal.models import (
     ArtifactEvidence,
 )
 from backend.app.services.cache.models import CacheEntry
+from backend.app.services.governance.models import (
+    GovernancePolicy,
+    GovernancePolicyVersion,
+    BudgetPolicy,
+    BudgetReservation,
+    GovernanceDecisionLog,
+)
 
 __all__ = [
     "Base",
@@ -159,6 +166,11 @@ __all__ = [
     "ArtifactPart",
     "ArtifactEvidence",
     "CacheEntry",
+    "GovernancePolicy",
+    "GovernancePolicyVersion",
+    "BudgetPolicy",
+    "BudgetReservation",
+    "GovernanceDecisionLog",
 ]
 
 

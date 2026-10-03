@@ -265,6 +265,31 @@ class EventConsumerRegistry:
         self.register(AuditEventConsumer())
         self.register(RealtimeEventConsumer())
         self.register(CacheInvalidationEventConsumer())
+        self.register(GovernanceEventConsumer())
+
+
+class GovernanceEventConsumer(EventConsumer):
+    """
+    Handles governance.* events for notification and observability routing.
+    Does not execute governance decisions — only routes events.
+    """
+
+    @property
+    def consumer_name(self) -> str:
+        return "governance_event_consumer"
+
+    @property
+    def supported_event_types(self) -> List[str]:
+        return ["governance.*"]
+
+    async def process(self, event: EventContract) -> bool:
+        from backend.app.core.logging import logger
+        logger.debug(
+            "GovernanceEventConsumer: received event '%s' for org=%s",
+            event.event_type,
+            event.organization_id,
+        )
+        return True
 
 
 # Global consumer registry singleton

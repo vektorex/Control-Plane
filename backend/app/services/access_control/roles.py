@@ -91,6 +91,13 @@ from backend.app.services.access_control.permissions import (
     CACHE_INVALIDATE,
     CACHE_DELETE,
 )
+from backend.app.services.access_control.permissions import (
+    GOVERNANCE_READ,
+    GOVERNANCE_CONFIGURE,
+    GOVERNANCE_SIMULATE,
+    GOVERNANCE_ACTIVATE,
+    GOVERNANCE_AUDIT,
+)
 
 # 1. Organization Role Permissions
 ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
@@ -179,6 +186,11 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         CACHE_CONFIGURE,
         CACHE_INVALIDATE,
         CACHE_DELETE,
+        GOVERNANCE_READ,
+        GOVERNANCE_CONFIGURE,
+        GOVERNANCE_SIMULATE,
+        GOVERNANCE_ACTIVATE,
+        GOVERNANCE_AUDIT,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -248,6 +260,8 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_ANALYZE,
         CACHE_READ,
         CACHE_INVALIDATE,
+        GOVERNANCE_READ,
+        GOVERNANCE_SIMULATE,
     },
 
     # VIEWER: read-only access to granted resources.
@@ -274,6 +288,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GRAPH_READ,
         ARTIFACT_READ,
         CACHE_READ,
+        GOVERNANCE_READ,
     },
 }
 
@@ -352,6 +367,11 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         CACHE_CONFIGURE,
         CACHE_INVALIDATE,
         CACHE_DELETE,
+        GOVERNANCE_READ,
+        GOVERNANCE_CONFIGURE,
+        GOVERNANCE_SIMULATE,
+        GOVERNANCE_ACTIVATE,
+        GOVERNANCE_AUDIT,
     },
     WorkspaceRole.MEMBER.value: {
         WORKSPACE_READ,
@@ -417,6 +437,8 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ARTIFACT_ANALYZE,
         CACHE_READ,
         CACHE_INVALIDATE,
+        GOVERNANCE_READ,
+        GOVERNANCE_SIMULATE,
     },
     WorkspaceRole.VIEWER.value: {
         WORKSPACE_READ,
@@ -438,6 +460,7 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GRAPH_READ,
         ARTIFACT_READ,
         CACHE_READ,
+        GOVERNANCE_READ,
     },
 }
 

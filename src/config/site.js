@@ -109,6 +109,12 @@ export const siteConfig = {
       description: "Intelligent reuse layer, exact & semantic matching, invalidation, and metrics",
     },
     {
+      label: "Governance",
+      href: "/app/governance",
+      icon: "ShieldAlert",
+      description: "AI Governance, policy control plane, safety guardrails, budget limits, and audit logs",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

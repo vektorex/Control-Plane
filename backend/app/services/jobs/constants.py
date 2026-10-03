@@ -46,6 +46,7 @@ class JobType(str, Enum):
     MULTIMODAL_EXTRACTION = "multimodal_extraction"
     CACHE_REFRESH = "cache_refresh"
     CACHE_CLEANUP = "cache_cleanup"
+    GOVERNANCE_POLICY_RECHECK = "governance_policy_recheck"
 
 
 class JobEventType(str, Enum):

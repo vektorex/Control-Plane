@@ -28,6 +28,7 @@ class AggregateType(str, Enum):
     GRAPH = "graph"
     ARTIFACT = "artifact"
     CACHE = "cache"
+    GOVERNANCE = "governance"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -177,6 +178,18 @@ class SystemEventType(str, Enum):
     CACHE_REFRESH_COMPLETED = "cache.refresh_completed"
     CACHE_REFRESH_FAILED = "cache.refresh_failed"
 
+    # Step 32 Governance events
+    GOVERNANCE_POLICY_CREATED = "governance.policy_created"
+    GOVERNANCE_POLICY_UPDATED = "governance.policy_updated"
+    GOVERNANCE_POLICY_ACTIVATED = "governance.policy_activated"
+    GOVERNANCE_POLICY_DEACTIVATED = "governance.policy_deactivated"
+    GOVERNANCE_POLICY_SIMULATED = "governance.policy_simulated"
+    GOVERNANCE_DECISION_DENIED = "governance.decision_denied"
+    GOVERNANCE_APPROVAL_REQUIRED = "governance.approval_required"
+    GOVERNANCE_VERIFICATION_REQUIRED = "governance.verification_required"
+    GOVERNANCE_BUDGET_BLOCKED = "governance.budget_blocked"
+    GOVERNANCE_BUDGET_THRESHOLD_REACHED = "governance.budget_threshold_reached"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
@@ -220,6 +233,15 @@ AUDITABLE_EVENTS = {
     SystemEventType.PROMPT_ARCHIVED.value,
     SystemEventType.PROMPT_EXPERIMENT_STARTED.value,
     SystemEventType.PROMPT_EXPERIMENT_COMPLETED.value,
+    # Step 32 Governance auditable events
+    SystemEventType.GOVERNANCE_POLICY_CREATED.value,
+    SystemEventType.GOVERNANCE_POLICY_UPDATED.value,
+    SystemEventType.GOVERNANCE_POLICY_ACTIVATED.value,
+    SystemEventType.GOVERNANCE_POLICY_DEACTIVATED.value,
+    SystemEventType.GOVERNANCE_DECISION_DENIED.value,
+    SystemEventType.GOVERNANCE_APPROVAL_REQUIRED.value,
+    SystemEventType.GOVERNANCE_VERIFICATION_REQUIRED.value,
+    SystemEventType.GOVERNANCE_BUDGET_BLOCKED.value,
 }
 
 # Sensitive keys scrubbed from all payloads

@@ -817,6 +817,53 @@ class CacheCleanupJobHandler(JobHandler):
         return {"status": "completed", "evicted_count": evicted}
 
 
+class GovernancePolicyRecheckJobHandler(JobHandler):
+    """
+    Re-evaluates governance policy for a long-running job before a privileged side effect.
+    Reads job context for enforcement_point and re-checks via GovernancePolicyEngine.
+    If policy now denies the operation, the job is cancelled.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.governance.policy_engine import GovernancePolicyEngine
+        from backend.app.services.governance.repository import GovernancePolicyRepository
+        from backend.app.services.governance.schemas import GovernanceEvaluationRequest
+        from backend.app.services.governance.constants import EnforcementPoint
+        from backend.app.services.governance.errors import GovernanceDeniedError
+
+        payload = job.payload or {}
+        enforcement_point_str = payload.get("enforcement_point", "job_execution")
+        org_id = payload.get("organization_id")
+        ws_id = payload.get("workspace_id")
+
+        try:
+            ep = EnforcementPoint(enforcement_point_str)
+        except ValueError:
+            ep = EnforcementPoint.JOB_EXECUTION
+
+        try:
+            repo = GovernancePolicyRepository(context.session)
+            engine = GovernancePolicyEngine(repo)
+            request = GovernanceEvaluationRequest(
+                enforcement_point=ep,
+                organization_id=org_id or "00000000-0000-0000-0000-000000000000",
+                workspace_id=ws_id,
+            )
+            decision = await engine.evaluate(request)
+            from backend.app.services.governance.constants import GovernanceDecisionType
+            if decision.decision == GovernanceDecisionType.DENY:
+                return {"status": "blocked", "decision": decision.decision.value, "reasons": decision.reasons}
+        except Exception as exc:
+            logger.warning("GovernancePolicyRecheck: evaluation failed: %s", exc)
+
+        return {"status": "passed"}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -846,6 +893,7 @@ class JobHandlerRegistry:
         self.register(JobType.MULTIMODAL_EXTRACTION.value, MultimodalExtractionJobHandler())
         self.register(JobType.CACHE_REFRESH.value, CacheRefreshJobHandler())
         self.register(JobType.CACHE_CLEANUP.value, CacheCleanupJobHandler())
+        self.register(JobType.GOVERNANCE_POLICY_RECHECK.value, GovernancePolicyRecheckJobHandler())
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

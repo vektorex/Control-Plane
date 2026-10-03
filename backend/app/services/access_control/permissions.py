@@ -127,12 +127,24 @@ CACHE_CONFIGURE = "cache.configure"
 CACHE_INVALIDATE = "cache.invalidate"
 CACHE_DELETE = "cache.delete"
 
+# Governance permissions (Step 32)
+GOVERNANCE_READ = "governance.read"
+GOVERNANCE_CONFIGURE = "governance.configure"
+GOVERNANCE_SIMULATE = "governance.simulate"
+GOVERNANCE_ACTIVATE = "governance.activate"
+GOVERNANCE_AUDIT = "governance.audit"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
     CACHE_READ,
     CACHE_CONFIGURE,
     CACHE_INVALIDATE,
     CACHE_DELETE,
+    GOVERNANCE_READ,
+    GOVERNANCE_CONFIGURE,
+    GOVERNANCE_SIMULATE,
+    GOVERNANCE_ACTIVATE,
+    GOVERNANCE_AUDIT,
     ORGANIZATION_READ,
     ORGANIZATION_UPDATE,
     ORGANIZATION_DELETE,

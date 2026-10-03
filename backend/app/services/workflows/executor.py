@@ -637,6 +637,42 @@ class WorkflowExecutor:
             )
             return None, res
 
+        # Step 32: Governance Control Plane Step Check
+        if workspace_id:
+            try:
+                from backend.app.services.governance.service import GovernanceService
+                from backend.app.services.governance.schemas import GovernanceEvaluationRequest
+                from backend.app.services.governance.constants import EnforcementPoint, GovernanceDecisionType
+                from backend.app.services.governance.errors import GovernanceDeniedError
+
+                gov_svc = GovernanceService(self.session)
+                step_model = (step.config or {}).get("model")
+                step_tools = (step.config or {}).get("tools") or []
+                gov_eval_req = GovernanceEvaluationRequest(
+                    enforcement_point=EnforcementPoint.WORKFLOW_STEP,
+                    organization_id=workspace_id,
+                    workspace_id=workspace_id,
+                    project_id=project_id,
+                    user_id=user.id,
+                    task_type="workflow_step",
+                    model_id=step_model,
+                    requested_tools=step_tools if isinstance(step_tools, list) else [],
+                    parameters={"step_id": step.id, "step_name": step.name, "step_type": step.type.value},
+                )
+                gov_dec = await gov_svc.evaluate(gov_eval_req)
+                if gov_dec.decision == GovernanceDecisionType.DENY:
+                    tracer.record_event(
+                        TraceEventType.GOVERNANCE_ENFORCEMENT_BLOCKED,
+                        step_type=step.type.value,
+                        status=TraceEventStatus.COMPLETED,
+                        metadata={"reasons": gov_dec.reasons, "step_id": step.id},
+                    )
+                    raise GovernanceDeniedError(f"Workflow step '{step.name}' blocked by governance: {'; '.join(gov_dec.reasons)}")
+            except GovernanceDeniedError:
+                raise
+            except Exception as gov_step_err:
+                logger.debug(f"[WorkflowExecutor] Governance step check skipped: {gov_step_err}")
+
         while attempt <= retries_allowed:
             try:
                 jump_target, output_data, metadata = await self._dispatch_step(

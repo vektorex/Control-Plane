@@ -396,6 +396,99 @@ class TaskExecutionService:
                 await tracer.flush_to_db(self.session)
             return run
 
+        # Step 32: AI Governance Policy Control Plane Check
+        governance_decision = None
+        if workspace_id:
+            try:
+                from backend.app.services.governance.service import GovernanceService
+                from backend.app.services.governance.schemas import GovernanceEvaluationRequest
+                from backend.app.services.governance.constants import EnforcementPoint, GovernanceDecisionType
+
+                if tracer:
+                    tracer.record_event(
+                        TraceEventType.GOVERNANCE_EVALUATION_STARTED,
+                        status=TraceEventStatus.STARTED,
+                        metadata={
+                            "enforcement_point": EnforcementPoint.TASK_EXECUTION.value,
+                            "task_id": str(task.id),
+                            "model_id": model_selection.model_id,
+                        },
+                    )
+
+                gov_svc = GovernanceService(self.session)
+                gov_eval_req = GovernanceEvaluationRequest(
+                    enforcement_point=EnforcementPoint.TASK_EXECUTION,
+                    organization_id=workspace_id,
+                    workspace_id=workspace_id,
+                    project_id=task.project_id,
+                    user_id=user.id,
+                    task_type=resolved_reqs.task_type,
+                    model_id=model_selection.model_id,
+                    model_provider=model_selection.provider,
+                    requested_tools=tools_planned or [],
+                    parameters={"prompt": prompt_check},
+                )
+                governance_decision = await gov_svc.evaluate(gov_eval_req)
+
+                if tracer:
+                    tracer.record_event(
+                        TraceEventType.GOVERNANCE_EVALUATION_COMPLETED,
+                        status=TraceEventStatus.COMPLETED,
+                        metadata={
+                            "decision": governance_decision.decision.value,
+                            "reasons": governance_decision.reasons,
+                        },
+                    )
+
+                if governance_decision.decision == GovernanceDecisionType.DENY:
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.GOVERNANCE_ENFORCEMENT_BLOCKED,
+                            status=TraceEventStatus.COMPLETED,
+                            metadata={
+                                "reasons": governance_decision.reasons,
+                                "matched_policies": governance_decision.matched_policies,
+                            },
+                        )
+                        tracer.record_event(
+                            TraceEventType.GOVERNANCE_DECISION_DENIED,
+                            status=TraceEventStatus.COMPLETED,
+                            metadata={"reasons": governance_decision.reasons},
+                        )
+                    run.status = RunStatus.FAILED.value
+                    run.error = f"Governance policy violation: {'; '.join(governance_decision.reasons)}"
+                    run.latency_ms = int((time.perf_counter() - start_time) * 1000)
+                    run.completed_at = datetime.now(timezone.utc)
+                    snap = dict(run.input_snapshot) if run.input_snapshot else {}
+                    snap["governance"] = governance_decision.model_dump(mode="json")
+                    run.input_snapshot = snap
+                    if task.status != TaskStatus.DRAFT.value:
+                        task.status = TaskStatus.FAILED.value
+                        self.session.add(task)
+                    await self.session.flush()
+                    await self.session.refresh(run)
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.RUN_FAILED,
+                            status=TraceEventStatus.COMPLETED,
+                            completed_at=run.completed_at,
+                            duration_ms=run.latency_ms,
+                            metadata={"error": run.error},
+                        )
+                        await tracer.flush_to_db(self.session)
+                    return run
+
+                if governance_decision.decision == GovernanceDecisionType.REQUIRE_APPROVAL:
+                    if tracer:
+                        tracer.record_event(
+                            TraceEventType.GOVERNANCE_APPROVAL_REQUIRED,
+                            status=TraceEventStatus.COMPLETED,
+                            metadata={"reasons": governance_decision.reasons},
+                        )
+
+            except Exception as gov_err:
+                logger.warning(f"Governance evaluation error: {gov_err}")
+
         # 5. Execute Orchestration Plan with bounded agentic loop
         try:
             state = await self.orchestrator.execute_task(
@@ -552,6 +645,13 @@ class TaskExecutionService:
                 "truncated": run.context_truncated,
                 "sources": run.context_sources,
             }
+            if governance_decision:
+                snap["governance"] = {
+                    "decision": governance_decision.decision.value,
+                    "reasons": governance_decision.reasons,
+                    "matched_policies": governance_decision.matched_policies,
+                    "expires_at": str(governance_decision.expires_at) if governance_decision.expires_at else None,
+                }
             run.input_snapshot = snap
 
             # Step 31: Semantic Cache Admission Gate

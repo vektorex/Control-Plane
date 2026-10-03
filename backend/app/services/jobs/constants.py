@@ -35,6 +35,9 @@ class JobType(str, Enum):
     CONNECTOR_OPERATION = "connector_operation"
     NOTIFICATION_DELIVERY = "notification_delivery"
     PROMPT_EXPERIMENT = "prompt_experiment"
+    GRAPH_EXTRACTION = "graph_extraction"
+    GRAPH_RECONCILIATION = "graph_reconciliation"
+    GRAPH_REBUILD = "graph_rebuild"
 
 
 class JobEventType(str, Enum):

@@ -82,9 +82,11 @@ class RAGContextProvider(ContextProvider):
 
         # 3. Determine workspace and project scoping
         workspace_id = None
-        if hasattr(task, "project") and task.project and hasattr(task.project, "workspace_id"):
-            workspace_id = task.project.workspace_id
-        elif task.project_id:
+        if "project" in getattr(task, "__dict__", {}) and task.__dict__["project"]:
+            workspace_id = getattr(task.__dict__["project"], "workspace_id", None)
+        elif getattr(task, "workspace_id", None):
+            workspace_id = task.workspace_id
+        elif getattr(task, "project_id", None) and session:
             from backend.app.db.models.project import Project
             from sqlalchemy import select
             proj_stmt = select(Project.workspace_id).where(Project.id == task.project_id)

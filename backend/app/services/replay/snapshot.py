@@ -149,6 +149,17 @@ class ReplaySnapshotService:
                 "prompt_content_hash": input_snap.get("prompt_content_hash"),
             }
 
+        # Safe Knowledge Graph configuration (Step 29)
+        graph_config = input_snap.get("graph_configuration")
+        if not graph_config and (input_snap.get("graph_entities") or input_snap.get("graph_context") or input_snap.get("graph_entity_ids")):
+            graph_config = {
+                "entity_ids": input_snap.get("graph_entity_ids", []),
+                "relationship_ids": input_snap.get("graph_relationship_ids", []),
+                "source_references": input_snap.get("graph_source_references", []),
+                "traversal_config": input_snap.get("graph_traversal_config", {"max_hops": 1}),
+                "snapshot_hash": input_snap.get("graph_snapshot_hash"),
+            }
+
         # Raw snapshot dictionary
         raw_snapshot = {
             "snapshot_version": "1.0",
@@ -172,6 +183,7 @@ class ReplaySnapshotService:
             "workflow_version": None,
             "relevant_context_metadata": context_metadata,
             "prompt_configuration": prompt_config,
+            "graph_configuration": graph_config,
             "trace_metadata": trace_meta,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }

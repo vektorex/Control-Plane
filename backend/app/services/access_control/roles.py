@@ -74,6 +74,12 @@ from backend.app.services.access_control.permissions import (
     PROMPT_EXECUTE,
     PROMPT_EXPERIMENT,
     PROMPT_ARCHIVE,
+    GRAPH_READ,
+    GRAPH_CREATE,
+    GRAPH_UPDATE,
+    GRAPH_DELETE,
+    GRAPH_EXTRACT,
+    GRAPH_MERGE,
 )
 
 # 1. Organization Role Permissions
@@ -147,6 +153,12 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_EXECUTE,
         PROMPT_EXPERIMENT,
         PROMPT_ARCHIVE,
+        GRAPH_READ,
+        GRAPH_CREATE,
+        GRAPH_UPDATE,
+        GRAPH_DELETE,
+        GRAPH_EXTRACT,
+        GRAPH_MERGE,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -203,6 +215,12 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_EXECUTE,
         PROMPT_EXPERIMENT,
         PROMPT_ARCHIVE,
+        GRAPH_READ,
+        GRAPH_CREATE,
+        GRAPH_UPDATE,
+        GRAPH_DELETE,
+        GRAPH_EXTRACT,
+        GRAPH_MERGE,
     },
 
     # VIEWER: read-only access to granted resources.
@@ -226,6 +244,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ANALYTICS_READ,
         EVENT_READ,
         PROMPT_READ,
+        GRAPH_READ,
     },
 }
 
@@ -288,6 +307,12 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_EXECUTE,
         PROMPT_EXPERIMENT,
         PROMPT_ARCHIVE,
+        GRAPH_READ,
+        GRAPH_CREATE,
+        GRAPH_UPDATE,
+        GRAPH_DELETE,
+        GRAPH_EXTRACT,
+        GRAPH_MERGE,
     },
     WorkspaceRole.MEMBER.value: {
         WORKSPACE_READ,
@@ -340,6 +365,12 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_EXECUTE,
         PROMPT_EXPERIMENT,
         PROMPT_ARCHIVE,
+        GRAPH_READ,
+        GRAPH_CREATE,
+        GRAPH_UPDATE,
+        GRAPH_DELETE,
+        GRAPH_EXTRACT,
+        GRAPH_MERGE,
     },
     WorkspaceRole.VIEWER.value: {
         WORKSPACE_READ,
@@ -358,6 +389,7 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ANALYTICS_READ,
         EVENT_READ,
         PROMPT_READ,
+        GRAPH_READ,
     },
 }
 
@@ -410,6 +442,12 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PROMPT_EXECUTE,
         PROMPT_EXPERIMENT,
         PROMPT_ARCHIVE,
+        GRAPH_READ,
+        GRAPH_CREATE,
+        GRAPH_UPDATE,
+        GRAPH_DELETE,
+        GRAPH_EXTRACT,
+        GRAPH_MERGE,
     },
     ProjectRole.VIEWER.value: {
         PROJECT_READ,
@@ -426,5 +464,6 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         ANALYTICS_READ,
         EVENT_READ,
         PROMPT_READ,
+        GRAPH_READ,
     },
 }

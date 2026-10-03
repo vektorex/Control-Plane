@@ -69,6 +69,15 @@ from backend.app.services.prompts.models import (
     PromptExperimentVariant,
     PromptExperimentAssignment,
 )
+from backend.app.services.knowledge_graph.models import (
+    Entity,
+    EntityAlias,
+    EntitySource,
+    Relationship,
+    GraphChangeProposal,
+    GraphChangeLog,
+    GraphConflict,
+)
 
 __all__ = [
     "Base",
@@ -133,6 +142,13 @@ __all__ = [
     "PromptExperiment",
     "PromptExperimentVariant",
     "PromptExperimentAssignment",
+    "Entity",
+    "EntityAlias",
+    "EntitySource",
+    "Relationship",
+    "GraphChangeProposal",
+    "GraphChangeLog",
+    "GraphConflict",
 ]
 
 

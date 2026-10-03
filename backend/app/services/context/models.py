@@ -23,6 +23,7 @@ class ContextSourceType(str, Enum):
     TOOL = "tool"
     CONNECTOR = "connector"
     MEMORY = "memory"
+    KNOWLEDGE_GRAPH = "knowledge_graph"
 
 
 class ContextItem(BaseModel):
@@ -39,6 +40,15 @@ class ContextItem(BaseModel):
     token_estimate: int = Field(default=0, description="Estimated token count for this item")
     trust_level: Optional[str] = Field(default="trusted_user_context", description="Security and provenance trust classification")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def estimated_tokens(self) -> int:
+        """Alias for token_estimate for backward compatibility and test access."""
+        return self.token_estimate
+
+    @estimated_tokens.setter
+    def estimated_tokens(self, value: int) -> None:
+        self.token_estimate = value
 
     def __repr__(self) -> str:
         return f"<ContextItem id={self.id} source={self.source_type} title='{self.title}' priority={self.priority} tokens={self.token_estimate}>"

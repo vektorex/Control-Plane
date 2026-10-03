@@ -539,3 +539,38 @@ async def preview_task_retrieval(
     )
 
 
+# --- Step 29: Knowledge Graph Preview Endpoint ---
+
+@router.post("/{task_id}/graph/preview")
+async def preview_task_graph(
+    task_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Step 29: Previews whether graph retrieval is recommended for a task,
+    detected entities, candidate relationships, and estimated token size without executing the task.
+    """
+    from backend.app.services.knowledge_graph.service import KnowledgeGraphService
+    task_repo = TaskRepository(session)
+    task = await task_repo.get_by_id_and_owner_or_raise(task_id, user.id)
+
+    workspace_id = getattr(task, "workspace_id", None)
+    if not workspace_id and task.project_id:
+        from backend.app.db.models.project import Project
+        from sqlalchemy import select
+        proj_res = await session.execute(
+            select(Project.workspace_id).where(Project.id == task.project_id)
+        )
+        workspace_id = proj_res.scalar_one_or_none()
+
+    text = (task.instructions or "").strip() or (task.title or "").strip()
+    service = KnowledgeGraphService(session)
+    return await service.preview_task_graph(
+        workspace_id=workspace_id or user.id,
+        text=text,
+        project_id=task.project_id,
+    )
+
+
+

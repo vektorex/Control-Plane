@@ -24,6 +24,7 @@ import {
   Bell,
   Building2,
   FileCode2,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
@@ -43,6 +44,7 @@ const iconMap = {
   ShieldCheck,
   Plug,
   Brain,
+  Network,
   FolderKanban,
   Files,
   BarChart3,

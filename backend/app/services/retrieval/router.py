@@ -253,7 +253,106 @@ class RetrievalRouter:
                 retrieval_latency_ms=latency_ms,
             )
 
-        # 6. Strategy: Document / Hybrid (default)
+        # 6. Strategy: Graph
+        elif decision.strategy == RetrievalStrategy.GRAPH:
+            start_time = time.perf_counter()
+            from backend.app.services.knowledge_graph.retriever import GraphRetriever
+            from backend.app.services.retrieval.models import RetrievalCandidate
+
+            graph_retriever = GraphRetriever()
+            graph_res = await graph_retriever.retrieve_for_task(
+                session=session,
+                workspace_id=workspace_id,
+                project_id=effective_project_id,
+                task_text=decision.query,
+                max_hops=1,
+                max_entities=decision.top_k * 2,
+            )
+            candidates = []
+            for ent in graph_res.entities:
+                cand = RetrievalCandidate(
+                    chunk_id=ent.id,
+                    document_id=ent.id,
+                    workspace_id=workspace_id,
+                    project_id=ent.project_id,
+                    filename=f"graph:{ent.entity_type}:{ent.canonical_name}",
+                    content=f"[{ent.entity_type.upper()}] {ent.canonical_name}: {ent.description or ''}",
+                    metadata={
+                        "entity_id": str(ent.id),
+                        "entity_type": ent.entity_type,
+                        "canonical_name": ent.canonical_name,
+                        "properties": ent.properties,
+                        "source_count": ent.source_count,
+                        "provenance": "knowledge_graph",
+                    },
+                    fusion_score=0.9,
+                    rerank_score=0.9,
+                )
+                candidates.append(cand)
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            return RetrievalResult(
+                candidates=candidates,
+                query=decision.query,
+                total_found=len(candidates),
+                vector_count=0,
+                keyword_count=0,
+                retrieval_latency_ms=latency_ms,
+            )
+
+        # 7. Strategy: Hybrid Graph
+        elif decision.strategy == RetrievalStrategy.HYBRID_GRAPH:
+            start_time = time.perf_counter()
+            from backend.app.services.knowledge_graph.retriever import GraphRetriever
+            from backend.app.services.retrieval.models import RetrievalCandidate
+
+            hybrid_res = await self.hybrid_retriever.retrieve(
+                query=decision.query,
+                workspace_id=workspace_id,
+                session=session,
+                project_id=effective_project_id,
+                top_k=decision.top_k,
+            )
+            graph_retriever = GraphRetriever()
+            graph_res = await graph_retriever.retrieve_for_task(
+                session=session,
+                workspace_id=workspace_id,
+                project_id=effective_project_id,
+                task_text=decision.query,
+                max_hops=1,
+                max_entities=5,
+            )
+            graph_candidates = []
+            for ent in graph_res.entities:
+                cand = RetrievalCandidate(
+                    chunk_id=ent.id,
+                    document_id=ent.id,
+                    workspace_id=workspace_id,
+                    project_id=ent.project_id,
+                    filename=f"graph:{ent.entity_type}:{ent.canonical_name}",
+                    content=f"[{ent.entity_type.upper()}] {ent.canonical_name}: {ent.description or ''}",
+                    metadata={
+                        "entity_id": str(ent.id),
+                        "entity_type": ent.entity_type,
+                        "canonical_name": ent.canonical_name,
+                        "properties": ent.properties,
+                        "provenance": "knowledge_graph",
+                    },
+                    fusion_score=0.85,
+                    rerank_score=0.85,
+                )
+                graph_candidates.append(cand)
+            combined = hybrid_res.candidates + graph_candidates
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            return RetrievalResult(
+                candidates=combined,
+                query=decision.query,
+                total_found=len(combined),
+                vector_count=hybrid_res.vector_count,
+                keyword_count=hybrid_res.keyword_count,
+                retrieval_latency_ms=latency_ms,
+            )
+
+        # 8. Strategy: Document / Hybrid (default)
         else:
             return await self.hybrid_retriever.retrieve(
                 query=decision.query,

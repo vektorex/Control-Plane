@@ -105,6 +105,14 @@ PROMPT_EXECUTE = "prompt.execute"
 PROMPT_EXPERIMENT = "prompt.experiment"
 PROMPT_ARCHIVE = "prompt.archive"
 
+# Knowledge Graph permissions (Step 29)
+GRAPH_READ = "graph.read"
+GRAPH_CREATE = "graph.create"
+GRAPH_UPDATE = "graph.update"
+GRAPH_DELETE = "graph.delete"
+GRAPH_EXTRACT = "graph.extract"
+GRAPH_MERGE = "graph.merge"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
     ORGANIZATION_READ,
@@ -171,5 +179,11 @@ ALL_PERMISSIONS = {
     PROMPT_EXECUTE,
     PROMPT_EXPERIMENT,
     PROMPT_ARCHIVE,
+    GRAPH_READ,
+    GRAPH_CREATE,
+    GRAPH_UPDATE,
+    GRAPH_DELETE,
+    GRAPH_EXTRACT,
+    GRAPH_MERGE,
 }
 

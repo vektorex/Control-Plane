@@ -51,6 +51,10 @@ class AssertionType(str, Enum):
     REQUIRED_FIELDS = "required_fields"
     OUTPUT_FORMAT = "output_format"
     EVALUATOR_CHECK = "evaluator_check"
+    ENTITY_EXISTS = "entity_exists"
+    RELATIONSHIP_EXISTS = "relationship_exists"
+    RELATIONSHIP_MATCHES_SOURCE = "relationship_matches_source"
+    SOURCE_REFERENCE_EXISTS = "source_reference_exists"
 
 
 class AssertionDefinition(BaseModel):

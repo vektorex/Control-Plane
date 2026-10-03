@@ -47,6 +47,7 @@ class ExecutionSnapshot(BaseModel):
     workflow_version: Optional[int] = Field(default=None, description="Workflow version executed if applicable")
     relevant_context_metadata: Dict[str, Any] = Field(default_factory=dict, description="Sanitized context item metadata and sources")
     prompt_configuration: Optional[Dict[str, Any]] = Field(default=None, description="Captured prompt management snapshot (prompt_id, prompt_version_id, content_hash, release_environment)")
+    graph_configuration: Optional[Dict[str, Any]] = Field(default=None, description="Captured knowledge graph retrieval snapshot (entity_ids, relationship_ids, source_references, traversal_config, snapshot_hash)")
     trace_metadata: Dict[str, Any] = Field(default_factory=dict, description="High-level telemetry timestamps and counts")
     created_at: str = Field(..., description="Timestamp of snapshot creation")
 

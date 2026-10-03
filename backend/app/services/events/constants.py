@@ -25,6 +25,7 @@ class AggregateType(str, Enum):
     SYSTEM = "system"
     PROMPT = "prompt"
     PROMPT_EXPERIMENT = "prompt_experiment"
+    GRAPH = "graph"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -144,11 +145,26 @@ class SystemEventType(str, Enum):
     PROMPT_EXPERIMENT_PAUSED = "prompt.experiment_paused"
     PROMPT_EXPERIMENT_COMPLETED = "prompt.experiment_completed"
 
+    # Step 29 Knowledge Graph events
+    GRAPH_ENTITY_CREATED = "graph.entity_created"
+    GRAPH_ENTITY_UPDATED = "graph.entity_updated"
+    GRAPH_ENTITY_ARCHIVED = "graph.entity_archived"
+    GRAPH_RELATIONSHIP_CREATED = "graph.relationship_created"
+    GRAPH_RELATIONSHIP_REMOVED = "graph.relationship_removed"
+    GRAPH_PROPOSAL_CREATED = "graph.proposal_created"
+    GRAPH_PROPOSAL_APPROVED = "graph.proposal_approved"
+    GRAPH_PROPOSAL_REJECTED = "graph.proposal_rejected"
+    GRAPH_CONFLICT_CREATED = "graph.conflict_created"
+    GRAPH_CONFLICT_RESOLVED = "graph.conflict_resolved"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
     SystemEventType.APPROVAL_APPROVED.value,
     SystemEventType.APPROVAL_REJECTED.value,
+    SystemEventType.GRAPH_PROPOSAL_APPROVED.value,
+    SystemEventType.GRAPH_PROPOSAL_REJECTED.value,
+    SystemEventType.GRAPH_CONFLICT_RESOLVED.value,
     SystemEventType.TRIGGER_UPDATED.value,
     SystemEventType.TRIGGER_PAUSED.value,
     SystemEventType.TRIGGER_RESUMED.value,

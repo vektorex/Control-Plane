@@ -31,6 +31,7 @@ from backend.app.api.routes.events import events_router
 from backend.app.api.routes.organizations import organizations_router, invitations_router
 from backend.app.api.routes.prompts import router as prompts_router
 from backend.app.api.routes.prompt_experiments import router as prompt_experiments_router
+from backend.app.api.routes.knowledge_graph import router as knowledge_graph_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -65,6 +66,7 @@ api_router.include_router(jobs_router)
 api_router.include_router(events_router)
 api_router.include_router(prompts_router)
 api_router.include_router(prompt_experiments_router)
+api_router.include_router(knowledge_graph_router)
 
 __all__ = ["api_router"]
 

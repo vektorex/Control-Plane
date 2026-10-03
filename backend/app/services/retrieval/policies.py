@@ -97,6 +97,16 @@ class RuleBasedDecisionProvider(RetrievalDecisionProvider):
         re.compile(r"\b(across\s+workspaces?|global\s+workspace)\b", re.IGNORECASE),
     ]
 
+    # Graph relationship and entity dependency signals
+    GRAPH_RELATIONSHIP_PATTERNS = [
+        re.compile(r"\b(what|which)\s+(services?|apps?|components?|modules?|apis?|endpoints?)\s+(depend\s+on|use|call|import|invoke)\b", re.IGNORECASE),
+        re.compile(r"\b(dependencies|dependency\s+tree|dependency\s+graph|depend\s+on|depends\s+on)\b", re.IGNORECASE),
+        re.compile(r"\b(who\s+owns|ownership\s+of|owned\s+by|assigned\s+to|created\s+by)\b", re.IGNORECASE),
+        re.compile(r"\b(what\s+is\s+connected\s+to|how\s+are\s+.+\s+connected|relationship\s+between|entity\s+relationship)\b", re.IGNORECASE),
+        re.compile(r"\b(belongs\s+to|member\s+of|part\s+of|deployed\s+to|configured\s+by)\b", re.IGNORECASE),
+        re.compile(r"\bknowledge\s+graph\b", re.IGNORECASE),
+    ]
+
     async def decide(
         self,
         task: Task,
@@ -224,7 +234,22 @@ class RuleBasedDecisionProvider(RetrievalDecisionProvider):
                         metadata={"matched_pattern": pat.pattern},
                     )
 
-        # 10. Check Exact Phrase / Keyword Search Patterns
+        # 10. Check Graph Relationship & Dependency Patterns
+        for pat in self.GRAPH_RELATIONSHIP_PATTERNS:
+            if pat.search(clean_text):
+                strat = RetrievalStrategy.HYBRID_GRAPH if has_project_grounding else RetrievalStrategy.GRAPH
+                return RetrievalDecision(
+                    retrieval_required=True,
+                    strategy=strat,
+                    scope=scope,
+                    top_k=top_k,
+                    query=query,
+                    reason="Task inquires about dependencies, entity relationships, or system component connections.",
+                    confidence=0.91,
+                    metadata={"matched_pattern": pat.pattern, "graph_retrieval": True},
+                )
+
+        # 11. Check Exact Phrase / Keyword Search Patterns
         for pat in self.EXACT_PHRASE_PATTERNS:
             if pat.search(clean_text):
                 return RetrievalDecision(
@@ -306,19 +331,24 @@ class RuleBasedDecisionProvider(RetrievalDecisionProvider):
 
     def _extract_task_text(self, task: Task, **kwargs: Any) -> str:
         parts = []
-        if task.title:
-            parts.append(task.title)
-        if task.instructions:
-            parts.append(task.instructions)
-        elif task.description:
-            parts.append(task.description)
+        title = getattr(task, "title", None)
+        instructions = getattr(task, "instructions", None)
+        description = getattr(task, "description", None)
+        if title:
+            parts.append(title)
+        if instructions:
+            parts.append(instructions)
+        elif description:
+            parts.append(description)
         return " ".join(parts)
 
     def _extract_clean_query(self, task: Task, full_text: str) -> str:
-        if task.instructions and task.instructions.strip():
-            return task.instructions.strip()
-        if task.title and task.title.strip():
-            return task.title.strip()
+        instructions = getattr(task, "instructions", None)
+        title = getattr(task, "title", None)
+        if instructions and instructions.strip():
+            return instructions.strip()
+        if title and title.strip():
+            return title.strip()
         return full_text.strip()
 
     def _extract_exact_phrase_target(self, text: str) -> Optional[str]:

@@ -26,6 +26,7 @@ class RetrievalStrategy(str, Enum):
     DOCUMENT = "document"
     WEB = "web"
     GRAPH = "graph"
+    HYBRID_GRAPH = "hybrid_graph"
     DATABASE = "database"
     API = "api"
     GITHUB = "github"

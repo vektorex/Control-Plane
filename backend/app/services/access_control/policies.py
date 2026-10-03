@@ -73,6 +73,12 @@ from backend.app.services.access_control.permissions import (
     PROMPT_EXECUTE,
     PROMPT_EXPERIMENT,
     PROMPT_ARCHIVE,
+    GRAPH_READ,
+    GRAPH_CREATE,
+    GRAPH_UPDATE,
+    GRAPH_DELETE,
+    GRAPH_EXTRACT,
+    GRAPH_MERGE,
 )
 
 # Workspace-scoped permissions (subject to workspace role restrictions)
@@ -133,6 +139,12 @@ WORKSPACE_SCOPED_PERMISSIONS: Set[str] = {
     PROMPT_EXECUTE,
     PROMPT_EXPERIMENT,
     PROMPT_ARCHIVE,
+    GRAPH_READ,
+    GRAPH_CREATE,
+    GRAPH_UPDATE,
+    GRAPH_DELETE,
+    GRAPH_EXTRACT,
+    GRAPH_MERGE,
 }
 
 # Project-scoped permissions (subject to project restrictions if restricted)
@@ -181,6 +193,12 @@ PROJECT_SCOPED_PERMISSIONS: Set[str] = {
     PROMPT_EXECUTE,
     PROMPT_EXPERIMENT,
     PROMPT_ARCHIVE,
+    GRAPH_READ,
+    GRAPH_CREATE,
+    GRAPH_UPDATE,
+    GRAPH_DELETE,
+    GRAPH_EXTRACT,
+    GRAPH_MERGE,
 }
 
 

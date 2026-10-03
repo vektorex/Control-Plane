@@ -21,7 +21,6 @@ from backend.app.services.access_control.permissions import (
     PROMPT_ROLLBACK,
     PROMPT_UPDATE,
 )
-from backend.app.services.hitl.service import HITLService
 from backend.app.services.prompts.constants import PromptEnvironment
 from backend.app.services.prompts.errors import ExecutionConfigPolicyError
 from backend.app.services.prompts.models import Prompt

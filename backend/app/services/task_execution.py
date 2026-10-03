@@ -597,8 +597,16 @@ class TaskExecutionService:
 
         # Step 20: AI Task Intelligence - Resolve Execution Requirements
         prompt_str = prompt_check
+        stream_ws_id = None
+        if "project" in getattr(task, "__dict__", {}) and task.__dict__["project"]:
+            stream_ws_id = getattr(task.__dict__["project"], "workspace_id", None)
+        elif task.project_id:
+            from backend.app.db.models.project import Project
+            from sqlalchemy import select
+            proj_stmt = select(Project.workspace_id).where(Project.id == task.project_id)
+            proj_res = await self.session.execute(proj_stmt)
+            stream_ws_id = proj_res.scalar_one_or_none()
         context_str = task.context_text or ""
-        stream_ws_id = task.project.workspace_id if (task.project and task.project.workspace_id) else None
         user_overrides = {
             "execution_mode": request.execution_mode or getattr(task, "execution_mode", "auto"),
             "enable_web_search": request.enable_web_search,
@@ -760,7 +768,15 @@ class TaskExecutionService:
         await self.session.refresh(run)
 
         # Resolve workspace context
-        workspace_id = task.project.workspace_id if (task.project and task.project.workspace_id) else None
+        workspace_id = None
+        if "project" in getattr(task, "__dict__", {}) and task.__dict__["project"]:
+            workspace_id = getattr(task.__dict__["project"], "workspace_id", None)
+        elif task.project_id:
+            from backend.app.db.models.project import Project
+            from sqlalchemy import select
+            proj_stmt = select(Project.workspace_id).where(Project.id == task.project_id)
+            proj_res = await self.session.execute(proj_stmt)
+            workspace_id = proj_res.scalar_one_or_none()
         tracer = ExecutionTracer(run_id=run.id, workspace_id=workspace_id) if workspace_id else None
         if tracer:
             tracer.record_event(

@@ -325,6 +325,107 @@ class AssertionEngine:
                 details=matching_finding,
             )
 
+        # 12. entity_exists (Step 29 Knowledge Graph assertion)
+        elif a_type == AssertionType.ENTITY_EXISTS:
+            expected_entity = str(assertion.value or "").lower()
+            found = False
+            # Check context items from knowledge graph
+            if context_items:
+                for item in context_items:
+                    meta = item.get("metadata", {})
+                    c_name = str(meta.get("canonical_name", "")).lower()
+                    if expected_entity in c_name or expected_entity in str(item.get("content", "")).lower():
+                        found = True
+                        break
+            if not found and expected_entity in str_val.lower():
+                found = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=found,
+                status="passed" if found else "failed",
+                path=assertion.path,
+                expected=f"Entity '{assertion.value}' exists in graph context or output",
+                actual="found" if found else "not found",
+                message=f"Entity '{assertion.value}' was {'found' if found else 'missing'}",
+            )
+
+        # 13. relationship_exists (Step 29 Knowledge Graph assertion)
+        elif a_type == AssertionType.RELATIONSHIP_EXISTS:
+            expected_rel = str(assertion.value or "").lower()
+            found = False
+            if context_items:
+                for item in context_items:
+                    meta = item.get("metadata", {})
+                    rels = meta.get("relationships", [])
+                    for r in rels:
+                        if expected_rel in str(r).lower():
+                            found = True
+                            break
+                    if not found and expected_rel in str(item.get("content", "")).lower():
+                        found = True
+                        break
+            if not found and expected_rel in str_val.lower():
+                found = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=found,
+                status="passed" if found else "failed",
+                path=assertion.path,
+                expected=f"Relationship '{assertion.value}' exists in graph context or output",
+                actual="found" if found else "not found",
+                message=f"Relationship '{assertion.value}' was {'found' if found else 'missing'}",
+            )
+
+        # 14. relationship_matches_source (Step 29 Knowledge Graph assertion)
+        elif a_type == AssertionType.RELATIONSHIP_MATCHES_SOURCE:
+            expected_src = str(assertion.value or "").lower()
+            matches = False
+            if context_items:
+                for item in context_items:
+                    meta = item.get("metadata", {})
+                    sources = meta.get("sources", []) or meta.get("source_reference", {})
+                    if expected_src in str(sources).lower():
+                        matches = True
+                        break
+            if not matches and expected_src in str_val.lower():
+                matches = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=matches,
+                status="passed" if matches else "failed",
+                path=assertion.path,
+                expected=f"Relationship matches source '{assertion.value}'",
+                actual="matched" if matches else "unmatched",
+                message=f"Relationship source match {'succeeded' if matches else 'failed'}",
+            )
+
+        # 15. source_reference_exists (Step 29 Knowledge Graph assertion)
+        elif a_type == AssertionType.SOURCE_REFERENCE_EXISTS:
+            has_source = False
+            if context_items:
+                for item in context_items:
+                    meta = item.get("metadata", {})
+                    if meta.get("sources") or meta.get("source_reference") or meta.get("source_count", 0) > 0:
+                        has_source = True
+                        break
+            if not has_source and retrieval_sources and len(retrieval_sources) > 0:
+                has_source = True
+            if not has_source and ("source" in str_val.lower() or "provenance" in str_val.lower()):
+                has_source = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=has_source,
+                status="passed" if has_source else "failed",
+                path=assertion.path,
+                expected="Source reference exists for graph entity or relationship",
+                actual="found" if has_source else "missing",
+                message="Graph source reference verified" if has_source else "Missing source reference for graph element",
+            )
+
         # Fallback unknown assertion
         return AssertionResult(
             assertion_type=str(a_type),

@@ -73,6 +73,12 @@ export const siteConfig = {
       description: "Persistent knowledge, user preferences, suggestions, and conflicts",
     },
     {
+      label: "Knowledge Graph",
+      href: "/app/knowledge",
+      icon: "Network",
+      description: "Structured relational knowledge graph, entities, relationships, proposals, and conflicts",
+    },
+    {
       label: "Organizations",
       href: "/app/organizations",
       icon: "Building2",

@@ -4,6 +4,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
+from sqlalchemy.orm import joinedload
+
 from backend.app.core.errors import NotFoundError, DatabaseError
 from backend.app.db.models.task import Task
 from backend.app.db.models.project import Project
@@ -22,6 +24,7 @@ class TaskRepository:
             select(Task)
             .join(Project, Task.project_id == Project.id)
             .join(Workspace, Project.workspace_id == Workspace.id)
+            .options(joinedload(Task.project))
             .where(
                 Task.id == task_id,
                 Workspace.owner_user_id == owner_user_id,

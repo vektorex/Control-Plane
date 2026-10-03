@@ -1,6 +1,7 @@
 import asyncio
 import time
 import pytest
+import pytest_asyncio
 from typing import AsyncIterator, List
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import (
@@ -157,7 +158,7 @@ async def override_get_db():
             await session.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_session() -> AsyncIterator[AsyncSession]:
     """Yields an isolated async session for database model testing."""
     async with test_async_session_factory() as session:

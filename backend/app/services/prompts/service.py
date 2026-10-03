@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.logging import logger
 from backend.app.db.models.user import User
-from backend.app.services.ai_gateway import GatewayRequest, default_ai_gateway
 from backend.app.services.events.constants import ActorType, AggregateType, SystemEventType
 from backend.app.services.events.publisher import EventPublisher
 from backend.app.services.events.schemas import EventPublishRequest

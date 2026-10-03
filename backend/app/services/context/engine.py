@@ -45,6 +45,9 @@ class ContextEngine:
             self.registry.register(ConnectorContextProvider())
         if not self.registry.get_provider("memory_context"):
             self.registry.register(MemoryContextProvider())
+        if not self.registry.get_provider("knowledge_graph_context"):
+            from backend.app.services.knowledge_graph.context_provider import GraphContextProvider
+            self.registry.register(GraphContextProvider())
 
 
 

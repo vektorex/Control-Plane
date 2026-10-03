@@ -55,8 +55,14 @@ class MemoryContextProvider(ContextProvider):
         # 2. Dynamic memory retrieval if session and task available
         if session and task:
             workspace_id = kwargs.get("workspace_id")
-            if not workspace_id and task.project:
-                workspace_id = task.project.workspace_id
+            if not workspace_id and "project" in getattr(task, "__dict__", {}) and task.__dict__["project"]:
+                workspace_id = getattr(task.__dict__["project"], "workspace_id", None)
+            elif not workspace_id and getattr(task, "project_id", None) and session:
+                from backend.app.db.models.project import Project
+                from sqlalchemy import select
+                proj_stmt = select(Project.workspace_id).where(Project.id == task.project_id)
+                proj_res = await session.execute(proj_stmt)
+                workspace_id = proj_res.scalar_one_or_none()
 
             if not workspace_id:
                 return []

@@ -144,6 +144,108 @@ Structure the report into:
         "model_requirements": {"provider": "openai", "model": "gpt-4o-mini"},
         "execution_config": {"temperature": 0.3, "max_output_tokens": 4096},
     },
+    {
+        "key": "multimodal.image_analysis",
+        "name": "Multimodal Image & Visual Reasoning",
+        "prompt_type": PromptType.TASK.value,
+        "description": "Inspects and reasons over images, screenshots, diagrams, and visual artifacts with factual grounding.",
+        "content": """Analyze the provided visual artifact and address the user instruction: {{instruction}}
+
+### GROUNDING RULES:
+1. Ground all visual assertions in observable visual features, layout elements, or text visible in the artifact.
+2. If text or error messages appear in the image, transcribe and explain them directly.
+3. State spatial coordinates or relative positions (e.g. top-left, center, header) when referencing components.
+4. Do NOT speculate or fabricate details not visible in the image.""",
+        "variable_schema": {
+            "instruction": {"type": "string", "required": True},
+        },
+        "model_requirements": {"provider": "openai", "model": "gpt-4o", "requires_vision": True},
+        "execution_config": {"temperature": 0.2, "max_output_tokens": 2048},
+    },
+    {
+        "key": "multimodal.ocr_cleanup",
+        "name": "OCR Text Normalization & Cleanup",
+        "prompt_type": PromptType.TRANSFORM.value,
+        "description": "Corrects OCR artifact noise, fixes character breaks, and restores reading flow while preserving original wording.",
+        "content": """Clean and normalize the following OCR raw output without inventing or altering facts:
+
+### RAW OCR TEXT:
+{{raw_ocr_text}}
+
+### INSTRUCTIONS:
+1. Fix hyphenation breaks and line wrap artifacts.
+2. Correct obvious optical character confusions (e.g. '0' vs 'O', '1' vs 'l') where unambiguous from context.
+3. Preserve original terminology, numbers, dates, and names exactly.
+4. Return only the cleaned text.""",
+        "variable_schema": {
+            "raw_ocr_text": {"type": "string", "required": True},
+        },
+        "model_requirements": {"provider": "openai", "model": "gpt-4o-mini"},
+        "execution_config": {"temperature": 0.0, "max_output_tokens": 2048},
+    },
+    {
+        "key": "multimodal.table_understanding",
+        "name": "Structured Table & Data Analysis",
+        "prompt_type": PromptType.TASK.value,
+        "description": "Analyzes tabular spreadsheets, CSVs, and metrics tables to summarize trends, statistics, and anomalies.",
+        "content": """Analyze the provided tabular data artifact and answer the user question: {{instruction}}
+
+### TABLE CONTEXT:
+{{table_context}}
+
+### GUIDELINES:
+1. Cite specific column names, row ranges, and exact values to support each claim.
+2. Note any trends, outliers, or missing values observed in the dataset.
+3. Do not assume data beyond the rows provided.""",
+        "variable_schema": {
+            "instruction": {"type": "string", "required": True},
+            "table_context": {"type": "string", "required": True},
+        },
+        "model_requirements": {"provider": "openai", "model": "gpt-4o-mini"},
+        "execution_config": {"temperature": 0.1, "max_output_tokens": 2048},
+    },
+    {
+        "key": "multimodal.audio_summary",
+        "name": "Audio Recording & Transcript Synthesis",
+        "prompt_type": PromptType.TASK.value,
+        "description": "Summarizes meeting recordings and audio transcripts with speaker attribution and timestamps.",
+        "content": """Summarize the audio recording transcript below according to: {{instruction}}
+
+### TRANSCRIPT:
+{{transcript_text}}
+
+### REQUIREMENTS:
+1. Organize discussion points chronologically with timestamps [HH:MM:SS].
+2. Attribute statements to identified speakers where available; never fabricate speaker identities.
+3. Highlight decisions made, action items, and open questions.""",
+        "variable_schema": {
+            "instruction": {"type": "string", "required": True},
+            "transcript_text": {"type": "string", "required": True},
+        },
+        "model_requirements": {"provider": "openai", "model": "gpt-4o-mini"},
+        "execution_config": {"temperature": 0.2, "max_output_tokens": 2048},
+    },
+    {
+        "key": "multimodal.video_analysis",
+        "name": "Video Keyframe & Temporal Analysis",
+        "prompt_type": PromptType.TASK.value,
+        "description": "Reasons over video keyframes, scene transitions, and progression over time.",
+        "content": """Analyze the provided video keyframes and chronological progression for: {{instruction}}
+
+### CHRONOLOGICAL KEYFRAMES:
+{{keyframes_context}}
+
+### GUIDELINES:
+1. Reference keyframe timestamps when describing actions, scenes, or on-screen changes.
+2. Track visible entity transitions and continuous actions across frames.
+3. Conclude with a clear temporal summary of events.""",
+        "variable_schema": {
+            "instruction": {"type": "string", "required": True},
+            "keyframes_context": {"type": "string", "required": True},
+        },
+        "model_requirements": {"provider": "openai", "model": "gpt-4o", "requires_vision": True},
+        "execution_config": {"temperature": 0.2, "max_output_tokens": 2048},
+    },
 ]
 
 

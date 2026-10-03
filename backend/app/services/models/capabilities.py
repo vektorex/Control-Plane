@@ -12,6 +12,11 @@ class ModelCapability(str, Enum):
     STRUCTURED_OUTPUT = "structured_output"
     TOOL_CALLING = "tool_calling"
     VISION = "vision"
+    IMAGE_INPUT = "image_input"
+    MULTIMODAL_INPUT = "multimodal_input"
+    AUDIO_INPUT = "audio_input"
+    AUDIO_TRANSCRIPTION = "audio_transcription"
+    VIDEO = "video"
     LONG_CONTEXT = "long_context"
     STREAMING = "streaming"
     EMBEDDINGS = "embeddings"
@@ -34,7 +39,10 @@ def normalize_capability(cap: str) -> str:
         "json_mode": ModelCapability.STRUCTURED_OUTPUT.value,
         "stream": ModelCapability.STREAMING.value,
         "image": ModelCapability.VISION.value,
-        "multimodal": ModelCapability.VISION.value,
+        "multimodal": ModelCapability.MULTIMODAL_INPUT.value,
+        "audio": ModelCapability.AUDIO_INPUT.value,
+        "transcription": ModelCapability.AUDIO_TRANSCRIPTION.value,
+        "video": ModelCapability.VIDEO.value,
     }
     return alias_map.get(normalized, normalized)
 

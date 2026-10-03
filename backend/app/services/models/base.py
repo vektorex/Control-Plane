@@ -73,6 +73,8 @@ class ModelDefinition(BaseModel):
     supports_tools: bool = Field(default=True, description="Whether the model supports native function/tool calling")
     supports_structured_output: bool = Field(default=True, description="Whether the model supports strict JSON output")
     supports_vision: bool = Field(default=False, description="Whether the model supports image/multimodal inputs")
+    supports_audio: bool = Field(default=False, description="Whether the model supports direct audio input")
+    supports_video: bool = Field(default=False, description="Whether the model supports direct video input")
     enabled: bool = Field(default=True, description="Whether this model is enabled in server policy")
     cost_class: str = Field(default="low", description="Cost category: 'low', 'medium', 'high'")
     latency_class: str = Field(default="low", description="Latency category: 'low', 'medium', 'high'")
@@ -90,7 +92,30 @@ class ModelDefinition(BaseModel):
             return False
         if req.requires_tools and not self.supports_tools:
             return False
-        if req.requires_vision and not self.supports_vision:
+        if (req.requires_vision or req.requires_image_input) and not (
+            self.supports_vision
+            or self.has_capability("vision")
+            or self.has_capability("image_input")
+            or self.has_capability("multimodal_input")
+        ):
+            return False
+        if (req.requires_audio or req.requires_audio_input) and not (
+            self.supports_audio
+            or self.has_capability("audio_input")
+            or self.has_capability("audio_transcription")
+        ):
+            return False
+        if req.requires_video and not (
+            self.supports_video
+            or self.has_capability("video")
+            or self.supports_vision
+        ):
+            return False
+        if req.requires_multimodal and not (
+            self.supports_vision
+            or self.has_capability("multimodal_input")
+            or self.has_capability("vision")
+        ):
             return False
         if req.requires_streaming and not self.supports_streaming:
             return False
@@ -113,6 +138,13 @@ class ModelRequirements(BaseModel):
     requires_reasoning: bool = Field(default=False, description="Whether complex reasoning or code logic is required")
     requires_tools: bool = Field(default=False, description="Whether external tool execution is required")
     requires_vision: bool = Field(default=False, description="Whether image or multimodal ingestion is required")
+    requires_image_input: bool = Field(default=False, description="Whether direct image input is required")
+    requires_multimodal: bool = Field(default=False, description="Whether mixed multimodal reasoning is required")
+    requires_audio: bool = Field(default=False, description="Whether audio understanding is required")
+    requires_audio_input: bool = Field(default=False, description="Whether direct audio input is required")
+    requires_video: bool = Field(default=False, description="Whether video understanding is required")
+    requires_table: bool = Field(default=False, description="Whether structured table analysis is required")
+    requires_document: bool = Field(default=False, description="Whether document understanding is required")
     requires_long_context: bool = Field(default=False, description="Whether large context window (>32k) is required")
     requires_streaming: bool = Field(default=True, description="Whether streaming is required")
     requires_structured_output: bool = Field(default=False, description="Whether strict JSON schema is required")

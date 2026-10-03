@@ -10,6 +10,7 @@ from backend.app.services.ai_gateway.errors import (
     ProviderUnavailableError,
     ProviderTimeoutError,
     RateLimitedError,
+    CapabilityUnsupportedError,
     GatewayError,
 )
 from backend.app.services.ai_gateway.requests import GatewayRequest
@@ -136,6 +137,77 @@ class BaseProviderAdapter(ModelProviderAdapter):
             usage_source="provider",
         )
 
+    def _validate_request_capabilities(self, request: GatewayRequest) -> None:
+        """
+        Validates that the target model satisfies any multimodal capabilities present in request.
+        """
+        has_images = any(
+            isinstance(m.get("content"), list)
+            and any(isinstance(p, dict) and p.get("type") in ("image", "input_image") for p in m["content"])
+            for m in request.messages
+        )
+        has_audio = any(
+            isinstance(m.get("content"), list)
+            and any(isinstance(p, dict) and p.get("type") in ("audio", "audio_input") for p in m["content"])
+            for m in request.messages
+        )
+        has_video = any(
+            isinstance(m.get("content"), list)
+            and any(isinstance(p, dict) and p.get("type") in ("video", "video_frame") for p in m["content"])
+            for m in request.messages
+        )
+
+        if not (has_images or has_audio or has_video):
+            return
+
+        model_def = default_model_registry.get_model(request.model, provider=self.provider_id)
+
+        if has_images:
+            supports_vision = bool(
+                model_def
+                and (
+                    model_def.supports_vision
+                    or "vision" in model_def.capabilities
+                    or "image_input" in model_def.capabilities
+                    or "multimodal_input" in model_def.capabilities
+                )
+            )
+            if not supports_vision:
+                raise CapabilityUnsupportedError(
+                    f"Model '{request.model}' on provider '{self.provider_id}' does not support vision or image inputs.",
+                    details={"model": request.model, "required_capability": "vision"},
+                )
+
+        if has_audio:
+            supports_audio = bool(
+                model_def
+                and (
+                    getattr(model_def, "supports_audio", False)
+                    or "audio_input" in model_def.capabilities
+                    or "audio_transcription" in model_def.capabilities
+                )
+            )
+            if not supports_audio:
+                raise CapabilityUnsupportedError(
+                    f"Model '{request.model}' on provider '{self.provider_id}' does not support direct audio inputs.",
+                    details={"model": request.model, "required_capability": "audio_input"},
+                )
+
+        if has_video:
+            supports_video = bool(
+                model_def
+                and (
+                    getattr(model_def, "supports_video", False)
+                    or "video" in model_def.capabilities
+                    or (model_def and model_def.supports_vision)
+                )
+            )
+            if not supports_video:
+                raise CapabilityUnsupportedError(
+                    f"Model '{request.model}' on provider '{self.provider_id}' does not support video capabilities.",
+                    details={"model": request.model, "required_capability": "video"},
+                )
+
     def _convert_messages(self, request: GatewayRequest) -> List[ChatMessage]:
         converted: List[ChatMessage] = []
         if request.system_instruction:
@@ -143,11 +215,15 @@ class BaseProviderAdapter(ModelProviderAdapter):
 
         for msg in request.messages:
             role = msg.get("role", "user")
-            content = str(msg.get("content", ""))
-            converted.append(ChatMessage(role=role, content=content))
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                converted.append(ChatMessage(role=role, content=content))
+            else:
+                converted.append(ChatMessage(role=role, content=str(content)))
         return converted
 
     async def generate(self, request: GatewayRequest) -> GatewayResponse:
+        self._validate_request_capabilities(request)
         start_time = time.perf_counter()
         req_id = request.metadata.get("request_id") or str(uuid.uuid4())
 
@@ -180,6 +256,7 @@ class BaseProviderAdapter(ModelProviderAdapter):
             self._handle_provider_error(exc)
 
     async def generate_stream(self, request: GatewayRequest) -> AsyncIterator[Dict[str, Any]]:
+        self._validate_request_capabilities(request)
         try:
             llm_req = LLMGenerateRequest(
                 model=request.model,

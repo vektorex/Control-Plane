@@ -97,6 +97,12 @@ export const siteConfig = {
       description: "Manage uploaded knowledge base, chunking, and vector index",
     },
     {
+      label: "Artifacts",
+      href: "/app/artifacts",
+      icon: "FileImage",
+      description: "Unified multimodal artifacts, images, PDFs, audio, video frames, and structured tables",
+    },
+    {
       label: "Analytics",
       href: "/app/analytics",
       icon: "BarChart3",

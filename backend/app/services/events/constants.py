@@ -26,6 +26,7 @@ class AggregateType(str, Enum):
     PROMPT = "prompt"
     PROMPT_EXPERIMENT = "prompt_experiment"
     GRAPH = "graph"
+    ARTIFACT = "artifact"
 
 
 class EventDeliveryStatus(str, Enum):
@@ -156,6 +157,15 @@ class SystemEventType(str, Enum):
     GRAPH_PROPOSAL_REJECTED = "graph.proposal_rejected"
     GRAPH_CONFLICT_CREATED = "graph.conflict_created"
     GRAPH_CONFLICT_RESOLVED = "graph.conflict_resolved"
+
+    # Step 30 Multimodal Artifact events
+    ARTIFACT_PROCESSING_STARTED = "artifact.processing_started"
+    ARTIFACT_PROCESSING_PROGRESS = "artifact.processing_progress"
+    ARTIFACT_PROCESSING_COMPLETED = "artifact.processing_completed"
+    ARTIFACT_PROCESSING_FAILED = "artifact.processing_failed"
+    ARTIFACT_ANALYSIS_STARTED = "artifact.analysis_started"
+    ARTIFACT_ANALYSIS_COMPLETED = "artifact.analysis_completed"
+    ARTIFACT_ANALYSIS_FAILED = "artifact.analysis_failed"
 
 
 # Auditable event types

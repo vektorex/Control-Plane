@@ -24,6 +24,8 @@ class ContextSourceType(str, Enum):
     CONNECTOR = "connector"
     MEMORY = "memory"
     KNOWLEDGE_GRAPH = "knowledge_graph"
+    ARTIFACT = "artifact"
+    MULTIMODAL = "multimodal"
 
 
 class ContextItem(BaseModel):

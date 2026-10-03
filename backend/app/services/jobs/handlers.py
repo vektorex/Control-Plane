@@ -639,6 +639,98 @@ class GraphRebuildJobHandler(JobHandler):
         return {"status": "completed", "workspace_id": str(job.workspace_id)}
 
 
+class ArtifactProcessingJobHandler(JobHandler):
+    """
+    Asynchronously inspects, extracts, and normalizes an uploaded artifact.
+    """
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        artifact_id_str = job.payload.get("artifact_id")
+        if not artifact_id_str:
+            return {"status": "skipped", "reason": "No artifact_id provided in payload."}
+
+        artifact_id = uuid.UUID(str(artifact_id_str))
+        await context.update_progress(20, "Inspecting artifact media", 1, 3, "Inspecting")
+        if cancellation_token.is_set():
+            raise JobCancellationError("Artifact processing cancelled.")
+
+        from backend.app.services.multimodal.artifact_service import ArtifactService
+        art_service = ArtifactService(context.session)
+
+        # Get system user or job owner user
+        owner_id = job.created_by or uuid.uuid4()
+        user_proxy = User(id=owner_id, is_active=True)
+
+        artifact = await art_service.process_artifact(
+            artifact_id=artifact_id,
+            user=user_proxy,
+            cancellation_token=cancellation_token,
+        )
+
+        await context.update_progress(100, f"Artifact {artifact.filename} processed successfully", 3, 3, "Completed")
+        return {
+            "status": "completed",
+            "artifact_id": str(artifact.id),
+            "parts_count": len(artifact.parts) if artifact.parts else 0,
+            "artifact_type": artifact.artifact_type.value,
+        }
+
+
+class ImageProcessingJobHandler(JobHandler):
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        return await ArtifactProcessingJobHandler().execute(job, context, cancellation_token)
+
+
+class AudioTranscriptionJobHandler(JobHandler):
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        return await ArtifactProcessingJobHandler().execute(job, context, cancellation_token)
+
+
+class VideoProcessingJobHandler(JobHandler):
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        return await ArtifactProcessingJobHandler().execute(job, context, cancellation_token)
+
+
+class TableProcessingJobHandler(JobHandler):
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        return await ArtifactProcessingJobHandler().execute(job, context, cancellation_token)
+
+
+class MultimodalExtractionJobHandler(JobHandler):
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        return await ArtifactProcessingJobHandler().execute(job, context, cancellation_token)
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -660,6 +752,12 @@ class JobHandlerRegistry:
         self.register(JobType.GRAPH_EXTRACTION.value, GraphExtractionJobHandler())
         self.register(JobType.GRAPH_RECONCILIATION.value, GraphReconciliationJobHandler())
         self.register(JobType.GRAPH_REBUILD.value, GraphRebuildJobHandler())
+        self.register(JobType.ARTIFACT_PROCESSING.value, ArtifactProcessingJobHandler())
+        self.register(JobType.IMAGE_PROCESSING.value, ImageProcessingJobHandler())
+        self.register(JobType.AUDIO_TRANSCRIPTION.value, AudioTranscriptionJobHandler())
+        self.register(JobType.VIDEO_PROCESSING.value, VideoProcessingJobHandler())
+        self.register(JobType.TABLE_PROCESSING.value, TableProcessingJobHandler())
+        self.register(JobType.MULTIMODAL_EXTRACTION.value, MultimodalExtractionJobHandler())
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

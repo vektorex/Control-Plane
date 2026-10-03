@@ -107,6 +107,14 @@ class RuleBasedDecisionProvider(RetrievalDecisionProvider):
         re.compile(r"\bknowledge\s+graph\b", re.IGNORECASE),
     ]
 
+    # Multimodal artifact directives (screenshots, audio, spreadsheets, video)
+    MULTIMODAL_PATTERNS = [
+        re.compile(r"\b(screenshot(\s+error)?|in\s+this\s+screenshot|analyze\s+this\s+image|diagram\s+shown)\b", re.IGNORECASE),
+        re.compile(r"\b(meeting\s+recording|audio\s+file|what\s+does\s+this\s+meeting\s+recording\s+say|transcribe\s+this\s+audio)\b", re.IGNORECASE),
+        re.compile(r"\b(spreadsheet|csv|xlsx|excel\s+sheet|analyze\s+this\s+spreadsheet)\b", re.IGNORECASE),
+        re.compile(r"\b(video\s+clip|keyframes?|scenes?\s+in\s+this\s+video)\b", re.IGNORECASE),
+    ]
+
     async def decide(
         self,
         task: Task,
@@ -249,7 +257,26 @@ class RuleBasedDecisionProvider(RetrievalDecisionProvider):
                     metadata={"matched_pattern": pat.pattern, "graph_retrieval": True},
                 )
 
-        # 11. Check Exact Phrase / Keyword Search Patterns
+        # 11. Check Multimodal Artifact Directives
+        has_artifacts = bool(kwargs.get("artifacts") or kwargs.get("artifact_ids"))
+        meta = getattr(task, "metadata_json", None) or {}
+        if not has_artifacts and (meta.get("artifacts") or meta.get("artifact_ids") or meta.get("input_artifacts")):
+            has_artifacts = True
+
+        for pat in self.MULTIMODAL_PATTERNS:
+            if pat.search(clean_text) or has_artifacts:
+                return RetrievalDecision(
+                    retrieval_required=True,
+                    strategy=RetrievalStrategy.MULTIMODAL,
+                    scope=scope,
+                    top_k=top_k,
+                    query=query,
+                    reason="Task directive or referenced artifacts require multimodal artifact processing.",
+                    confidence=0.94,
+                    metadata={"matched_pattern": pat.pattern if pat.search(clean_text) else "attached_artifacts", "multimodal": True},
+                )
+
+        # 12. Check Exact Phrase / Keyword Search Patterns
         for pat in self.EXACT_PHRASE_PATTERNS:
             if pat.search(clean_text):
                 return RetrievalDecision(

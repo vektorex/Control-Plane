@@ -79,6 +79,12 @@ from backend.app.services.access_control.permissions import (
     GRAPH_DELETE,
     GRAPH_EXTRACT,
     GRAPH_MERGE,
+    ARTIFACT_READ,
+    ARTIFACT_CREATE,
+    ARTIFACT_UPDATE,
+    ARTIFACT_DELETE,
+    ARTIFACT_PROCESS,
+    ARTIFACT_ANALYZE,
 )
 
 # Workspace-scoped permissions (subject to workspace role restrictions)
@@ -145,6 +151,12 @@ WORKSPACE_SCOPED_PERMISSIONS: Set[str] = {
     GRAPH_DELETE,
     GRAPH_EXTRACT,
     GRAPH_MERGE,
+    ARTIFACT_READ,
+    ARTIFACT_CREATE,
+    ARTIFACT_UPDATE,
+    ARTIFACT_DELETE,
+    ARTIFACT_PROCESS,
+    ARTIFACT_ANALYZE,
 }
 
 # Project-scoped permissions (subject to project restrictions if restricted)
@@ -199,6 +211,12 @@ PROJECT_SCOPED_PERMISSIONS: Set[str] = {
     GRAPH_DELETE,
     GRAPH_EXTRACT,
     GRAPH_MERGE,
+    ARTIFACT_READ,
+    ARTIFACT_CREATE,
+    ARTIFACT_UPDATE,
+    ARTIFACT_DELETE,
+    ARTIFACT_PROCESS,
+    ARTIFACT_ANALYZE,
 }
 
 

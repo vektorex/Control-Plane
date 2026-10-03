@@ -38,6 +38,12 @@ class JobType(str, Enum):
     GRAPH_EXTRACTION = "graph_extraction"
     GRAPH_RECONCILIATION = "graph_reconciliation"
     GRAPH_REBUILD = "graph_rebuild"
+    ARTIFACT_PROCESSING = "artifact_processing"
+    IMAGE_PROCESSING = "image_processing"
+    AUDIO_TRANSCRIPTION = "audio_transcription"
+    VIDEO_PROCESSING = "video_processing"
+    TABLE_PROCESSING = "table_processing"
+    MULTIMODAL_EXTRACTION = "multimodal_extraction"
 
 
 class JobEventType(str, Enum):

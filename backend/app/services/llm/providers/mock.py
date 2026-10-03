@@ -75,8 +75,14 @@ class MockLLMProvider(BaseLLMProvider):
             raise RuntimeError(f"Simulated Mock Provider failure for model '{request.model}'")
 
         # Check if this is a planning prompt (asking for JSON plan)
+        first_msg = request.messages[0].content if request.messages else ""
         last_msg = request.messages[-1].content if request.messages else ""
-        if "Plan this task using only available capabilities" in last_msg or "Execution Planner" in (request.messages[0].content if request.messages else ""):
+        if isinstance(first_msg, list):
+            first_msg = " ".join(p.get("text", "") for p in first_msg if isinstance(p, dict))
+        if isinstance(last_msg, list):
+            last_msg = " ".join(p.get("text", "") for p in last_msg if isinstance(p, dict))
+
+        if "Plan this task using only available capabilities" in last_msg or "Execution Planner" in first_msg:
             content = """{
   "goal": "Execute synthesized workflow with validated context and generation",
   "steps": [
@@ -97,7 +103,15 @@ class MockLLMProvider(BaseLLMProvider):
         else:
             content = f"Mock LLM generated output for model '{request.model}'. Task processed successfully."
 
-        prompt_tokens = sum(len(m.content.split()) for m in request.messages) * 2
+        def _count_msg_tokens(msg: ChatMessage) -> int:
+            if isinstance(msg.content, str):
+                return len(msg.content.split()) * 2
+            elif isinstance(msg.content, list):
+                txt_tokens = sum(len(p.get("text", "").split()) * 2 for p in msg.content if isinstance(p, dict))
+                return max(10, txt_tokens)
+            return 10
+
+        prompt_tokens = sum(_count_msg_tokens(m) for m in request.messages)
         completion_tokens = len(content.split()) * 2
         total_tokens = prompt_tokens + completion_tokens
 

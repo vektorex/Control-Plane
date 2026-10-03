@@ -32,6 +32,7 @@ from backend.app.api.routes.organizations import organizations_router, invitatio
 from backend.app.api.routes.prompts import router as prompts_router
 from backend.app.api.routes.prompt_experiments import router as prompt_experiments_router
 from backend.app.api.routes.knowledge_graph import router as knowledge_graph_router
+from backend.app.api.routes.artifacts import router as artifacts_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -46,6 +47,7 @@ api_router.include_router(tasks_router)
 api_router.include_router(runs_router)
 api_router.include_router(context_router)
 api_router.include_router(documents_router)
+api_router.include_router(artifacts_router)
 api_router.include_router(tools_router)
 api_router.include_router(evaluation_router)
 api_router.include_router(analytics_router)

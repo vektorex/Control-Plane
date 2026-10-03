@@ -352,7 +352,52 @@ class RetrievalRouter:
                 retrieval_latency_ms=latency_ms,
             )
 
-        # 8. Strategy: Document / Hybrid (default)
+        # 8. Strategy: Multimodal Artifacts
+        elif decision.strategy == RetrievalStrategy.MULTIMODAL:
+            start_time = time.perf_counter()
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+            from backend.app.services.multimodal.models import Artifact, ArtifactPart
+            from backend.app.services.retrieval.models import RetrievalCandidate
+
+            stmt = (
+                select(Artifact)
+                .options(selectinload(Artifact.parts))
+                .where(Artifact.workspace_id == workspace_id)
+            )
+            if effective_project_id:
+                stmt = stmt.where(Artifact.project_id == effective_project_id)
+            stmt = stmt.limit(decision.top_k)
+
+            res = await session.execute(stmt)
+            artifacts = res.scalars().all()
+
+            multimodal_candidates: List[RetrievalCandidate] = []
+            for art in artifacts:
+                for part in (art.parts or []):
+                    if part.text_content:
+                        cand = RetrievalCandidate(
+                            chunk_id=part.id,
+                            document_id=art.id,
+                            workspace_id=art.workspace_id,
+                            project_id=art.project_id,
+                            filename=art.filename,
+                            content=part.text_content,
+                            fusion_score=0.9,
+                            metadata={"artifact_type": art.artifact_type.value, "part_type": part.part_type.value},
+                        )
+                        multimodal_candidates.append(cand)
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            return RetrievalResult(
+                candidates=multimodal_candidates[:decision.top_k],
+                query=decision.query,
+                total_found=len(multimodal_candidates),
+                vector_count=0,
+                keyword_count=len(multimodal_candidates),
+                retrieval_latency_ms=latency_ms,
+            )
+
+        # 9. Strategy: Document / Hybrid (default)
         else:
             return await self.hybrid_retriever.retrieve(
                 query=decision.query,

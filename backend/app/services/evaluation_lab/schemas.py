@@ -55,6 +55,12 @@ class AssertionType(str, Enum):
     RELATIONSHIP_EXISTS = "relationship_exists"
     RELATIONSHIP_MATCHES_SOURCE = "relationship_matches_source"
     SOURCE_REFERENCE_EXISTS = "source_reference_exists"
+    IMAGE_CLAIM_SUPPORTED = "image_claim_supported"
+    TABLE_VALUE_CORRECT = "table_value_correct"
+    TRANSCRIPT_GROUNDED = "transcript_grounded"
+    SOURCE_TIMESTAMP_EXISTS = "source_timestamp_exists"
+    VISUAL_EVIDENCE_PRESENT = "visual_evidence_present"
+    ARTIFACT_REFERENCE_EXISTS = "artifact_reference_exists"
 
 
 class AssertionDefinition(BaseModel):

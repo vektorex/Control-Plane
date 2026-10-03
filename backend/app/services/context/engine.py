@@ -48,6 +48,9 @@ class ContextEngine:
         if not self.registry.get_provider("knowledge_graph_context"):
             from backend.app.services.knowledge_graph.context_provider import GraphContextProvider
             self.registry.register(GraphContextProvider())
+        if not self.registry.get_provider("multimodal_context"):
+            from backend.app.services.multimodal.context_provider import MultimodalContextProvider
+            self.registry.register(MultimodalContextProvider())
 
 
 

@@ -78,6 +78,11 @@ from backend.app.services.knowledge_graph.models import (
     GraphChangeLog,
     GraphConflict,
 )
+from backend.app.services.multimodal.models import (
+    Artifact,
+    ArtifactPart,
+    ArtifactEvidence,
+)
 
 __all__ = [
     "Base",
@@ -149,6 +154,9 @@ __all__ = [
     "GraphChangeProposal",
     "GraphChangeLog",
     "GraphConflict",
+    "Artifact",
+    "ArtifactPart",
+    "ArtifactEvidence",
 ]
 
 

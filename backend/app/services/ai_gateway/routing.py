@@ -37,10 +37,32 @@ class GatewayRouter:
         cost_pref = request.metadata.get("cost_preference", "balanced")
         pref_prov = request.provider or request.metadata.get("preferred_provider")
 
+        req_vision = bool(request.metadata.get("requires_vision")) or any(
+            isinstance(m.get("content"), list)
+            and any(isinstance(p, dict) and p.get("type") in ("image", "input_image") for p in m["content"])
+            for m in request.messages
+        )
+        req_audio = bool(request.metadata.get("requires_audio")) or any(
+            isinstance(m.get("content"), list)
+            and any(isinstance(p, dict) and p.get("type") in ("audio", "audio_input") for p in m["content"])
+            for m in request.messages
+        )
+        req_video = bool(request.metadata.get("requires_video")) or any(
+            isinstance(m.get("content"), list)
+            and any(isinstance(p, dict) and p.get("type") in ("video", "video_frame") for p in m["content"])
+            for m in request.messages
+        )
+        req_multimodal = req_vision or req_audio or req_video or bool(request.metadata.get("requires_multimodal"))
+
         requirements = ModelRequirements(
             requires_tools=req_tools,
             requires_streaming=req_stream,
             requires_structured_output=req_structured,
+            requires_vision=req_vision,
+            requires_image_input=req_vision,
+            requires_audio=req_audio,
+            requires_video=req_video,
+            requires_multimodal=req_multimodal,
             latency_preference=lat_pref,
             cost_preference=cost_pref,
             preferred_provider=pref_prov,

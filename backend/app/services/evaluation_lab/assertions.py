@@ -426,6 +426,143 @@ class AssertionEngine:
                 message="Graph source reference verified" if has_source else "Missing source reference for graph element",
             )
 
+        # 16. image_claim_supported (Step 30 Multimodal assertion)
+        elif a_type == AssertionType.IMAGE_CLAIM_SUPPORTED:
+            expected_kw = str(assertion.value or "").lower()
+            found = False
+            if context_items:
+                for item in context_items:
+                    meta = item.get("metadata", {})
+                    if meta.get("media_type") == "image" or "image" in item.get("title", "").lower():
+                        if not expected_kw or expected_kw in str(item.get("content", "")).lower() or expected_kw in str_val.lower():
+                            found = True
+                            break
+            if not found and expected_kw and expected_kw in str_val.lower():
+                found = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=found,
+                status="passed" if found else "failed",
+                path=assertion.path,
+                expected=f"Image claim supported for '{assertion.value}'",
+                actual="supported" if found else "unsupported",
+                message=f"Image claim was {'supported by visual context' if found else 'unsupported'}",
+            )
+
+        # 17. table_value_correct (Step 30 Multimodal assertion)
+        elif a_type == AssertionType.TABLE_VALUE_CORRECT:
+            expected_val = str(assertion.value or "").strip().lower()
+            found = expected_val in str_val.lower() if expected_val else False
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=found,
+                status="passed" if found else "failed",
+                path=assertion.path,
+                expected=f"Table value '{assertion.value}' in output",
+                actual="found" if found else "missing",
+                message=f"Table value '{assertion.value}' was {'verified' if found else 'missing'}",
+            )
+
+        # 18. transcript_grounded (Step 30 Multimodal assertion)
+        elif a_type == AssertionType.TRANSCRIPT_GROUNDED:
+            claim = str(assertion.value or "").lower()
+            grounded = False
+            if context_items:
+                for item in context_items:
+                    meta = item.get("metadata", {})
+                    if meta.get("media_type") == "audio_transcript" or "transcript" in item.get("title", "").lower():
+                        if not claim or claim in str(item.get("content", "")).lower():
+                            grounded = True
+                            break
+            if not grounded and claim and claim in str_val.lower():
+                grounded = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=grounded,
+                status="passed" if grounded else "failed",
+                path=assertion.path,
+                expected="Transcript grounded in audio context",
+                actual="grounded" if grounded else "ungrounded",
+                message="Claim grounded in transcript" if grounded else "Transcript claim lacking audio grounding",
+            )
+
+        # 19. source_timestamp_exists (Step 30 Multimodal assertion)
+        elif a_type == AssertionType.SOURCE_TIMESTAMP_EXISTS:
+            ts_regex = re.compile(r"\b\d{1,2}:\d{2}(:\d{2})?\b")
+            has_ts = bool(ts_regex.search(str_val))
+            if not has_ts and context_items:
+                for item in context_items:
+                    if ts_regex.search(str(item.get("content", ""))) or item.get("metadata", {}).get("timestamp"):
+                        has_ts = True
+                        break
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=has_ts,
+                status="passed" if has_ts else "failed",
+                path=assertion.path,
+                expected="Timestamp in MM:SS or HH:MM:SS format present",
+                actual="found" if has_ts else "missing",
+                message="Timestamp verified" if has_ts else "Missing source timestamp",
+            )
+
+        # 20. visual_evidence_present (Step 30 Multimodal assertion)
+        elif a_type == AssertionType.VISUAL_EVIDENCE_PRESENT:
+            has_evidence = False
+            if output_data and output_data.get("evidence"):
+                has_evidence = True
+            elif context_items:
+                for item in context_items:
+                    meta = item.get("metadata", {})
+                    if meta.get("media_type") in ("image", "video_frame") or meta.get("storage_reference"):
+                        has_evidence = True
+                        break
+            if not has_evidence and ("image" in str_val.lower() or "figure" in str_val.lower() or "evidence" in str_val.lower()):
+                has_evidence = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=has_evidence,
+                status="passed" if has_evidence else "failed",
+                path=assertion.path,
+                expected="Visual evidence present in result or context",
+                actual="present" if has_evidence else "missing",
+                message="Visual evidence confirmed" if has_evidence else "Missing visual evidence",
+            )
+
+        # 21. artifact_reference_exists (Step 30 Multimodal assertion)
+        elif a_type == AssertionType.ARTIFACT_REFERENCE_EXISTS:
+            expected_ref = str(assertion.value or "").lower()
+            has_ref = False
+            if expected_ref:
+                has_ref = expected_ref in str_val.lower()
+                if not has_ref and context_items:
+                    for item in context_items:
+                        meta = item.get("metadata", {})
+                        if expected_ref in str(meta.get("artifact_id", "")).lower() or expected_ref in str(meta.get("filename", "")).lower():
+                            has_ref = True
+                            break
+            else:
+                if context_items:
+                    for item in context_items:
+                        if item.get("metadata", {}).get("artifact_id"):
+                            has_ref = True
+                            break
+                if not has_ref and output_data and output_data.get("artifact_id"):
+                    has_ref = True
+
+            return AssertionResult(
+                assertion_type=a_type.value,
+                passed=has_ref,
+                status="passed" if has_ref else "failed",
+                path=assertion.path,
+                expected=f"Artifact reference exists: '{assertion.value or 'any'}'",
+                actual="referenced" if has_ref else "missing",
+                message="Artifact reference verified" if has_ref else "Missing artifact reference",
+            )
+
         # Fallback unknown assertion
         return AssertionResult(
             assertion_type=str(a_type),

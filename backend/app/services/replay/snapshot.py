@@ -160,6 +160,18 @@ class ReplaySnapshotService:
                 "snapshot_hash": input_snap.get("graph_snapshot_hash"),
             }
 
+        # Safe Multimodal Artifact configuration (Step 30)
+        artifact_config = input_snap.get("artifact_configuration")
+        if not artifact_config and (input_snap.get("artifacts") or input_snap.get("artifact_ids")):
+            artifact_config = {
+                "artifact_ids": input_snap.get("artifact_ids", []),
+                "content_hashes": input_snap.get("artifact_content_hashes", {}),
+                "selected_parts": input_snap.get("selected_artifact_parts", []),
+                "media_preprocessing_config": input_snap.get("media_preprocessing_config", {}),
+                "model_capability_requirements": input_snap.get("model_capability_requirements", []),
+                "fallback_path": input_snap.get("fallback_path"),
+            }
+
         # Raw snapshot dictionary
         raw_snapshot = {
             "snapshot_version": "1.0",
@@ -184,6 +196,7 @@ class ReplaySnapshotService:
             "relevant_context_metadata": context_metadata,
             "prompt_configuration": prompt_config,
             "graph_configuration": graph_config,
+            "artifact_configuration": artifact_config,
             "trace_metadata": trace_meta,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }

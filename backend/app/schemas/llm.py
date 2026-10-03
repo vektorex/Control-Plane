@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 
@@ -6,7 +6,7 @@ class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant", "developer"] = Field(
         description="Role of the message author"
     )
-    content: str = Field(min_length=1, description="Text content of the message")
+    content: Union[str, List[Dict[str, Any]]] = Field(description="Text or multimodal content parts of the message")
 
 
 class LLMGenerateRequest(BaseModel):

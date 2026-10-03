@@ -80,6 +80,12 @@ from backend.app.services.access_control.permissions import (
     GRAPH_DELETE,
     GRAPH_EXTRACT,
     GRAPH_MERGE,
+    ARTIFACT_READ,
+    ARTIFACT_CREATE,
+    ARTIFACT_UPDATE,
+    ARTIFACT_DELETE,
+    ARTIFACT_PROCESS,
+    ARTIFACT_ANALYZE,
 )
 
 # 1. Organization Role Permissions
@@ -159,6 +165,12 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GRAPH_DELETE,
         GRAPH_EXTRACT,
         GRAPH_MERGE,
+        ARTIFACT_READ,
+        ARTIFACT_CREATE,
+        ARTIFACT_UPDATE,
+        ARTIFACT_DELETE,
+        ARTIFACT_PROCESS,
+        ARTIFACT_ANALYZE,
     },
 
     # MEMBER: normal workspace/project execution and authoring
@@ -221,6 +233,11 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GRAPH_DELETE,
         GRAPH_EXTRACT,
         GRAPH_MERGE,
+        ARTIFACT_READ,
+        ARTIFACT_CREATE,
+        ARTIFACT_UPDATE,
+        ARTIFACT_PROCESS,
+        ARTIFACT_ANALYZE,
     },
 
     # VIEWER: read-only access to granted resources.
@@ -245,6 +262,7 @@ ORGANIZATION_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         EVENT_READ,
         PROMPT_READ,
         GRAPH_READ,
+        ARTIFACT_READ,
     },
 }
 
@@ -313,6 +331,12 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GRAPH_DELETE,
         GRAPH_EXTRACT,
         GRAPH_MERGE,
+        ARTIFACT_READ,
+        ARTIFACT_CREATE,
+        ARTIFACT_UPDATE,
+        ARTIFACT_DELETE,
+        ARTIFACT_PROCESS,
+        ARTIFACT_ANALYZE,
     },
     WorkspaceRole.MEMBER.value: {
         WORKSPACE_READ,
@@ -371,6 +395,11 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GRAPH_DELETE,
         GRAPH_EXTRACT,
         GRAPH_MERGE,
+        ARTIFACT_READ,
+        ARTIFACT_CREATE,
+        ARTIFACT_UPDATE,
+        ARTIFACT_PROCESS,
+        ARTIFACT_ANALYZE,
     },
     WorkspaceRole.VIEWER.value: {
         WORKSPACE_READ,
@@ -390,6 +419,7 @@ WORKSPACE_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         EVENT_READ,
         PROMPT_READ,
         GRAPH_READ,
+        ARTIFACT_READ,
     },
 }
 
@@ -448,6 +478,11 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         GRAPH_DELETE,
         GRAPH_EXTRACT,
         GRAPH_MERGE,
+        ARTIFACT_READ,
+        ARTIFACT_CREATE,
+        ARTIFACT_UPDATE,
+        ARTIFACT_PROCESS,
+        ARTIFACT_ANALYZE,
     },
     ProjectRole.VIEWER.value: {
         PROJECT_READ,
@@ -465,5 +500,6 @@ PROJECT_ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         EVENT_READ,
         PROMPT_READ,
         GRAPH_READ,
+        ARTIFACT_READ,
     },
 }

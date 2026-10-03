@@ -31,6 +31,7 @@ class RetrievalStrategy(str, Enum):
     API = "api"
     GITHUB = "github"
     CONNECTOR = "connector"
+    MULTIMODAL = "multimodal"
 
 
 

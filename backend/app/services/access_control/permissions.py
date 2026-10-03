@@ -113,6 +113,14 @@ GRAPH_DELETE = "graph.delete"
 GRAPH_EXTRACT = "graph.extract"
 GRAPH_MERGE = "graph.merge"
 
+# Artifact & Multimodal permissions (Step 30)
+ARTIFACT_READ = "artifact.read"
+ARTIFACT_CREATE = "artifact.create"
+ARTIFACT_UPDATE = "artifact.update"
+ARTIFACT_DELETE = "artifact.delete"
+ARTIFACT_PROCESS = "artifact.process"
+ARTIFACT_ANALYZE = "artifact.analyze"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
     ORGANIZATION_READ,
@@ -185,5 +193,11 @@ ALL_PERMISSIONS = {
     GRAPH_DELETE,
     GRAPH_EXTRACT,
     GRAPH_MERGE,
+    ARTIFACT_READ,
+    ARTIFACT_CREATE,
+    ARTIFACT_UPDATE,
+    ARTIFACT_DELETE,
+    ARTIFACT_PROCESS,
+    ARTIFACT_ANALYZE,
 }
 

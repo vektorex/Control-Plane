@@ -97,7 +97,11 @@ export function ExecutionPreview({
   const usesTools = getReqValue(reqs.tools_required || reqs.tools);
   const usesEvaluation = getReqValue(reqs.evaluation_required || reqs.evaluation);
   const usesStructuredOutput = getReqValue(reqs.structured_output_required || reqs.structured_output);
-  const usesVision = getReqValue(reqs.vision_required);
+  const usesVision = getReqValue(reqs.vision_required || reqs.requires_vision);
+  const usesAudio = getReqValue(reqs.audio_required || reqs.requires_audio);
+  const usesVideo = getReqValue(reqs.video_required || reqs.requires_video);
+  const usesTable = getReqValue(reqs.table_required || reqs.requires_table);
+  const usesMultimodal = getReqValue(reqs.multimodal_required || reqs.requires_multimodal) || usesVision || usesAudio || usesVideo || usesTable;
   const requiresApproval = getReqValue(reqs.human_approval_required || reqs.human_approval);
 
   // Active knowledge sources list
@@ -106,6 +110,14 @@ export function ExecutionPreview({
   if (usesWebSearch) knowledgeSources.push("Web Search");
   if (usesConnectors) knowledgeSources.push("External Connectors");
   if (usesMemory) knowledgeSources.push("User Memory");
+  if (usesMultimodal) knowledgeSources.push("Multimodal Artifacts");
+
+  // Multimodal capabilities list
+  const multimodalCaps = [];
+  if (usesVision) multimodalCaps.push("Vision");
+  if (usesAudio) multimodalCaps.push("Audio");
+  if (usesVideo) multimodalCaps.push("Video");
+  if (usesTable) multimodalCaps.push("Structured Tables");
 
   // Model capabilities list
   const modelCapabilities = Array.isArray(reqs.model_capabilities?.value)
@@ -280,6 +292,17 @@ export function ExecutionPreview({
                 : "Standard Chat"}
             </span>
           </div>
+
+          {/* Multimodal Intelligence */}
+          {multimodalCaps.length > 0 && (
+            <div className="flex items-center gap-2 text-slate-300 sm:col-span-2">
+              <Sparkles className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+              <span className="text-slate-400">Multimodal:</span>
+              <span className="font-medium text-pink-300">
+                {multimodalCaps.join(", ")}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

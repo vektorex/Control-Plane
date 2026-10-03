@@ -22,6 +22,8 @@ class TaskBase(BaseModel):
     # Step 20: Task Intelligence Preferences
     execution_mode: Optional[str] = Field(default="auto", description="Execution mode: auto | direct | retrieval | tool_assisted | orchestrated | workflow")
     task_type: Optional[str] = Field(default=None, description="Optional task category classification")
+    # Step 30: Multimodal Artifacts
+    artifact_ids: Optional[List[UUID]] = Field(default=None, description="Optional referenced multimodal artifact IDs")
 
 
 class TaskCreate(TaskBase):
@@ -82,6 +84,9 @@ class TaskRunRequest(BaseModel):
     execution_mode: Optional[str] = Field(default="auto", description="Execution mode: auto | direct | retrieval | tool_assisted | orchestrated | workflow")
     task_type: Optional[str] = Field(default=None, description="Optional task type override")
     task_intelligence_mode: Optional[str] = Field(default="auto", description="Intelligence mode: auto | deterministic | llm | hybrid")
+
+    # Step 30: Multimodal Artifacts
+    artifact_ids: Optional[List[UUID]] = Field(default=None, description="Optional referenced multimodal artifact IDs")
 
 
 class TaskResponse(BaseModel):

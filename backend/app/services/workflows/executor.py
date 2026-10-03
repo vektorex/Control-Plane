@@ -1070,6 +1070,50 @@ class WorkflowExecutor:
             state.output_data = dict(output_data) if isinstance(output_data, dict) else {"output": output_data}
             metadata = {"has_output": bool(state.output_data)}
 
+        # 10. ARTIFACT_INPUT STEP (Step 30 Multimodal)
+        elif stype == StepType.ARTIFACT_INPUT:
+            artifact_id_val = state.resolve_value(cfg.get("artifact_id") or state.input.get("artifact_id"))
+            if not artifact_id_val:
+                raise WorkflowExecutionError("No artifact_id specified for artifact_input step.")
+            from backend.app.services.multimodal.artifact_service import ArtifactService
+            art_service = ArtifactService(self.session)
+            art = await art_service.get_artifact(UUID(str(artifact_id_val)), user)
+            output_data = {
+                "artifact_id": str(art.id),
+                "filename": art.filename,
+                "artifact_type": art.artifact_type.value,
+                "mime_type": art.mime_type,
+                "status": art.status.value,
+                "parts_count": len(art.parts) if art.parts else 0,
+            }
+            metadata = {"artifact_id": str(art.id), "artifact_type": art.artifact_type.value}
+
+        # 11. ARTIFACT_ANALYZE STEP (Step 30 Multimodal)
+        elif stype == StepType.ARTIFACT_ANALYZE:
+            artifact_id_val = state.resolve_value(cfg.get("artifact_id") or state.input.get("artifact_id"))
+            if not artifact_id_val:
+                raise WorkflowExecutionError("No artifact_id specified for artifact_analyze step.")
+            instruction_val = state.resolve_value(
+                cfg.get("instruction") or state.input.get("instruction") or "Analyze this multimodal artifact."
+            )
+            from backend.app.services.multimodal.service import MultimodalService
+            from backend.app.services.multimodal.schemas import ArtifactAnalysisRequest
+            mm_service = MultimodalService(self.session)
+            analysis_res = await mm_service.analyze_artifact(
+                artifact_id=UUID(str(artifact_id_val)),
+                user=user,
+                request=ArtifactAnalysisRequest(instruction=instruction_val, mode=cfg.get("mode", "auto")),
+            )
+            output_data = {
+                "artifact_id": str(analysis_res.artifact_id),
+                "result": analysis_res.result,
+                "model_used": analysis_res.model_used,
+                "provider_used": analysis_res.provider_used,
+                "evidence_count": len(analysis_res.evidence),
+                "fallback_used": analysis_res.fallback_used,
+            }
+            metadata = {"model_used": analysis_res.model_used, "evidence_count": len(analysis_res.evidence)}
+
         return jump_target, output_data, metadata
 
     def _apply_transform(self, op: str, source: Any, cfg: Dict[str, Any]) -> Any:

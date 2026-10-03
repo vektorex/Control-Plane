@@ -162,6 +162,14 @@ class TaskExecutionService:
         if resolved_reqs.evaluation.get("enabled") and (not request.evaluation_mode or request.evaluation_mode == "off"):
             request.evaluation_mode = resolved_reqs.evaluation.get("mode", "standard")
 
+        # Step 30: Multimodal Artifacts - Verify artifact access before execution
+        req_art_ids = getattr(request, "artifact_ids", None) or (getattr(task, "metadata_json", None) or {}).get("artifact_ids") or []
+        if req_art_ids:
+            from backend.app.services.multimodal.artifact_service import ArtifactService
+            art_service = ArtifactService(self.session)
+            for a_id in req_art_ids:
+                await art_service.get_artifact(uuid.UUID(str(a_id)), user)
+
         # 1. Generate & Validate Plan
         plan = await self.orchestrator.plan_task(
             task=task,

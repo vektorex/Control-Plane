@@ -20,6 +20,8 @@ class StepType(str, Enum):
     TRANSFORM = "transform"
     CONDITION = "condition"
     OUTPUT = "output"
+    ARTIFACT_INPUT = "artifact_input"
+    ARTIFACT_ANALYZE = "artifact_analyze"
 
 
 

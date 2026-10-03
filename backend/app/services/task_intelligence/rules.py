@@ -47,8 +47,20 @@ class RuleBasedTaskAnalyzer:
     ]
 
     VISION_PATTERNS = [
-        r"\b(?:analyze\s+this\s+image|look\s+at\s+this\s+(?:picture|image|photo))\b",
-        r"\b(?:in\s+this\s+screenshot|image\s+of|diagram\s+shown|inspect\s+the\s+graphic)\b",
+        r"\b(?:analyze\s+this\s+(?:image|screenshot|picture|photo)|look\s+at\s+this\s+(?:picture|image|photo|screenshot))\b",
+        r"\b(?:(?:in\s+)?this\s+screenshot|screenshot|image\s+of|diagram\s+shown|inspect\s+the\s+graphic|screenshot\s+error)\b",
+    ]
+
+    AUDIO_PATTERNS = [
+        r"\b(?:transcribe|transcript|audio|listen\s+to|voice\s+note|recording|meeting\s+recording|podcast|mp3|wav|m4a)\b",
+    ]
+
+    VIDEO_PATTERNS = [
+        r"\b(?:video|mp4|webm|scenes?|keyframes?|watch\s+this\s+clip)\b",
+    ]
+
+    TABLE_PATTERNS = [
+        r"\b(?:csv|xlsx|excel|spreadsheet|structured\s+table|rows\s+and\s+columns|sheets?|revenue\s+trend)\b",
     ]
 
     MEMORY_PATTERNS = [
@@ -71,7 +83,7 @@ class RuleBasedTaskAnalyzer:
         (TaskType.RESEARCH, [r"\b(?:research|investigate|find\s+information|deep\s+dive|survey|explore\s+recent)\b"]),
         (TaskType.SUMMARIZATION, [r"\b(?:summarize|summary|tldr|tl;dr|brief\s+overview|key\s+takeaways|recap)\b"]),
         (TaskType.DOCUMENT_ANALYSIS, [r"\b(?:analyze\s+(?:the\s+)?document|review\s+contract|audit\s+pdf|policy\s+review)\b"]),
-        (TaskType.DATA_ANALYSIS, [r"\b(?:analyze\s+data|dataset|statistics|compute\s+metrics|trend\s+analysis|visualize\s+data)\b"]),
+        (TaskType.DATA_ANALYSIS, [r"\b(?:analyze\s+(?:this\s+)?(?:data|csv|spreadsheet|dataset)|statistics|compute\s+metrics|trend\s+analysis|visualize\s+data)\b"]),
         (TaskType.EXTRACTION, [r"\b(?:extract\s+entities|extract\s+all|parse\s+(?:out|from)|pull\s+out|gather\s+list\s+of)\b"]),
         (TaskType.COMPARISON, [r"\b(?:compare|differences?\s+between|pros\s+and\s+cons|versus|\bvs\b|tradeoffs?)\b"]),
         (TaskType.TRANSFORMATION, [r"\b(?:convert|translate|reformat|transform\s+(?:to|into)|rewrite\s+as)\b"]),
@@ -87,6 +99,9 @@ class RuleBasedTaskAnalyzer:
         self._compiled_connectors = [re.compile(p, re.IGNORECASE) for p in self.CONNECTOR_PATTERNS]
         self._compiled_structured_out = [re.compile(p, re.IGNORECASE) for p in self.STRUCTURED_OUTPUT_PATTERNS]
         self._compiled_vision = [re.compile(p, re.IGNORECASE) for p in self.VISION_PATTERNS]
+        self._compiled_audio = [re.compile(p, re.IGNORECASE) for p in self.AUDIO_PATTERNS]
+        self._compiled_video = [re.compile(p, re.IGNORECASE) for p in self.VIDEO_PATTERNS]
+        self._compiled_table = [re.compile(p, re.IGNORECASE) for p in self.TABLE_PATTERNS]
         self._compiled_memory = [re.compile(p, re.IGNORECASE) for p in self.MEMORY_PATTERNS]
         self._compiled_external_action = [re.compile(p, re.IGNORECASE) for p in self.EXTERNAL_ACTION_PATTERNS]
         self._compiled_task_types = [
@@ -126,6 +141,10 @@ class RuleBasedTaskAnalyzer:
         connectors = self._matches_any(full_text, self._compiled_connectors)
         structured_output = self._matches_any(full_text, self._compiled_structured_out)
         vision = self._matches_any(full_text, self._compiled_vision)
+        audio = self._matches_any(full_text, self._compiled_audio)
+        video = self._matches_any(full_text, self._compiled_video)
+        table = self._matches_any(full_text, self._compiled_table)
+        multimodal = bool(vision or audio or video or (doc_retrieval and (vision or audio)))
         memory = self._matches_any(full_text, self._compiled_memory)
         external_action = self._matches_any(full_text, self._compiled_external_action)
 
@@ -141,6 +160,14 @@ class RuleBasedTaskAnalyzer:
             detected_signals.append("structured_output")
         if vision:
             detected_signals.append("vision")
+        if audio:
+            detected_signals.append("audio")
+        if video:
+            detected_signals.append("video")
+        if table:
+            detected_signals.append("table")
+        if multimodal:
+            detected_signals.append("multimodal")
         if memory:
             detected_signals.append("memory")
         if external_action:
@@ -155,14 +182,16 @@ class RuleBasedTaskAnalyzer:
                 break
 
         # Fallback task type heuristics
-        if classified_type == TaskType.UNKNOWN:
-            if web_search:
+        if classified_type == TaskType.UNKNOWN or classified_type == TaskType.QUESTION_ANSWERING:
+            if table:
+                classified_type = TaskType.DATA_ANALYSIS
+            elif web_search:
                 classified_type = TaskType.RESEARCH
             elif doc_retrieval:
                 classified_type = TaskType.DOCUMENT_ANALYSIS
             elif structured_output:
                 classified_type = TaskType.EXTRACTION
-            else:
+            elif classified_type == TaskType.UNKNOWN:
                 classified_type = TaskType.QUESTION_ANSWERING
 
         # 4. Determine suggested execution mode
@@ -191,7 +220,7 @@ class RuleBasedTaskAnalyzer:
         # 6. Evaluation policy recommendation
         evaluation_required = False
         evaluation_mode = "off"
-        if classified_type in (TaskType.RESEARCH, TaskType.CODING, TaskType.DOCUMENT_ANALYSIS):
+        if classified_type in (TaskType.RESEARCH, TaskType.CODING, TaskType.DOCUMENT_ANALYSIS, TaskType.DATA_ANALYSIS):
             evaluation_required = True
             evaluation_mode = "standard"
         elif external_action:
@@ -204,6 +233,12 @@ class RuleBasedTaskAnalyzer:
             model_caps.append("tools")
         if vision:
             model_caps.append("vision")
+        if audio:
+            model_caps.append("audio_transcription")
+        if video:
+            model_caps.append("video")
+        if multimodal:
+            model_caps.append("multimodal_input")
         if structured_output:
             model_caps.append("structured_output")
         if doc_retrieval or len(full_text.split()) > 1000:
@@ -219,6 +254,14 @@ class RuleBasedTaskAnalyzer:
         explanation_parts = []
         if classified_type != TaskType.UNKNOWN:
             explanation_parts.append(f"Classified as {classified_type.value.replace('_', ' ')}")
+        if vision:
+            explanation_parts.append("requires vision / image understanding")
+        if audio:
+            explanation_parts.append("requires audio transcription")
+        if video:
+            explanation_parts.append("requires video analysis")
+        if table:
+            explanation_parts.append("requires structured table data analysis")
         if web_search:
             explanation_parts.append("requires web search for current information")
         if doc_retrieval:
@@ -274,6 +317,11 @@ class RuleBasedTaskAnalyzer:
             multi_query_allowed=RequirementValue(value=bool(doc_retrieval and web_search), source=source, confidence=confidence),
             structured_output_required=RequirementValue(value=structured_output, source=source, confidence=confidence),
             vision_required=RequirementValue(value=vision, source=source, confidence=confidence),
+            audio_required=RequirementValue(value=audio, source=source, confidence=confidence),
+            video_required=RequirementValue(value=video, source=source, confidence=confidence),
+            table_required=RequirementValue(value=table, source=source, confidence=confidence),
+            document_required=RequirementValue(value=doc_retrieval, source=source, confidence=confidence),
+            multimodal_required=RequirementValue(value=multimodal, source=source, confidence=confidence),
             streaming_required=RequirementValue(value=True, source=source, confidence=1.0),
             evaluation_required=RequirementValue(value=evaluation_required, source=source, confidence=confidence),
             evaluation_mode=RequirementValue(value=evaluation_mode, source=source, confidence=confidence),

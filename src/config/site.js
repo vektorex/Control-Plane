@@ -43,6 +43,12 @@ export const siteConfig = {
       description: "Multi-agent teams, coordinated role execution, cross-agent context, and conflict resolution",
     },
     {
+      label: "Simulations",
+      href: "/app/simulations",
+      icon: "Sliders",
+      description: "Safe sandbox simulation, scenario suites, fault injection, and dry-run policy evaluation",
+    },
+    {
       label: "Prompts",
       href: "/app/prompts",
       icon: "FileCode2",

@@ -2090,3 +2090,367 @@ async def public_replay_agent_run(
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)
 
+
+# =============================================================================
+# Step 41: AI Agent Simulation, Sandbox & Scenario Testing Layer Endpoints
+# =============================================================================
+
+@public_v1_router.post("/simulations", status_code=status.HTTP_201_CREATED)
+async def public_create_simulation(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:write")
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationCreate
+
+        sim_req = SimulationCreate.model_validate(req)
+        svc = SimulationService(db)
+        sim, _ = await svc.create_simulation(principal.workspace_id, principal.user_id, sim_req)
+        return sim
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulations")
+async def public_list_simulations(
+    project_id: Optional[str] = Query(None),
+    target_type: Optional[str] = Query(None),
+    target_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        sims, _ = await svc.list_simulations(principal.workspace_id, project_id, target_type, target_id, status, limit, offset)
+        return sims
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulations/{simulation_id}")
+async def public_get_simulation(
+    simulation_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        return await svc.get_simulation(simulation_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/simulations/{simulation_id}")
+async def public_update_simulation(
+    simulation_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:write")
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationUpdate
+
+        up_req = SimulationUpdate.model_validate(req)
+        svc = SimulationService(db)
+        return await svc.update_simulation(simulation_id, principal.workspace_id, up_req)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/simulations/{simulation_id}/versions", status_code=status.HTTP_201_CREATED)
+async def public_create_simulation_version(
+    simulation_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:write")
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationVersionCreate
+
+        ver_req = SimulationVersionCreate.model_validate(req)
+        svc = SimulationService(db)
+        return await svc.create_version(simulation_id, principal.workspace_id, principal.user_id, ver_req)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/simulations/{simulation_id}/run")
+async def public_run_simulation(
+    simulation_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:execute")
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationRunCreate
+
+        run_req = SimulationRunCreate.model_validate(req)
+        svc = SimulationService(db)
+        return await svc.run_simulation(simulation_id, principal.workspace_id, principal.user_id, run_req)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulations/{simulation_id}/runs")
+async def public_list_simulation_runs(
+    simulation_id: str,
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        runs, _ = await svc.list_runs(simulation_id=simulation_id, status=status, limit=limit, offset=offset)
+        return runs
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/simulation-scenarios", status_code=status.HTTP_201_CREATED)
+async def public_create_simulation_scenario(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:write")
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationScenarioCreate
+
+        sc_req = SimulationScenarioCreate.model_validate(req)
+        svc = SimulationService(db)
+        return await svc.create_scenario(principal.workspace_id, sc_req)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulation-scenarios/{scenario_id}")
+async def public_get_simulation_scenario(
+    scenario_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        return await svc.get_scenario(scenario_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/simulation-scenarios/{scenario_id}")
+async def public_update_simulation_scenario(
+    scenario_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:write")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        scen = await svc.get_scenario(scenario_id, principal.workspace_id)
+        if "name" in req:
+            scen.name = req["name"]
+        if "description" in req:
+            scen.description = req["description"]
+        if "input" in req:
+            scen.input = req["input"]
+        if "assertions" in req:
+            scen.assertions = req["assertions"]
+        await db.commit()
+        return scen
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/simulation-suites", status_code=status.HTTP_201_CREATED)
+async def public_create_simulation_suite(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:write")
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationSuiteCreate
+
+        st_req = SimulationSuiteCreate.model_validate(req)
+        svc = SimulationService(db)
+        return await svc.create_suite(principal.workspace_id, principal.user_id, st_req)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulation-suites")
+async def public_list_simulation_suites(
+    target_type: Optional[str] = Query(None),
+    target_id: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        suites, _ = await svc.list_suites(principal.workspace_id, target_type, target_id, limit, offset)
+        return suites
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/simulation-suites/{suite_id}/run")
+async def public_run_simulation_suite(
+    suite_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:execute")
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationSuiteRunRequest
+
+        r_req = SimulationSuiteRunRequest.model_validate(req)
+        svc = SimulationService(db)
+        return await svc.run_suite(suite_id, principal.workspace_id, principal.user_id, r_req)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulation-runs/{run_id}")
+async def public_get_simulation_run(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        return await svc.get_run(run_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulation-runs/{run_id}/trace")
+async def public_get_simulation_run_trace(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        run = await svc.get_run(run_id)
+        return {
+            "run_id": run.id,
+            "seed": run.seed,
+            "tool_calls": run.tool_calls,
+            "connector_calls": run.connector_calls,
+            "side_effects": run.side_effects,
+            "assertions": run.assertion_results,
+        }
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulation-runs/{run_id}/report")
+async def public_get_simulation_run_report(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        return await svc.get_run_report(run_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulation-runs/{run_id}/side-effects")
+async def public_get_simulation_run_side_effects(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        run = await svc.get_run(run_id)
+        return run.side_effects
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/simulation-runs/{run_id}/assertions")
+async def public_get_simulation_run_assertions(
+    run_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        svc = SimulationService(db)
+        run = await svc.get_run(run_id)
+        return run.assertion_results
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/simulation-runs/{run_id}/compare")
+async def public_compare_simulation_runs(
+    run_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "simulations:read")
+        from backend.app.services.simulation.service import SimulationService
+
+        comp_run_id = req.get("comparison_run_id")
+        svc = SimulationService(db)
+        return await svc.compare_runs(run_id, comp_run_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+

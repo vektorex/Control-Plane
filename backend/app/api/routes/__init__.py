@@ -43,6 +43,12 @@ from backend.app.api.routes.developer import developer_router
 from backend.app.api.routes.marketplace import router as marketplace_router
 from backend.app.api.routes.collaboration import router as collaboration_router
 from backend.app.api.routes.agents import agents_router, teams_router, runs_router
+from backend.app.api.routes.simulation import (
+    simulations_router,
+    scenarios_router,
+    suites_router,
+    runs_router as simulation_runs_router,
+)
 from backend.app.api.routes.public_v1 import public_v1_router
 
 api_router = APIRouter(prefix="/api")
@@ -92,6 +98,10 @@ api_router.include_router(collaboration_router)
 api_router.include_router(agents_router)
 api_router.include_router(teams_router)
 api_router.include_router(runs_router)
+api_router.include_router(simulations_router)
+api_router.include_router(scenarios_router)
+api_router.include_router(suites_router)
+api_router.include_router(simulation_runs_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

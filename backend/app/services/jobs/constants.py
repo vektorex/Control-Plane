@@ -80,6 +80,9 @@ class JobType(str, Enum):
     AGENT_DELEGATION = "agent_delegation"
     AGENT_TEAM_RUN = "agent_team_run"
     AGENT_EVALUATION = "agent_evaluation"
+    SIMULATION_RUN = "simulation_run"
+    SIMULATION_SUITE_RUN = "simulation_suite_run"
+    SIMULATION_SCENARIO_RUN = "simulation_scenario_run"
 
 
 class JobEventType(str, Enum):

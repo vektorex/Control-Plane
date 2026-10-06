@@ -36,6 +36,7 @@ import {
   Users,
   Bot,
   Boxes,
+  Sliders,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -77,6 +78,7 @@ const iconMap = {
   Users,
   Bot,
   Boxes,
+  Sliders,
 };
 
 

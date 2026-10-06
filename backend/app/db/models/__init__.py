@@ -191,6 +191,20 @@ from backend.app.services.agents.models import (
     AgentMessage,
     AgentConflict,
 )
+from backend.app.services.simulation.models import (
+    Simulation,
+    SimulationVersion,
+    SimulationEnvironment,
+    SimulationScenario,
+    FaultProfile,
+    FaultInjection,
+    SimulationRun,
+    SimulationAssertion,
+    SimulationSideEffect,
+    SimulationSuite,
+    SimulationSuiteScenario,
+    SimulationComparison,
+)
 
 
 __all__ = [
@@ -356,6 +370,18 @@ __all__ = [
     "AgentTeamRun",
     "AgentMessage",
     "AgentConflict",
+    "Simulation",
+    "SimulationVersion",
+    "SimulationEnvironment",
+    "SimulationScenario",
+    "FaultProfile",
+    "FaultInjection",
+    "SimulationRun",
+    "SimulationAssertion",
+    "SimulationSideEffect",
+    "SimulationSuite",
+    "SimulationSuiteScenario",
+    "SimulationComparison",
 ]
 
 

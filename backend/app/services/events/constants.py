@@ -41,6 +41,9 @@ class AggregateType(str, Enum):
     AGENT_TEAM = "agent_team"
     AGENT_RUN = "agent_run"
     AGENT_TEAM_RUN = "agent_team_run"
+    SIMULATION = "simulation"
+    SIMULATION_RUN = "simulation_run"
+    SIMULATION_SUITE = "simulation_suite"
 
 
 
@@ -332,6 +335,20 @@ class SystemEventType(str, Enum):
     AGENT_TEAM_ASSIGNMENT_COMPLETED = "agent.team.assignment.completed"
     AGENT_TEAM_CONFLICT_DETECTED = "agent.team.conflict.detected"
     AGENT_TEAM_RUN_COMPLETED = "agent.team.run.completed"
+
+    # Step 41 AI Agent Simulation and Scenario Testing Layer events
+    SIMULATION_CREATED = "simulation.created"
+    SIMULATION_VERSION_CREATED = "simulation.version.created"
+    SIMULATION_STARTED = "simulation.started"
+    SIMULATION_SCENARIO_STARTED = "simulation.scenario.started"
+    SIMULATION_FAULT_INJECTED = "simulation.fault.injected"
+    SIMULATION_ASSERTION_FAILED = "simulation.assertion.failed"
+    SIMULATION_SIDE_EFFECT_INTERCEPTED = "simulation.side_effect.intercepted"
+    SIMULATION_SCENARIO_COMPLETED = "simulation.scenario.completed"
+    SIMULATION_COMPLETED = "simulation.completed"
+    SIMULATION_FAILED = "simulation.failed"
+    SIMULATION_CANCELLED = "simulation.cancelled"
+    SIMULATION_REGRESSION_DETECTED = "simulation.regression.detected"
 
 
 # Auditable event types

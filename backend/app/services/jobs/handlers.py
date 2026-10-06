@@ -1141,6 +1141,56 @@ class MarketplaceJobHandler(JobHandler):
         return {"action": self.action, "status": "completed", "package_id": (job.payload or {}).get("package_id")}
 
 
+class SimulationJobHandler(JobHandler):
+    """Executes asynchronous simulation runs and suites via SimulationService."""
+
+    def __init__(self, action: str = "run"):
+        self.action = action
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.simulation.service import SimulationService
+        from backend.app.services.simulation.schemas import SimulationRunCreate, SimulationSuiteRunRequest
+
+        session = context.session
+        payload = job.payload or {}
+        sim_service = SimulationService(session)
+
+        await context.update_progress(10, f"Initializing simulation {self.action}", 1, 3, "Started")
+        if cancellation_token.is_set():
+            raise JobCancellationError(f"Simulation {self.action} cancelled.")
+
+        if self.action == "suite_run":
+            suite_id = payload.get("suite_id")
+            user_id = str(payload.get("user_id", "system"))
+            req = SimulationSuiteRunRequest(
+                target_version_id=payload.get("target_version_id"),
+                seed=payload.get("seed", 42),
+            )
+            res = await sim_service.run_suite(suite_id, str(job.workspace_id), user_id, req)
+            await context.update_progress(100, f"Simulation suite completed ({res.completed_scenarios}/{res.total_scenarios})", 3, 3, "Completed")
+            return res.model_dump()
+        else:
+            sim_id = payload.get("simulation_id")
+            user_id = str(payload.get("user_id", "system"))
+            req = SimulationRunCreate(
+                simulation_version_id=payload.get("simulation_version_id"),
+                scenario_id=payload.get("scenario_id"),
+                seed=payload.get("seed", 42),
+                target_version_id=payload.get("target_version_id"),
+                policy_overrides=payload.get("policy_overrides"),
+                fault_overrides=payload.get("fault_overrides"),
+                scenario_override=payload.get("scenario_override"),
+            )
+            run = await sim_service.run_simulation(sim_id, str(job.workspace_id), user_id, req)
+            await context.update_progress(100, f"Simulation run completed with status '{run.status}'", 3, 3, "Completed")
+            return {"run_id": run.id, "status": run.status, "cost": run.cost, "latency": run.latency}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -1200,6 +1250,9 @@ class JobHandlerRegistry:
         self.register(JobType.MARKETPLACE_UPDATE.value, MarketplaceJobHandler("update"))
         self.register(JobType.MARKETPLACE_ROLLBACK.value, MarketplaceJobHandler("rollback"))
         self.register(JobType.MARKETPLACE_EVALUATION.value, MarketplaceJobHandler("evaluation"))
+        self.register(JobType.SIMULATION_RUN.value, SimulationJobHandler("run"))
+        self.register(JobType.SIMULATION_SUITE_RUN.value, SimulationJobHandler("suite_run"))
+        self.register(JobType.SIMULATION_SCENARIO_RUN.value, SimulationJobHandler("scenario_run"))
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

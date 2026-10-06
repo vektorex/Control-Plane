@@ -517,6 +517,81 @@ class AgentTeamsResource:
         return self._client._request("GET", f"/agent-team-runs/{run_id}")
 
 
+class SimulationsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._client._request("POST", "/simulations", json=payload, idempotency_key=idempotency_key)
+
+    def get(self, simulation_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/simulations/{simulation_id}")
+
+    def list(self, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/simulations", params=params)
+
+    def update(self, simulation_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("PATCH", f"/simulations/{simulation_id}", json=payload)
+
+    def create_version(self, simulation_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", f"/simulations/{simulation_id}/versions", json=payload)
+
+    def run(self, simulation_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return self._client._request("POST", f"/simulations/{simulation_id}/run", json=payload or {})
+
+    def list_runs(self, simulation_id: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/simulations/{simulation_id}/runs", params=params)
+
+    def get_run(self, run_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/simulation-runs/{run_id}")
+
+    def get_trace(self, run_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/simulation-runs/{run_id}/trace")
+
+    def get_report(self, run_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/simulation-runs/{run_id}/report")
+
+    def get_side_effects(self, run_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/simulation-runs/{run_id}/side-effects")
+
+    def get_assertions(self, run_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/simulation-runs/{run_id}/assertions")
+
+    def compare(self, run_id: str, comparison_run_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/simulation-runs/{run_id}/compare", json={"comparison_run_id": comparison_run_id})
+
+
+class ScenariosResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", "/simulation-scenarios", json=payload)
+
+    def get(self, scenario_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/simulation-scenarios/{scenario_id}")
+
+    def update(self, scenario_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("PATCH", f"/simulation-scenarios/{scenario_id}", json=payload)
+
+
+class SuitesResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", "/simulation-suites", json=payload)
+
+    def get(self, suite_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/simulation-suites/{suite_id}")
+
+    def list(self, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/simulation-suites", params=params)
+
+    def run(self, suite_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return self._client._request("POST", f"/simulation-suites/{suite_id}/run", json=payload or {})
+
+
 class Client:
     """Official AI Work Layer SDK client for Python applications."""
 
@@ -549,6 +624,9 @@ class Client:
         self.collaboration = CollaborationResource(self)
         self.agents = AgentsResource(self)
         self.agent_teams = AgentTeamsResource(self)
+        self.simulations = SimulationsResource(self)
+        self.scenarios = ScenariosResource(self)
+        self.suites = SuitesResource(self)
 
 
     def _request(

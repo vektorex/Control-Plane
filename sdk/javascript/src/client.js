@@ -33,6 +33,9 @@ export class AIWorkLayerClient {
     this.collaboration = new CollaborationResource(this);
     this.agents = new AgentsResource(this);
     this.agentTeams = new AgentTeamsResource(this);
+    this.simulations = new SimulationsResource(this);
+    this.scenarios = new ScenariosResource(this);
+    this.suites = new SuitesResource(this);
   }
 
 
@@ -618,6 +621,150 @@ export class AgentTeamsResource {
 
   async getRun(runId) {
     return this.client.request("GET", `/agent-team-runs/${runId}`);
+  }
+}
+
+export class SimulationsResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/simulations", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(simulationId) {
+    return this.client.request("GET", `/simulations/${simulationId}`);
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.projectId) query.set("project_id", params.projectId);
+    if (params.targetType) query.set("target_type", params.targetType);
+    if (params.targetId) query.set("target_id", params.targetId);
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/simulations${qs ? `?${qs}` : ""}`);
+  }
+
+  async update(simulationId, data, options = {}) {
+    return this.client.request("PATCH", `/simulations/${simulationId}`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async createVersion(simulationId, data, options = {}) {
+    return this.client.request("POST", `/simulations/${simulationId}/versions`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async run(simulationId, data = {}, options = {}) {
+    return this.client.request("POST", `/simulations/${simulationId}/run`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async listRuns(simulationId, params = {}) {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/simulations/${simulationId}/runs${qs ? `?${qs}` : ""}`);
+  }
+
+  async getRun(runId) {
+    return this.client.request("GET", `/simulation-runs/${runId}`);
+  }
+
+  async getTrace(runId) {
+    return this.client.request("GET", `/simulation-runs/${runId}/trace`);
+  }
+
+  async getReport(runId) {
+    return this.client.request("GET", `/simulation-runs/${runId}/report`);
+  }
+
+  async getSideEffects(runId) {
+    return this.client.request("GET", `/simulation-runs/${runId}/side-effects`);
+  }
+
+  async getAssertions(runId) {
+    return this.client.request("GET", `/simulation-runs/${runId}/assertions`);
+  }
+
+  async compare(runId, comparisonRunId, options = {}) {
+    return this.client.request("POST", `/simulation-runs/${runId}/compare`, {
+      body: { comparison_run_id: comparisonRunId },
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+}
+
+export class ScenariosResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/simulation-scenarios", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(scenarioId) {
+    return this.client.request("GET", `/simulation-scenarios/${scenarioId}`);
+  }
+
+  async update(scenarioId, data, options = {}) {
+    return this.client.request("PATCH", `/simulation-scenarios/${scenarioId}`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+}
+
+export class SuitesResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/simulation-suites", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(suiteId) {
+    return this.client.request("GET", `/simulation-suites/${suiteId}`);
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.targetType) query.set("target_type", params.targetType);
+    if (params.targetId) query.set("target_id", params.targetId);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/simulation-suites${qs ? `?${qs}` : ""}`);
+  }
+
+  async run(suiteId, data = {}, options = {}) {
+    return this.client.request("POST", `/simulation-suites/${suiteId}/run`, {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
   }
 }
 

@@ -1276,6 +1276,67 @@ class OutcomeJobHandler(JobHandler):
         return {"status": "completed", "action": self.action}
 
 
+class PlanningJobHandler(JobHandler):
+    """
+    Handles background execution of Step 44 work planning jobs:
+    planning_generation, planning_validation, capacity_refresh, capacity_forecast,
+    planning_scenario, plan_staleness_check, planning_recommendation.
+    """
+
+    def __init__(self, action: str):
+        self.action = action
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanGenerationRequest
+
+        payload = job.payload or {}
+        ws_id = payload.get("workspace_id")
+        plan_id = payload.get("work_plan_id")
+        svc = PlanningService(context.session)
+
+        if self.action == "planning_generation":
+            req = PlanGenerationRequest(
+                planning_mode=payload.get("planning_mode", "assisted"),
+                preferences=payload.get("preferences", {}),
+            )
+            res = await svc.generate_plan(plan_id, ws_id, req)
+            return {"status": "completed", "candidates_count": res.get("candidates_count", 0)}
+
+        elif self.action == "planning_validation":
+            res = await svc.validate_plan(plan_id, ws_id)
+            return {"status": "completed", "is_valid": res.get("is_valid", False)}
+
+        elif self.action == "capacity_refresh":
+            return {"status": "completed", "refreshed": True}
+
+        elif self.action == "capacity_forecast":
+            forecast = await svc.get_forecast(ws_id)
+            return {"status": "completed", "forecast": forecast}
+
+        elif self.action == "planning_scenario":
+            scenario_id = payload.get("scenario_id")
+            if scenario_id:
+                sc = await svc.run_scenario(scenario_id, ws_id)
+                return {"status": "completed", "scenario_id": sc.id}
+            return {"status": "completed"}
+
+        elif self.action == "plan_staleness_check":
+            val = await svc.validate_plan(plan_id, ws_id)
+            return {"status": "completed", "is_stale": val.get("is_stale", False)}
+
+        elif self.action == "planning_recommendation":
+            recs = await svc.list_recommendations(ws_id, plan_id)
+            return {"status": "completed", "count": len(recs)}
+
+        return {"status": "completed", "action": self.action}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -1344,6 +1405,13 @@ class JobHandlerRegistry:
         self.register(JobType.OUTCOME_IMPACT_ANALYSIS.value, OutcomeJobHandler("impact_analysis"))
         self.register(JobType.OUTCOME_RECOMMENDATION.value, OutcomeJobHandler("recommendation"))
         self.register(JobType.OUTCOME_GRAPH_UPDATE.value, OutcomeJobHandler("graph_update"))
+        self.register(JobType.PLANNING_GENERATION.value, PlanningJobHandler("planning_generation"))
+        self.register(JobType.PLANNING_VALIDATION.value, PlanningJobHandler("planning_validation"))
+        self.register(JobType.CAPACITY_REFRESH.value, PlanningJobHandler("capacity_refresh"))
+        self.register(JobType.CAPACITY_FORECAST.value, PlanningJobHandler("capacity_forecast"))
+        self.register(JobType.PLANNING_SCENARIO.value, PlanningJobHandler("planning_scenario"))
+        self.register(JobType.PLAN_STALENESS_CHECK.value, PlanningJobHandler("plan_staleness_check"))
+        self.register(JobType.PLANNING_RECOMMENDATION.value, PlanningJobHandler("planning_recommendation"))
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

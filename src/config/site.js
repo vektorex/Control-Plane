@@ -67,6 +67,24 @@ export const siteConfig = {
       description: "Auditable work decisions, AI-assisted provenance, human approvals, and governance",
     },
     {
+      label: "Planning",
+      href: "/app/planning",
+      icon: "CalendarRange",
+      description: "AI Work planning, dependency graphs, schedule candidates, timeline Gantt, and what-if scenarios",
+    },
+    {
+      label: "Resources",
+      href: "/app/resources",
+      icon: "Users2",
+      description: "Work resources, capabilities, availability windows, and capacity allocations",
+    },
+    {
+      label: "Capacity",
+      href: "/app/capacity",
+      icon: "Gauge",
+      description: "Capacity snapshots, demand forecasting, workload distributions, and reservations",
+    },
+    {
       label: "Prompts",
       href: "/app/prompts",
       icon: "FileCode2",

@@ -90,6 +90,14 @@ class JobType(str, Enum):
     OUTCOME_IMPACT_ANALYSIS = "outcome_impact_analysis"
     OUTCOME_RECOMMENDATION = "outcome_recommendation"
     OUTCOME_GRAPH_UPDATE = "outcome_graph_update"
+    # Step 44: AI Work Planning jobs
+    PLANNING_GENERATION = "planning_generation"
+    PLANNING_VALIDATION = "planning_validation"
+    CAPACITY_REFRESH = "capacity_refresh"
+    CAPACITY_FORECAST = "capacity_forecast"
+    PLANNING_SCENARIO = "planning_scenario"
+    PLAN_STALENESS_CHECK = "plan_staleness_check"
+    PLANNING_RECOMMENDATION = "planning_recommendation"
 
 
 class JobEventType(str, Enum):

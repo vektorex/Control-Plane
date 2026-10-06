@@ -3107,3 +3107,490 @@ async def public_get_objective_work_map(
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)
 
+
+# ---------------------------------------------------------------------------
+# Step 44 Work Planning, Capacity & Resource Optimization Public APIs
+# ---------------------------------------------------------------------------
+
+@public_v1_router.post("/work-plans", status_code=status.HTTP_201_CREATED)
+async def public_create_work_plan(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:write")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkPlanCreate, WorkPlanResponse
+
+        svc = PlanningService(db)
+        create_data = WorkPlanCreate(**req)
+        plan = await svc.create_plan(principal.workspace_id, principal.principal_id, create_data)
+        return WorkPlanResponse.model_validate(plan).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans")
+async def public_list_work_plans(
+    project_id: Optional[str] = Query(None),
+    objective_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkPlanResponse
+
+        svc = PlanningService(db)
+        plans = await svc.list_plans(principal.workspace_id, project_id, objective_id, status, limit, offset)
+        return [WorkPlanResponse.model_validate(p).model_dump() for p in plans]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans/{plan_id}")
+async def public_get_work_plan(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkPlanResponse
+
+        svc = PlanningService(db)
+        plan = await svc.get_plan(plan_id, principal.workspace_id)
+        return WorkPlanResponse.model_validate(plan).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/work-plans/{plan_id}")
+async def public_update_work_plan(
+    plan_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:write")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkPlanUpdate, WorkPlanResponse
+
+        svc = PlanningService(db)
+        plan = await svc.update_plan(plan_id, principal.workspace_id, WorkPlanUpdate(**req))
+        return WorkPlanResponse.model_validate(plan).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/work-plans/{plan_id}/versions", status_code=status.HTTP_201_CREATED)
+async def public_create_work_plan_version(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:write")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.models import WorkPlanVersion
+        from backend.app.services.planning.schemas import WorkPlanVersionResponse
+
+        svc = PlanningService(db)
+        plan = await svc.get_plan(plan_id, principal.workspace_id)
+        latest = await svc.repo.get_latest_version(plan.id)
+        next_ver_num = (latest.version + 1) if latest else 1
+
+        v = WorkPlanVersion(
+            work_plan_id=plan.id,
+            version=next_ver_num,
+            created_by=principal.principal_id,
+        )
+        created = await svc.repo.create_version(v)
+        await db.commit()
+        return WorkPlanVersionResponse.model_validate(created).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans/{plan_id}/versions")
+async def public_list_work_plan_versions(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkPlanVersionResponse
+
+        svc = PlanningService(db)
+        plan = await svc.get_plan(plan_id, principal.workspace_id)
+        return [WorkPlanVersionResponse.model_validate(v).model_dump() for v in plan.versions]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/work-plans/{plan_id}/plan")
+async def public_generate_work_plan(
+    plan_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:write")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanGenerationRequest, ScheduleCandidateResponse
+
+        svc = PlanningService(db)
+        res = await svc.generate_plan(plan_id, principal.workspace_id, PlanGenerationRequest(**req))
+        return {
+            "work_plan_id": res["work_plan_id"],
+            "version": res["version"],
+            "items_count": res["items_count"],
+            "dependencies_count": res["dependencies_count"],
+            "candidates_count": res["candidates_count"],
+            "blockers_count": res["blockers_count"],
+            "recommendations_count": res["recommendations_count"],
+            "candidates": [ScheduleCandidateResponse.model_validate(c).model_dump() for c in res["candidates"]],
+        }
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/work-plans/{plan_id}/validate")
+async def public_validate_work_plan(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+
+        svc = PlanningService(db)
+        return await svc.validate_plan(plan_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/work-plans/{plan_id}/activate")
+async def public_activate_work_plan(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:activate")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkPlanResponse
+
+        svc = PlanningService(db)
+        plan = await svc.activate_plan(plan_id, principal.workspace_id)
+        return WorkPlanResponse.model_validate(plan).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/work-plans/{plan_id}/pause")
+async def public_pause_work_plan(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:write")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkPlanResponse
+
+        svc = PlanningService(db)
+        plan = await svc.pause_plan(plan_id, principal.workspace_id)
+        return WorkPlanResponse.model_validate(plan).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans/{plan_id}/dependencies")
+async def public_get_work_plan_dependencies(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanningDependencyResponse
+
+        svc = PlanningService(db)
+        plan = await svc.get_plan(plan_id, principal.workspace_id)
+        latest = await svc.repo.get_latest_version(plan.id)
+        if not latest:
+            return []
+        deps = await svc.repo.list_dependencies_for_version(latest.id)
+        return [PlanningDependencyResponse.model_validate(d).model_dump() for d in deps]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans/{plan_id}/resources")
+async def public_get_work_plan_resources(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkResourceResponse
+
+        svc = PlanningService(db)
+        await svc.get_plan(plan_id, principal.workspace_id)
+        resources = await svc.list_resources(principal.workspace_id)
+        return [WorkResourceResponse.model_validate(r).model_dump() for r in resources]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans/{plan_id}/conflicts")
+async def public_get_work_plan_conflicts(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+
+        svc = PlanningService(db)
+        val = await svc.validate_plan(plan_id, principal.workspace_id)
+        return {"conflicts": val.get("conflicts", []), "hard_violations": val.get("hard_violations", [])}
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans/{plan_id}/blockers")
+async def public_get_work_plan_blockers(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanningBlockerResponse
+
+        svc = PlanningService(db)
+        plan = await svc.get_plan(plan_id, principal.workspace_id)
+        latest = await svc.repo.get_latest_version(plan.id)
+        if not latest:
+            return []
+        blockers = await svc.repo.list_blockers_for_version(latest.id)
+        return [PlanningBlockerResponse.model_validate(b).model_dump() for b in blockers]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/planning-scenarios", status_code=status.HTTP_201_CREATED)
+async def public_create_planning_scenario(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:write")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanningScenarioCreate, PlanningScenarioResponse
+
+        svc = PlanningService(db)
+        sc = await svc.create_scenario(principal.workspace_id, principal.principal_id, PlanningScenarioCreate(**req))
+        return PlanningScenarioResponse.model_validate(sc).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/planning-scenarios/{scenario_id}")
+async def public_get_planning_scenario(
+    scenario_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanningScenarioResponse
+        from backend.app.services.planning.errors import PlanNotFoundError
+
+        svc = PlanningService(db)
+        sc = await svc.repo.get_scenario(scenario_id, principal.workspace_id)
+        if not sc:
+            raise PlanNotFoundError(scenario_id)
+        return PlanningScenarioResponse.model_validate(sc).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/planning-scenarios/{scenario_id}/run")
+async def public_run_planning_scenario(
+    scenario_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "scenarios:run")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanningScenarioResponse
+
+        svc = PlanningService(db)
+        sc = await svc.run_scenario(scenario_id, principal.workspace_id)
+        return PlanningScenarioResponse.model_validate(sc).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/resources")
+async def public_list_resources(
+    resource_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "resources:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkResourceResponse
+
+        svc = PlanningService(db)
+        resources = await svc.list_resources(principal.workspace_id, resource_type, status)
+        return [WorkResourceResponse.model_validate(r).model_dump() for r in resources]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/resources/{resource_id}")
+async def public_get_resource(
+    resource_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "resources:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import WorkResourceResponse
+
+        svc = PlanningService(db)
+        res = await svc.get_resource(resource_id, principal.workspace_id)
+        return WorkResourceResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/resources/{resource_id}/capacity")
+async def public_get_resource_capacity(
+    resource_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "capacity:read")
+        from backend.app.services.planning.service import PlanningService
+
+        svc = PlanningService(db)
+        return await svc.get_resource_capacity(resource_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/capacity-reservations", status_code=status.HTTP_201_CREATED)
+async def public_create_capacity_reservation(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "capacity:reserve")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import CapacityReservationCreate, CapacityReservationResponse
+
+        svc = PlanningService(db)
+        res = await svc.create_reservation(principal.workspace_id, principal.principal_id, CapacityReservationCreate(**req))
+        return CapacityReservationResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/capacity-reservations")
+async def public_list_capacity_reservations(
+    resource_id: Optional[str] = Query(None),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "capacity:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import CapacityReservationResponse
+
+        svc = PlanningService(db)
+        if resource_id:
+            reserves = await svc.repo.list_reservations_for_resource(resource_id)
+            return [CapacityReservationResponse.model_validate(r).model_dump() for r in reserves]
+        return []
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/planning/recommendations")
+async def public_get_planning_recommendations(
+    work_plan_id: Optional[str] = Query(None),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+        from backend.app.services.planning.schemas import PlanningRecommendationResponse
+
+        svc = PlanningService(db)
+        recs = await svc.list_recommendations(principal.workspace_id, work_plan_id)
+        return [PlanningRecommendationResponse.model_validate(r).model_dump() for r in recs]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/planning/forecast")
+async def public_get_capacity_forecast(
+    horizon_days: int = Query(14, ge=1, le=90),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "capacity:read")
+        from backend.app.services.planning.service import PlanningService
+
+        svc = PlanningService(db)
+        return await svc.get_forecast(principal.workspace_id, horizon_days)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/planning/workload")
+async def public_get_planning_workload(
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "capacity:read")
+        from backend.app.services.planning.service import PlanningService
+
+        svc = PlanningService(db)
+        return await svc.get_workload(principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+

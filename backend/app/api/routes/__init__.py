@@ -58,6 +58,14 @@ from backend.app.api.routes.outcomes import (
     decisions_router,
     impact_router,
 )
+from backend.app.api.routes.planning import (
+    work_plans_router,
+    planning_router,
+    planning_scenarios_router,
+    resources_router,
+    capacity_router,
+    reservations_router,
+)
 from backend.app.api.routes.public_v1 import public_v1_router
 
 api_router = APIRouter(prefix="/api")
@@ -118,6 +126,12 @@ api_router.include_router(evidence_router)
 api_router.include_router(measurements_router)
 api_router.include_router(decisions_router)
 api_router.include_router(impact_router)
+api_router.include_router(work_plans_router)
+api_router.include_router(planning_router)
+api_router.include_router(planning_scenarios_router)
+api_router.include_router(resources_router)
+api_router.include_router(capacity_router)
+api_router.include_router(reservations_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

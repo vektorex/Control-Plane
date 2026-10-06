@@ -48,6 +48,14 @@ VALID_API_SCOPES: Set[str] = {
     "outcomes:verify",
     "decisions:read",
     "decisions:write",
+    "plans:read",
+    "plans:write",
+    "plans:activate",
+    "resources:read",
+    "resources:write",
+    "capacity:read",
+    "capacity:reserve",
+    "scenarios:run",
 }
 PUBLIC_SCOPES = VALID_API_SCOPES
 
@@ -95,6 +103,14 @@ SCOPE_TO_PERMISSION_MAP: Dict[str, str] = {
     "outcomes:verify": "outcome.verify",
     "decisions:read": "decision.read",
     "decisions:write": "decision.create",
+    "plans:read": "plan.read",
+    "plans:write": "plan.create",
+    "plans:activate": "plan.activate",
+    "resources:read": "resource.read",
+    "resources:write": "resource.create",
+    "capacity:read": "capacity.read",
+    "capacity:reserve": "capacity.reserve",
+    "scenarios:run": "scenario.run",
 }
 
 # Sensitive scopes that require explicit organization admin privileges
@@ -113,6 +129,8 @@ SENSITIVE_SCOPES: Set[str] = {
     "agents:execute",
     "agent_teams:write",
     "agent_teams:execute",
+    "plans:activate",
+    "capacity:reserve",
 }
 
 

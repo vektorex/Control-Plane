@@ -218,6 +218,22 @@ from backend.app.services.outcomes.models import (
     ImpactAnalysis,
     OutcomeHealthRecord,
 )
+from backend.app.services.planning.models import (
+    WorkPlan,
+    WorkPlanVersion,
+    PlanningItem,
+    PlanningDependency,
+    WorkResource,
+    ResourceAvailability,
+    CapacitySnapshot,
+    CapacityReservation,
+    PlanningConstraint,
+    ScheduleCandidate,
+    PlanningBlocker,
+    PlanningScenario,
+    PlanningRecommendation,
+    PlanStalenessRecord,
+)
 
 
 __all__ = [
@@ -406,6 +422,20 @@ __all__ = [
     "OutcomeAttribution",
     "ImpactAnalysis",
     "OutcomeHealthRecord",
+    "WorkPlan",
+    "WorkPlanVersion",
+    "PlanningItem",
+    "PlanningDependency",
+    "WorkResource",
+    "ResourceAvailability",
+    "CapacitySnapshot",
+    "CapacityReservation",
+    "PlanningConstraint",
+    "ScheduleCandidate",
+    "PlanningBlocker",
+    "PlanningScenario",
+    "PlanningRecommendation",
+    "PlanStalenessRecord",
 ]
 
 

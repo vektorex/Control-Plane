@@ -220,8 +220,36 @@ DECISION_UPDATE = "decision.update"
 DECISION_APPROVE = "decision.approve"
 DECISION_REJECT = "decision.reject"
 
+# Step 44: AI Work Planning permissions
+PLAN_READ = "plan.read"
+PLAN_CREATE = "plan.create"
+PLAN_UPDATE = "plan.update"
+PLAN_DELETE = "plan.delete"
+PLAN_VALIDATE = "plan.validate"
+PLAN_ACTIVATE = "plan.activate"
+PLAN_PAUSE = "plan.pause"
+RESOURCE_READ = "resource.read"
+RESOURCE_CREATE = "resource.create"
+RESOURCE_UPDATE = "resource.update"
+CAPACITY_READ = "capacity.read"
+CAPACITY_RESERVE = "capacity.reserve"
+SCENARIO_RUN = "scenario.run"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    PLAN_READ,
+    PLAN_CREATE,
+    PLAN_UPDATE,
+    PLAN_DELETE,
+    PLAN_VALIDATE,
+    PLAN_ACTIVATE,
+    PLAN_PAUSE,
+    RESOURCE_READ,
+    RESOURCE_CREATE,
+    RESOURCE_UPDATE,
+    CAPACITY_READ,
+    CAPACITY_RESERVE,
+    SCENARIO_RUN,
     OBJECTIVE_READ,
     OBJECTIVE_CREATE,
     OBJECTIVE_UPDATE,

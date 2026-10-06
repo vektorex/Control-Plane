@@ -39,6 +39,13 @@ class EntityType(str, Enum):
     MILESTONE = "milestone"
     DECISION = "decision"
     MEASUREMENT = "measurement"
+    # Step 44 Planning entity types
+    WORK_PLAN = "work_plan"
+    PLANNING_ITEM = "planning_item"
+    WORK_RESOURCE = "work_resource"
+    CAPACITY_SNAPSHOT = "capacity_snapshot"
+    PLANNING_CONSTRAINT = "planning_constraint"
+    PLANNING_SCENARIO = "planning_scenario"
 
 
 ALLOWED_ENTITY_TYPES: Set[str] = {e.value for e in EntityType}
@@ -79,6 +86,11 @@ class RelationshipType(str, Enum):
     MEASURES = "measures"
     DECIDED_BY = "decided_by"
     VALIDATED_BY = "validated_by"
+    # Step 44 Planning relationship types
+    PLANNED_FOR = "planned_for"
+    ALLOCATED_TO = "allocated_to"
+    CONSTRAINED_BY = "constrained_by"
+    REQUIRES_CAPABILITY = "requires_capability"
 
 
 ALLOWED_RELATIONSHIP_TYPES: Set[str] = {r.value for r in RelationshipType}

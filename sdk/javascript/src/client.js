@@ -39,6 +39,11 @@ export class AIWorkLayerClient {
     this.objectives = new ObjectivesResource(this);
     this.outcomes = new OutcomesResource(this);
     this.decisions = new DecisionsResource(this);
+    this.workPlans = new WorkPlansResource(this);
+    this.planningScenarios = new PlanningScenariosResource(this);
+    this.resources = new WorkResourcesResource(this);
+    this.capacity = new CapacityResource(this);
+    this.reservations = new ReservationsResource(this);
   }
 
 
@@ -905,4 +910,144 @@ export class DecisionsResource {
     return this.client.request("POST", `/decisions/${decisionId}/reject${query}`);
   }
 }
+
+export class WorkPlansResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/work-plans", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(planId) {
+    return this.client.request("GET", `/work-plans/${planId}`);
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.projectId) query.set("project_id", params.projectId);
+    if (params.objectiveId) query.set("objective_id", params.objectiveId);
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/work-plans${qs ? `?${qs}` : ""}`);
+  }
+
+  async update(planId, data) {
+    return this.client.request("PATCH", `/work-plans/${planId}`, { body: data });
+  }
+
+  async generate(planId, data = {}) {
+    return this.client.request("POST", `/work-plans/${planId}/plan`, { body: data });
+  }
+
+  async validate(planId) {
+    return this.client.request("POST", `/work-plans/${planId}/validate`);
+  }
+
+  async activate(planId) {
+    return this.client.request("POST", `/work-plans/${planId}/activate`);
+  }
+
+  async pause(planId) {
+    return this.client.request("POST", `/work-plans/${planId}/pause`);
+  }
+
+  async getDependencies(planId) {
+    return this.client.request("GET", `/work-plans/${planId}/dependencies`);
+  }
+
+  async getResources(planId) {
+    return this.client.request("GET", `/work-plans/${planId}/resources`);
+  }
+
+  async getConflicts(planId) {
+    return this.client.request("GET", `/work-plans/${planId}/conflicts`);
+  }
+
+  async getBlockers(planId) {
+    return this.client.request("GET", `/work-plans/${planId}/blockers`);
+  }
+}
+
+export class PlanningScenariosResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/planning-scenarios", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(scenarioId) {
+    return this.client.request("GET", `/planning-scenarios/${scenarioId}`);
+  }
+
+  async run(scenarioId) {
+    return this.client.request("POST", `/planning-scenarios/${scenarioId}/run`);
+  }
+}
+
+export class WorkResourcesResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.resourceType) query.set("resource_type", params.resourceType);
+    if (params.status) query.set("status", params.status);
+    const qs = query.toString();
+    return this.client.request("GET", `/resources${qs ? `?${qs}` : ""}`);
+  }
+
+  async get(resourceId) {
+    return this.client.request("GET", `/resources/${resourceId}`);
+  }
+
+  async getCapacity(resourceId) {
+    return this.client.request("GET", `/resources/${resourceId}/capacity`);
+  }
+}
+
+export class CapacityResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async getForecast(horizonDays = 14) {
+    return this.client.request("GET", `/planning/forecast?horizon_days=${horizonDays}`);
+  }
+
+  async getWorkload() {
+    return this.client.request("GET", "/planning/workload");
+  }
+}
+
+export class ReservationsResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/capacity-reservations", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async list(resourceId = null) {
+    const query = resourceId ? `?resource_id=${encodeURIComponent(resourceId)}` : "";
+    return this.client.request("GET", `/capacity-reservations${query}`);
+  }
+}
+
 

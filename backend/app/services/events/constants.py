@@ -374,9 +374,35 @@ class SystemEventType(str, Enum):
     DECISION_APPROVED = "decision.approved"
     DECISION_REJECTED = "decision.rejected"
 
+    # Step 44 Work Planning, Capacity & Resource Optimization events
+    WORK_PLAN_CREATED = "work_plan.created"
+    WORK_PLAN_VERSION_CREATED = "work_plan.version_created"
+    WORK_PLAN_GENERATED = "work_plan.generated"
+    WORK_PLAN_VALIDATED = "work_plan.validated"
+    WORK_PLAN_APPROVED = "work_plan.approved"
+    WORK_PLAN_ACTIVATED = "work_plan.activated"
+    WORK_PLAN_PAUSED = "work_plan.paused"
+    WORK_PLAN_COMPLETED = "work_plan.completed"
+    WORK_PLAN_CANCELLED = "work_plan.cancelled"
+    WORK_PLAN_STALE = "work_plan.stale"
+    PLANNING_CONFLICT_DETECTED = "planning.conflict_detected"
+    PLANNING_BLOCKER_DETECTED = "planning.blocker_detected"
+    PLANNING_RECOMMENDATION_CREATED = "planning.recommendation_created"
+    CAPACITY_UPDATED = "capacity.updated"
+    CAPACITY_FORECAST_UPDATED = "capacity.forecast_updated"
+    CAPACITY_RESERVATION_CREATED = "capacity.reservation_created"
+    CAPACITY_RESERVATION_RELEASED = "capacity.reservation_released"
+    PLANNING_SCENARIO_CREATED = "planning.scenario_created"
+    PLANNING_SCENARIO_COMPLETED = "planning.scenario_completed"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
+    SystemEventType.WORK_PLAN_APPROVED.value,
+    SystemEventType.WORK_PLAN_ACTIVATED.value,
+    SystemEventType.WORK_PLAN_CANCELLED.value,
+    SystemEventType.CAPACITY_RESERVATION_CREATED.value,
+    SystemEventType.CAPACITY_RESERVATION_RELEASED.value,
     SystemEventType.OBJECTIVE_COMPLETED.value,
     SystemEventType.OUTCOME_VERIFIED.value,
     SystemEventType.OUTCOME_DISPUTED.value,

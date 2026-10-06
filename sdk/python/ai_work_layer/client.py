@@ -671,6 +671,98 @@ class DecisionsResource:
         return self._client._request("POST", f"/decisions/{decision_id}/reject", params=params)
 
 
+class WorkPlansResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._client._request("POST", "/work-plans", json=payload, idempotency_key=idempotency_key)
+
+    def get(self, plan_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/work-plans/{plan_id}")
+
+    def list(self, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/work-plans", params=params)
+
+    def update(self, plan_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("PATCH", f"/work-plans/{plan_id}", json=payload)
+
+    def generate(self, plan_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return self._client._request("POST", f"/work-plans/{plan_id}/plan", json=payload or {})
+
+    def validate(self, plan_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/work-plans/{plan_id}/validate")
+
+    def activate(self, plan_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/work-plans/{plan_id}/activate")
+
+    def pause(self, plan_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/work-plans/{plan_id}/pause")
+
+    def get_dependencies(self, plan_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/work-plans/{plan_id}/dependencies")
+
+    def get_resources(self, plan_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/work-plans/{plan_id}/resources")
+
+    def get_conflicts(self, plan_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/work-plans/{plan_id}/conflicts")
+
+    def get_blockers(self, plan_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/work-plans/{plan_id}/blockers")
+
+
+class PlanningScenariosResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._client._request("POST", "/planning-scenarios", json=payload, idempotency_key=idempotency_key)
+
+    def get(self, scenario_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/planning-scenarios/{scenario_id}")
+
+    def run(self, scenario_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/planning-scenarios/{scenario_id}/run")
+
+
+class WorkResourcesResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def list(self, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/resources", params=params)
+
+    def get(self, resource_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/resources/{resource_id}")
+
+    def get_capacity(self, resource_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/resources/{resource_id}/capacity")
+
+
+class CapacityResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def get_forecast(self, horizon_days: int = 14) -> Dict[str, Any]:
+        return self._client._request("GET", f"/planning/forecast?horizon_days={horizon_days}")
+
+    def get_workload(self) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/planning/workload")
+
+
+class ReservationsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._client._request("POST", "/capacity-reservations", json=payload, idempotency_key=idempotency_key)
+
+    def list(self, resource_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        params = {"resource_id": resource_id} if resource_id else None
+        return self._client._request("GET", "/capacity-reservations", params=params)
+
+
 class Client:
     """Official AI Work Layer SDK client for Python applications."""
 
@@ -709,6 +801,11 @@ class Client:
         self.objectives = ObjectivesResource(self)
         self.outcomes = OutcomesResource(self)
         self.decisions = DecisionsResource(self)
+        self.work_plans = WorkPlansResource(self)
+        self.planning_scenarios = PlanningScenariosResource(self)
+        self.resources = WorkResourcesResource(self)
+        self.capacity = CapacityResource(self)
+        self.reservations = ReservationsResource(self)
 
 
     def _request(

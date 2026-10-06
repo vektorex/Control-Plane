@@ -40,6 +40,9 @@ import {
   Target,
   Award,
   Scale,
+  CalendarRange,
+  Users2,
+  Gauge,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -85,6 +88,9 @@ const iconMap = {
   Target,
   Award,
   Scale,
+  CalendarRange,
+  Users2,
+  Gauge,
 };
 
 

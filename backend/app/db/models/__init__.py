@@ -205,6 +205,19 @@ from backend.app.services.simulation.models import (
     SimulationSuiteScenario,
     SimulationComparison,
 )
+from backend.app.services.outcomes.models import (
+    Objective,
+    OutcomeTarget,
+    Outcome,
+    OutcomeWorkLink,
+    OutcomeEvidence,
+    OutcomeMeasurement,
+    OutcomeMilestone,
+    WorkDecision,
+    OutcomeAttribution,
+    ImpactAnalysis,
+    OutcomeHealthRecord,
+)
 
 
 __all__ = [
@@ -382,6 +395,17 @@ __all__ = [
     "SimulationSuite",
     "SimulationSuiteScenario",
     "SimulationComparison",
+    "Objective",
+    "OutcomeTarget",
+    "Outcome",
+    "OutcomeWorkLink",
+    "OutcomeEvidence",
+    "OutcomeMeasurement",
+    "OutcomeMilestone",
+    "WorkDecision",
+    "OutcomeAttribution",
+    "ImpactAnalysis",
+    "OutcomeHealthRecord",
 ]
 
 

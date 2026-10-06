@@ -83,6 +83,13 @@ class JobType(str, Enum):
     SIMULATION_RUN = "simulation_run"
     SIMULATION_SUITE_RUN = "simulation_suite_run"
     SIMULATION_SCENARIO_RUN = "simulation_scenario_run"
+    # Step 43: Outcome Intelligence jobs
+    OUTCOME_MEASUREMENT = "outcome_measurement"
+    OUTCOME_VERIFICATION = "outcome_verification"
+    OUTCOME_HEALTH_REFRESH = "outcome_health_refresh"
+    OUTCOME_IMPACT_ANALYSIS = "outcome_impact_analysis"
+    OUTCOME_RECOMMENDATION = "outcome_recommendation"
+    OUTCOME_GRAPH_UPDATE = "outcome_graph_update"
 
 
 class JobEventType(str, Enum):

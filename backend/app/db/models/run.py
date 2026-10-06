@@ -188,5 +188,30 @@ class Run(Base):
             or self.input_snapshot.get("task_intelligence", {}).get("task_analysis_version")
         )
 
+    # Step 43: Outcome Intelligence Execution Context
+    @property
+    def objective_id(self) -> Optional[str]:
+        if not self.input_snapshot:
+            return None
+        return self.input_snapshot.get("objective_id")
+
+    @property
+    def outcome_id(self) -> Optional[str]:
+        if not self.input_snapshot:
+            return None
+        return self.input_snapshot.get("outcome_id")
+
+    @property
+    def milestone_id(self) -> Optional[str]:
+        if not self.input_snapshot:
+            return None
+        return self.input_snapshot.get("milestone_id")
+
+    @property
+    def decision_id(self) -> Optional[str]:
+        if not self.input_snapshot:
+            return None
+        return self.input_snapshot.get("decision_id")
+
     def __repr__(self) -> str:
         return f"<Run(id={self.id}, task_id={self.task_id}, status='{self.status}', model='{self.model_name}')>"

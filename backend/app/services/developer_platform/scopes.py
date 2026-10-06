@@ -41,6 +41,13 @@ VALID_API_SCOPES: Set[str] = {
     "simulations:read",
     "simulations:write",
     "simulations:execute",
+    "objectives:read",
+    "objectives:write",
+    "outcomes:read",
+    "outcomes:write",
+    "outcomes:verify",
+    "decisions:read",
+    "decisions:write",
 }
 PUBLIC_SCOPES = VALID_API_SCOPES
 
@@ -81,6 +88,13 @@ SCOPE_TO_PERMISSION_MAP: Dict[str, str] = {
     "simulations:read": "simulation.read",
     "simulations:write": "simulation.create",
     "simulations:execute": "simulation.run",
+    "objectives:read": "objective.read",
+    "objectives:write": "objective.create",
+    "outcomes:read": "outcome.read",
+    "outcomes:write": "outcome.create",
+    "outcomes:verify": "outcome.verify",
+    "decisions:read": "decision.read",
+    "decisions:write": "decision.create",
 }
 
 # Sensitive scopes that require explicit organization admin privileges
@@ -88,6 +102,7 @@ SENSITIVE_SCOPES: Set[str] = {
     "tasks:run",
     "workflows:run",
     "artifacts:create",
+    "outcomes:verify",
     "marketplace:install",
     "marketplace:manage",
     "collaboration:execute",
@@ -103,6 +118,12 @@ SENSITIVE_SCOPES: Set[str] = {
 
 class ScopeRegistry:
     """Validates scopes, translates scopes to permissions, and prevents privilege escalation."""
+
+    SCOPES: Set[str] = VALID_API_SCOPES
+
+    @classmethod
+    def is_sensitive(cls, scope: str) -> bool:
+        return scope in SENSITIVE_SCOPES
 
     @classmethod
     def is_valid_scope(cls, scope: str) -> bool:

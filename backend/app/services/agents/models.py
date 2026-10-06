@@ -2,6 +2,7 @@
 SQLAlchemy models for Step 40: Governed AI Agent Runtime and Multi-Agent Teams Layer.
 """
 from datetime import datetime, timezone
+from typing import Optional
 import uuid
 from sqlalchemy import (
     Boolean,
@@ -123,11 +124,27 @@ class AgentRun(Base):
     latency = Column(Float, nullable=False, default=0.0)
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     error = Column(JSON, nullable=True)
     reproducibility_metadata = Column(JSON, nullable=False, default=dict)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
-
     agent = relationship("Agent", back_populates="runs")
+
+    # Step 43: Outcome Intelligence Execution Context
+    @property
+    def objective_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("objective_id") or (self.input_snapshot or {}).get("objective_id")
+
+    @property
+    def outcome_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("outcome_id") or (self.input_snapshot or {}).get("outcome_id")
+
+    @property
+    def milestone_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("milestone_id") or (self.input_snapshot or {}).get("milestone_id")
+
+    @property
+    def decision_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("decision_id") or (self.input_snapshot or {}).get("decision_id")
 
 
 class AgentDelegation(Base):

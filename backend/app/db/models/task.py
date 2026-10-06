@@ -57,6 +57,11 @@ class Task(Base):
     strict_evaluation: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     expected_format: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
+    # Step 43: Outcome Intelligence Execution References
+    objective_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    outcome_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    milestone_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

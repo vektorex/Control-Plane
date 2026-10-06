@@ -203,8 +203,40 @@ AGENT_TEAM_UPDATE = "agent_team.update"
 AGENT_TEAM_DELETE = "agent_team.delete"
 AGENT_TEAM_RUN = "agent_team.run"
 
+# Step 43: Outcome Intelligence permissions
+OBJECTIVE_READ = "objective.read"
+OBJECTIVE_CREATE = "objective.create"
+OBJECTIVE_UPDATE = "objective.update"
+OBJECTIVE_DELETE = "objective.delete"
+OUTCOME_READ = "outcome.read"
+OUTCOME_CREATE = "outcome.create"
+OUTCOME_UPDATE = "outcome.update"
+OUTCOME_DELETE = "outcome.delete"
+OUTCOME_VERIFY = "outcome.verify"
+OUTCOME_DISPUTE = "outcome.dispute"
+DECISION_READ = "decision.read"
+DECISION_CREATE = "decision.create"
+DECISION_UPDATE = "decision.update"
+DECISION_APPROVE = "decision.approve"
+DECISION_REJECT = "decision.reject"
+
 # Set of all valid system permissions
 ALL_PERMISSIONS = {
+    OBJECTIVE_READ,
+    OBJECTIVE_CREATE,
+    OBJECTIVE_UPDATE,
+    OBJECTIVE_DELETE,
+    OUTCOME_READ,
+    OUTCOME_CREATE,
+    OUTCOME_UPDATE,
+    OUTCOME_DELETE,
+    OUTCOME_VERIFY,
+    OUTCOME_DISPUTE,
+    DECISION_READ,
+    DECISION_CREATE,
+    DECISION_UPDATE,
+    DECISION_APPROVE,
+    DECISION_REJECT,
     AGENT_READ,
     AGENT_CREATE,
     AGENT_UPDATE,

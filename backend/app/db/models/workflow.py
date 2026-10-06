@@ -225,3 +225,20 @@ class WorkflowRun(Base):
         Index("ix_workflow_runs_ws_wf", "workspace_id", "workflow_id"),
         Index("ix_workflow_runs_ws_status", "workspace_id", "status"),
     )
+
+    # Step 43: Outcome Intelligence Execution Context
+    @property
+    def objective_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("objective_id") or (self.input_data or {}).get("objective_id")
+
+    @property
+    def outcome_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("outcome_id") or (self.input_data or {}).get("outcome_id")
+
+    @property
+    def milestone_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("milestone_id") or (self.input_data or {}).get("milestone_id")
+
+    @property
+    def decision_id(self) -> Optional[str]:
+        return (self.execution_state or {}).get("decision_id") or (self.input_data or {}).get("decision_id")

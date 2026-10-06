@@ -1191,6 +1191,91 @@ class SimulationJobHandler(JobHandler):
             return {"run_id": run.id, "status": run.status, "cost": run.cost, "latency": run.latency}
 
 
+class OutcomeJobHandler(JobHandler):
+    """
+    Handles asynchronous Step 43 Outcome Intelligence jobs:
+    measurement, verification, health refresh, impact analysis, recommendations, and graph updates.
+    """
+
+    def __init__(self, action: str):
+        self.action = action
+
+    async def execute(
+        self,
+        job: Job,
+        context: JobExecutionContext,
+        cancellation_token: asyncio.Event,
+    ) -> Dict[str, Any]:
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeMeasurementCreate, OutcomeVerifyRequest
+
+        session = context.session
+        payload = job.payload or {}
+        svc = OutcomeService(session)
+        ws_id = str(job.workspace_id)
+        outcome_id = payload.get("outcome_id")
+        objective_id = payload.get("objective_id")
+
+        await context.update_progress(15, f"Starting outcome {self.action}", 1, 3, "In progress")
+        if cancellation_token.is_set():
+            raise JobCancellationError(f"Outcome {self.action} job cancelled.")
+
+        if self.action == "measurement":
+            req = OutcomeMeasurementCreate(
+                target_id=payload.get("target_id"),
+                metric_name=payload.get("metric_name", "job_metric"),
+                value=float(payload.get("value", 1.0)),
+                unit=payload.get("unit", "count"),
+                measurement_source=payload.get("measurement_source", "system"),
+            )
+            res = await svc.add_measurement(outcome_id, ws_id, req)
+            await context.update_progress(100, "Measurement recorded", 3, 3, "Completed")
+            return {"measurement_id": res.id, "metric_name": res.metric_name, "value": res.value}
+
+        elif self.action == "verification":
+            user_id = str(payload.get("user_id", "system"))
+            req = OutcomeVerifyRequest(
+                evidence_ids=payload.get("evidence_ids", []),
+                notes=payload.get("notes"),
+                human_confirmed=payload.get("human_confirmed", True),
+            )
+            res = await svc.verify_outcome(outcome_id, ws_id, user_id, req)
+            await context.update_progress(100, f"Outcome verification complete ({res.status})", 3, 3, "Completed")
+            return {"outcome_id": res.id, "status": res.status, "confidence": res.confidence}
+
+        elif self.action == "health_refresh":
+            if outcome_id:
+                res = await svc.get_outcome_health(outcome_id, ws_id)
+            elif objective_id:
+                res = await svc.get_objective_health(objective_id, ws_id)
+            else:
+                return {"status": "skipped", "reason": "No outcome_id or objective_id provided"}
+            await context.update_progress(100, f"Health evaluated: {res.status}", 3, 3, "Completed")
+            return res.model_dump()
+
+        elif self.action == "recommendation":
+            if outcome_id:
+                recs = await svc.get_outcome_recommendations(outcome_id, ws_id)
+            elif objective_id:
+                recs = await svc.get_objective_recommendations(objective_id, ws_id)
+            else:
+                recs = []
+            await context.update_progress(100, f"Generated {len(recs)} recommendations", 3, 3, "Completed")
+            return {"count": len(recs), "recommendations": [r.model_dump() for r in recs]}
+
+        elif self.action == "graph_update":
+            if outcome_id:
+                map_res = await svc.get_outcome_work_map(outcome_id, ws_id)
+            elif objective_id:
+                map_res = await svc.get_objective_work_map(objective_id, ws_id)
+            else:
+                map_res = None
+            await context.update_progress(100, "Graph work map updated", 3, 3, "Completed")
+            return {"nodes_count": len(map_res.nodes) if map_res else 0}
+
+        return {"status": "completed", "action": self.action}
+
+
 class JobHandlerRegistry:
     """
     Singleton registry of JobHandlers keyed by JobType string.
@@ -1253,6 +1338,12 @@ class JobHandlerRegistry:
         self.register(JobType.SIMULATION_RUN.value, SimulationJobHandler("run"))
         self.register(JobType.SIMULATION_SUITE_RUN.value, SimulationJobHandler("suite_run"))
         self.register(JobType.SIMULATION_SCENARIO_RUN.value, SimulationJobHandler("scenario_run"))
+        self.register(JobType.OUTCOME_MEASUREMENT.value, OutcomeJobHandler("measurement"))
+        self.register(JobType.OUTCOME_VERIFICATION.value, OutcomeJobHandler("verification"))
+        self.register(JobType.OUTCOME_HEALTH_REFRESH.value, OutcomeJobHandler("health_refresh"))
+        self.register(JobType.OUTCOME_IMPACT_ANALYSIS.value, OutcomeJobHandler("impact_analysis"))
+        self.register(JobType.OUTCOME_RECOMMENDATION.value, OutcomeJobHandler("recommendation"))
+        self.register(JobType.OUTCOME_GRAPH_UPDATE.value, OutcomeJobHandler("graph_update"))
 
 
     def register(self, job_type: str, handler: JobHandler) -> None:

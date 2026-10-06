@@ -49,6 +49,15 @@ from backend.app.api.routes.simulation import (
     suites_router,
     runs_router as simulation_runs_router,
 )
+from backend.app.api.routes.outcomes import (
+    objectives_router,
+    outcomes_router,
+    targets_router,
+    evidence_router,
+    measurements_router,
+    decisions_router,
+    impact_router,
+)
 from backend.app.api.routes.public_v1 import public_v1_router
 
 api_router = APIRouter(prefix="/api")
@@ -102,6 +111,13 @@ api_router.include_router(simulations_router)
 api_router.include_router(scenarios_router)
 api_router.include_router(suites_router)
 api_router.include_router(simulation_runs_router)
+api_router.include_router(objectives_router)
+api_router.include_router(outcomes_router)
+api_router.include_router(targets_router)
+api_router.include_router(evidence_router)
+api_router.include_router(measurements_router)
+api_router.include_router(decisions_router)
+api_router.include_router(impact_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

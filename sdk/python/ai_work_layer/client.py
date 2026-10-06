@@ -592,6 +592,85 @@ class SuitesResource:
         return self._client._request("POST", f"/simulation-suites/{suite_id}/run", json=payload or {})
 
 
+class ObjectivesResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._client._request("POST", "/objectives", json=payload, idempotency_key=idempotency_key)
+
+    def get(self, objective_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/objectives/{objective_id}")
+
+    def list(self, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/objectives", params=params)
+
+    def update(self, objective_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("PATCH", f"/objectives/{objective_id}", json=payload)
+
+    def delete(self, objective_id: str) -> Dict[str, Any]:
+        return self._client._request("DELETE", f"/objectives/{objective_id}")
+
+    def get_health(self, objective_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/objectives/{objective_id}/health")
+
+    def get_work_map(self, objective_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/objectives/{objective_id}/work-map")
+
+
+class OutcomesResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._client._request("POST", "/outcomes", json=payload, idempotency_key=idempotency_key)
+
+    def get(self, outcome_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/outcomes/{outcome_id}")
+
+    def list(self, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/outcomes", params=params)
+
+    def add_evidence(self, outcome_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", f"/outcomes/{outcome_id}/evidence", json=payload)
+
+    def verify(self, outcome_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return self._client._request("POST", f"/outcomes/{outcome_id}/verify", json=payload or {})
+
+    def dispute(self, outcome_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self._client._request("POST", f"/outcomes/{outcome_id}/dispute", json=payload)
+
+    def get_impact(self, outcome_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/outcomes/{outcome_id}/impact")
+
+    def get_work(self, outcome_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/outcomes/{outcome_id}/work")
+
+    def get_graph(self, outcome_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/outcomes/{outcome_id}/graph")
+
+
+class DecisionsResource:
+    def __init__(self, client: "Client"):
+        self._client = client
+
+    def create(self, payload: Dict[str, Any], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._client._request("POST", "/decisions", json=payload, idempotency_key=idempotency_key)
+
+    def get(self, decision_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/decisions/{decision_id}")
+
+    def list(self, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        return self._client._request("GET", "/decisions", params=params)
+
+    def approve(self, decision_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/decisions/{decision_id}/approve")
+
+    def reject(self, decision_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
+        params = {"reason": reason} if reason else None
+        return self._client._request("POST", f"/decisions/{decision_id}/reject", params=params)
+
+
 class Client:
     """Official AI Work Layer SDK client for Python applications."""
 
@@ -627,6 +706,9 @@ class Client:
         self.simulations = SimulationsResource(self)
         self.scenarios = ScenariosResource(self)
         self.suites = SuitesResource(self)
+        self.objectives = ObjectivesResource(self)
+        self.outcomes = OutcomesResource(self)
+        self.decisions = DecisionsResource(self)
 
 
     def _request(

@@ -350,9 +350,40 @@ class SystemEventType(str, Enum):
     SIMULATION_CANCELLED = "simulation.cancelled"
     SIMULATION_REGRESSION_DETECTED = "simulation.regression.detected"
 
+    # Step 43 Outcome Intelligence & Work Impact events
+    OBJECTIVE_CREATED = "objective.created"
+    OBJECTIVE_UPDATED = "objective.updated"
+    OBJECTIVE_AT_RISK = "objective.at_risk"
+    OBJECTIVE_COMPLETED = "objective.completed"
+    MILESTONE_CREATED = "milestone.created"
+    MILESTONE_COMPLETED = "milestone.completed"
+    MILESTONE_BLOCKED = "milestone.blocked"
+    MILESTONE_MISSED = "milestone.missed"
+    OUTCOME_CREATED = "outcome.created"
+    OUTCOME_UPDATED = "outcome.updated"
+    OUTCOME_OBSERVED = "outcome.observed"
+    OUTCOME_VERIFIED = "outcome.verified"
+    OUTCOME_DISPUTED = "outcome.disputed"
+    OUTCOME_FAILED = "outcome.failed"
+    OUTCOME_STALE = "outcome.stale"
+    OUTCOME_TARGET_MISSED = "outcome.target_missed"
+    OUTCOME_EVIDENCE_ADDED = "outcome.evidence_added"
+    OUTCOME_MEASUREMENT_ADDED = "outcome.measurement_added"
+    OUTCOME_ATTRIBUTION_CREATED = "outcome.attribution_created"
+    DECISION_CREATED = "decision.created"
+    DECISION_APPROVED = "decision.approved"
+    DECISION_REJECTED = "decision.rejected"
+
 
 # Auditable event types
 AUDITABLE_EVENTS = {
+    SystemEventType.OBJECTIVE_COMPLETED.value,
+    SystemEventType.OUTCOME_VERIFIED.value,
+    SystemEventType.OUTCOME_DISPUTED.value,
+    SystemEventType.OUTCOME_FAILED.value,
+    SystemEventType.DECISION_CREATED.value,
+    SystemEventType.DECISION_APPROVED.value,
+    SystemEventType.DECISION_REJECTED.value,
     SystemEventType.AGENT_CREATED.value,
     SystemEventType.AGENT_VERSION_PUBLISHED.value,
     SystemEventType.AGENT_ACTIVATED.value,

@@ -32,6 +32,13 @@ class EntityType(str, Enum):
     CONCEPT = "concept"
     TOPIC = "topic"
     EVENT = "event"
+    # Step 43 Outcome Intelligence entity types
+    OBJECTIVE = "objective"
+    OUTCOME = "outcome"
+    OUTCOME_TARGET = "outcome_target"
+    MILESTONE = "milestone"
+    DECISION = "decision"
+    MEASUREMENT = "measurement"
 
 
 ALLOWED_ENTITY_TYPES: Set[str] = {e.value for e in EntityType}
@@ -65,6 +72,13 @@ class RelationshipType(str, Enum):
     SUPERSEDES = "supersedes"
     TESTED_BY = "tested_by"
     EVALUATED_BY = "evaluated_by"
+    # Step 43 Outcome Intelligence relationship types
+    SUPPORTS = "supports"
+    CONTRIBUTES_TO = "contributes_to"
+    ACHIEVES = "achieves"
+    MEASURES = "measures"
+    DECIDED_BY = "decided_by"
+    VALIDATED_BY = "validated_by"
 
 
 ALLOWED_RELATIONSHIP_TYPES: Set[str] = {r.value for r in RelationshipType}

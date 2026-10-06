@@ -36,6 +36,9 @@ export class AIWorkLayerClient {
     this.simulations = new SimulationsResource(this);
     this.scenarios = new ScenariosResource(this);
     this.suites = new SuitesResource(this);
+    this.objectives = new ObjectivesResource(this);
+    this.outcomes = new OutcomesResource(this);
+    this.decisions = new DecisionsResource(this);
   }
 
 
@@ -765,6 +768,141 @@ export class SuitesResource {
       body: data,
       idempotencyKey: options.idempotencyKey,
     });
+  }
+}
+
+export class ObjectivesResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/objectives", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(objectiveId) {
+    return this.client.request("GET", `/objectives/${objectiveId}`);
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.projectId) query.set("project_id", params.projectId);
+    if (params.status) query.set("status", params.status);
+    if (params.objectiveType) query.set("objective_type", params.objectiveType);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/objectives${qs ? `?${qs}` : ""}`);
+  }
+
+  async update(objectiveId, data) {
+    return this.client.request("PATCH", `/objectives/${objectiveId}`, { body: data });
+  }
+
+  async delete(objectiveId) {
+    return this.client.request("DELETE", `/objectives/${objectiveId}`);
+  }
+
+  async getHealth(objectiveId) {
+    return this.client.request("GET", `/objectives/${objectiveId}/health`);
+  }
+
+  async getWorkMap(objectiveId) {
+    return this.client.request("GET", `/objectives/${objectiveId}/work-map`);
+  }
+}
+
+export class OutcomesResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/outcomes", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(outcomeId) {
+    return this.client.request("GET", `/outcomes/${outcomeId}`);
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.projectId) query.set("project_id", params.projectId);
+    if (params.objectiveId) query.set("objective_id", params.objectiveId);
+    if (params.status) query.set("status", params.status);
+    if (params.outcomeType) query.set("outcome_type", params.outcomeType);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/outcomes${qs ? `?${qs}` : ""}`);
+  }
+
+  async addEvidence(outcomeId, data) {
+    return this.client.request("POST", `/outcomes/${outcomeId}/evidence`, { body: data });
+  }
+
+  async verify(outcomeId, data = {}) {
+    return this.client.request("POST", `/outcomes/${outcomeId}/verify`, { body: data });
+  }
+
+  async dispute(outcomeId, data = {}) {
+    return this.client.request("POST", `/outcomes/${outcomeId}/dispute`, { body: data });
+  }
+
+  async getImpact(outcomeId) {
+    return this.client.request("GET", `/outcomes/${outcomeId}/impact`);
+  }
+
+  async getWork(outcomeId) {
+    return this.client.request("GET", `/outcomes/${outcomeId}/work`);
+  }
+
+  async getGraph(outcomeId) {
+    return this.client.request("GET", `/outcomes/${outcomeId}/graph`);
+  }
+}
+
+export class DecisionsResource {
+  constructor(client) {
+    this.client = client;
+  }
+
+  async create(data, options = {}) {
+    return this.client.request("POST", "/decisions", {
+      body: data,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async get(decisionId) {
+    return this.client.request("GET", `/decisions/${decisionId}`);
+  }
+
+  async list(params = {}) {
+    const query = new URLSearchParams();
+    if (params.projectId) query.set("project_id", params.projectId);
+    if (params.objectiveId) query.set("objective_id", params.objectiveId);
+    if (params.outcomeId) query.set("outcome_id", params.outcomeId);
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    const qs = query.toString();
+    return this.client.request("GET", `/decisions${qs ? `?${qs}` : ""}`);
+  }
+
+  async approve(decisionId) {
+    return this.client.request("POST", `/decisions/${decisionId}/approve`);
+  }
+
+  async reject(decisionId, reason = null) {
+    const query = reason ? `?reason=${encodeURIComponent(reason)}` : "";
+    return this.client.request("POST", `/decisions/${decisionId}/reject${query}`);
   }
 }
 

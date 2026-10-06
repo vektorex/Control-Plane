@@ -49,6 +49,24 @@ export const siteConfig = {
       description: "Safe sandbox simulation, scenario suites, fault injection, and dry-run policy evaluation",
     },
     {
+      label: "Objectives",
+      href: "/app/objectives",
+      icon: "Target",
+      description: "Strategic work objectives, target key results, milestones, and health intelligence",
+    },
+    {
+      label: "Outcomes",
+      href: "/app/outcomes",
+      icon: "Award",
+      description: "Evidence-backed work deliverables, deterministic verification, impact analysis & work map",
+    },
+    {
+      label: "Decisions",
+      href: "/app/decisions",
+      icon: "Scale",
+      description: "Auditable work decisions, AI-assisted provenance, human approvals, and governance",
+    },
+    {
       label: "Prompts",
       href: "/app/prompts",
       icon: "FileCode2",

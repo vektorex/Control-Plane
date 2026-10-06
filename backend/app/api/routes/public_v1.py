@@ -2454,3 +2454,656 @@ async def public_compare_simulation_runs(
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)
 
+
+# =============================================================================
+# Step 43: Outcome Intelligence Public API Endpoints
+# =============================================================================
+
+@public_v1_router.post("/objectives")
+async def public_create_objective(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import ObjectiveCreate, ObjectiveResponse
+
+        svc = OutcomeService(db)
+        create_data = ObjectiveCreate(**req)
+        res = await svc.create_objective(principal.workspace_id, principal.principal_id, create_data)
+        return ObjectiveResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/objectives")
+async def public_list_objectives(
+    project_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    objective_type: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import ObjectiveResponse
+
+        svc = OutcomeService(db)
+        objs = await svc.list_objectives(principal.workspace_id, project_id, status, objective_type, limit, offset)
+        return [ObjectiveResponse.model_validate(o).model_dump() for o in objs]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/objectives/{objective_id}")
+async def public_get_objective(
+    objective_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import ObjectiveDetailResponse, OutcomeTargetResponse, OutcomeMilestoneResponse, OutcomeResponse
+
+        svc = OutcomeService(db)
+        obj = await svc.get_objective(objective_id, principal.workspace_id)
+        health = await svc.get_objective_health(objective_id, principal.workspace_id)
+        detail = ObjectiveDetailResponse(
+            id=obj.id,
+            workspace_id=obj.workspace_id,
+            project_id=obj.project_id,
+            name=obj.name,
+            description=obj.description,
+            objective_type=obj.objective_type,
+            status=obj.status,
+            priority=obj.priority,
+            owner_user_id=obj.owner_user_id,
+            created_by=obj.created_by,
+            requirements=obj.requirements or {},
+            start_at=obj.start_at,
+            target_at=obj.target_at,
+            completed_at=obj.completed_at,
+            created_at=obj.created_at,
+            updated_at=obj.updated_at,
+            targets=[OutcomeTargetResponse.model_validate(t) for t in obj.targets],
+            milestones=[OutcomeMilestoneResponse.model_validate(m) for m in obj.milestones],
+            outcomes=[OutcomeResponse.model_validate(o) for o in obj.outcomes],
+            health=health,
+        )
+        return detail.model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/objectives/{objective_id}")
+async def public_update_objective(
+    objective_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import ObjectiveUpdate, ObjectiveResponse
+
+        svc = OutcomeService(db)
+        up_data = ObjectiveUpdate(**req)
+        res = await svc.update_objective(objective_id, principal.workspace_id, up_data)
+        return ObjectiveResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.delete("/objectives/{objective_id}")
+async def public_delete_objective(
+    objective_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:write")
+        from backend.app.services.outcomes.service import OutcomeService
+
+        svc = OutcomeService(db)
+        await svc.delete_objective(objective_id, principal.workspace_id)
+        return {"deleted": True, "objective_id": objective_id}
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/objectives/{objective_id}/targets")
+async def public_create_target(
+    objective_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeTargetCreate, OutcomeTargetResponse
+
+        svc = OutcomeService(db)
+        create_data = OutcomeTargetCreate(**req)
+        res = await svc.create_target(objective_id, principal.workspace_id, create_data)
+        return OutcomeTargetResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/objectives/{objective_id}/targets")
+async def public_list_targets(
+    objective_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeTargetResponse
+
+        svc = OutcomeService(db)
+        targets = await svc.list_targets(objective_id, principal.workspace_id)
+        return [OutcomeTargetResponse.model_validate(t).model_dump() for t in targets]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/outcome-targets/{target_id}")
+async def public_update_target(
+    target_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeTargetUpdate, OutcomeTargetResponse
+
+        svc = OutcomeService(db)
+        up_data = OutcomeTargetUpdate(**req)
+        res = await svc.update_target(target_id, principal.workspace_id, up_data)
+        return OutcomeTargetResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/outcomes")
+async def public_create_outcome(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeCreate, OutcomeResponse
+
+        svc = OutcomeService(db)
+        create_data = OutcomeCreate(**req)
+        res = await svc.create_outcome(principal.workspace_id, principal.principal_id, create_data)
+        return OutcomeResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/outcomes")
+async def public_list_outcomes(
+    project_id: Optional[str] = Query(None),
+    objective_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    outcome_type: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeResponse
+
+        svc = OutcomeService(db)
+        outcomes = await svc.list_outcomes(principal.workspace_id, project_id, objective_id, status, outcome_type, limit, offset)
+        return [OutcomeResponse.model_validate(o).model_dump() for o in outcomes]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/outcomes/{outcome_id}")
+async def public_get_outcome(
+    outcome_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import (
+            OutcomeDetailResponse,
+            OutcomeEvidenceResponse,
+            OutcomeWorkLinkResponse,
+            OutcomeMeasurementResponse,
+            OutcomeAttributionResponse,
+            ImpactAnalysisResponse,
+            ObjectiveResponse,
+        )
+
+        svc = OutcomeService(db)
+        outcome = await svc.get_outcome(outcome_id, principal.workspace_id)
+        health = await svc.get_outcome_health(outcome_id, principal.workspace_id)
+        detail = OutcomeDetailResponse(
+            id=outcome.id,
+            workspace_id=outcome.workspace_id,
+            project_id=outcome.project_id,
+            objective_id=outcome.objective_id,
+            name=outcome.name,
+            description=outcome.description,
+            outcome_type=outcome.outcome_type,
+            status=outcome.status,
+            confidence=outcome.confidence,
+            owner_user_id=outcome.owner_user_id,
+            created_by=outcome.created_by,
+            requirements=outcome.requirements or {},
+            observed_at=outcome.observed_at,
+            verified_at=outcome.verified_at,
+            verified_by=outcome.verified_by,
+            created_at=outcome.created_at,
+            updated_at=outcome.updated_at,
+            objective=ObjectiveResponse.model_validate(outcome.objective) if outcome.objective else None,
+            evidence=[OutcomeEvidenceResponse.model_validate(e) for e in outcome.evidence],
+            work_links=[OutcomeWorkLinkResponse.model_validate(wl) for wl in outcome.work_links],
+            measurements=[OutcomeMeasurementResponse.model_validate(m) for m in outcome.measurements],
+            attributions=[OutcomeAttributionResponse.model_validate(a) for a in outcome.attributions],
+            impact_analyses=[ImpactAnalysisResponse.model_validate(i) for i in outcome.impact_analyses],
+            health=health,
+        )
+        return detail.model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.patch("/outcomes/{outcome_id}")
+async def public_update_outcome(
+    outcome_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeUpdate, OutcomeResponse
+
+        svc = OutcomeService(db)
+        up_data = OutcomeUpdate(**req)
+        res = await svc.update_outcome(outcome_id, principal.workspace_id, up_data)
+        return OutcomeResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/outcomes/{outcome_id}/evidence")
+async def public_add_evidence(
+    outcome_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeEvidenceCreate, OutcomeEvidenceResponse
+
+        svc = OutcomeService(db)
+        create_data = OutcomeEvidenceCreate(**req)
+        res = await svc.add_evidence(outcome_id, principal.workspace_id, create_data)
+        return OutcomeEvidenceResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/outcomes/{outcome_id}/evidence")
+async def public_list_evidence(
+    outcome_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeEvidenceResponse
+
+        svc = OutcomeService(db)
+        evidence = await svc.list_evidence(outcome_id, principal.workspace_id)
+        return [OutcomeEvidenceResponse.model_validate(e).model_dump() for e in evidence]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/outcomes/{outcome_id}/verify")
+async def public_verify_outcome(
+    outcome_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:verify")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeVerifyRequest, OutcomeResponse
+
+        svc = OutcomeService(db)
+        verify_req = OutcomeVerifyRequest(**req)
+        res = await svc.verify_outcome(outcome_id, principal.workspace_id, principal.principal_id, verify_req)
+        return OutcomeResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/outcomes/{outcome_id}/dispute")
+async def public_dispute_outcome(
+    outcome_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeDisputeRequest, OutcomeResponse
+
+        svc = OutcomeService(db)
+        disp_req = OutcomeDisputeRequest(**req)
+        res = await svc.dispute_outcome(outcome_id, principal.workspace_id, principal.principal_id, disp_req)
+        return OutcomeResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/outcomes/{outcome_id}/measurements")
+async def public_list_measurements(
+    outcome_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeMeasurementResponse
+
+        svc = OutcomeService(db)
+        measurements = await svc.list_measurements(outcome_id, principal.workspace_id)
+        return [OutcomeMeasurementResponse.model_validate(m).model_dump() for m in measurements]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/outcomes/{outcome_id}/measurements")
+async def public_add_measurement(
+    outcome_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeMeasurementCreate, OutcomeMeasurementResponse
+
+        svc = OutcomeService(db)
+        create_data = OutcomeMeasurementCreate(**req)
+        res = await svc.add_measurement(outcome_id, principal.workspace_id, create_data)
+        return OutcomeMeasurementResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/outcomes/{outcome_id}/work")
+async def public_list_work_links(
+    outcome_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeWorkLinkResponse
+
+        svc = OutcomeService(db)
+        links = await svc.list_work_links(outcome_id, principal.workspace_id)
+        return [OutcomeWorkLinkResponse.model_validate(l).model_dump() for l in links]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/outcomes/{outcome_id}/impact")
+async def public_list_outcome_impact(
+    outcome_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import ImpactAnalysisResponse
+
+        svc = OutcomeService(db)
+        impacts = await svc.list_impact_analyses(outcome_id, principal.workspace_id)
+        return [ImpactAnalysisResponse.model_validate(i).model_dump() for i in impacts]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/outcomes/{outcome_id}/graph")
+async def public_get_outcome_graph(
+    outcome_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "outcomes:read")
+        from backend.app.services.outcomes.service import OutcomeService
+
+        svc = OutcomeService(db)
+        return (await svc.get_outcome_work_map(outcome_id, principal.workspace_id)).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/objectives/{objective_id}/milestones")
+async def public_create_milestone(
+    objective_id: str,
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeMilestoneCreate, OutcomeMilestoneResponse
+
+        svc = OutcomeService(db)
+        create_data = OutcomeMilestoneCreate(**req)
+        res = await svc.create_milestone(objective_id, principal.workspace_id, create_data)
+        return OutcomeMilestoneResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/objectives/{objective_id}/milestones")
+async def public_list_milestones(
+    objective_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import OutcomeMilestoneResponse
+
+        svc = OutcomeService(db)
+        milestones = await svc.list_milestones(objective_id, principal.workspace_id)
+        return [OutcomeMilestoneResponse.model_validate(m).model_dump() for m in milestones]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/decisions")
+async def public_create_decision(
+    req: Dict[str, Any] = Body(...),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import WorkDecisionCreate, WorkDecisionResponse
+
+        svc = OutcomeService(db)
+        create_data = WorkDecisionCreate(**req)
+        res = await svc.create_decision(principal.workspace_id, principal.principal_id, create_data)
+        return WorkDecisionResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/decisions")
+async def public_list_decisions(
+    project_id: Optional[str] = Query(None),
+    objective_id: Optional[str] = Query(None),
+    outcome_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import WorkDecisionResponse
+
+        svc = OutcomeService(db)
+        decisions = await svc.list_decisions(principal.workspace_id, project_id, objective_id, outcome_id, status, limit, offset)
+        return [WorkDecisionResponse.model_validate(d).model_dump() for d in decisions]
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/decisions/{decision_id}")
+async def public_get_decision(
+    decision_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import WorkDecisionResponse
+
+        svc = OutcomeService(db)
+        decision = await svc.get_decision(decision_id, principal.workspace_id)
+        return WorkDecisionResponse.model_validate(decision).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/decisions/{decision_id}/approve")
+async def public_approve_decision(
+    decision_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import WorkDecisionResponse
+
+        svc = OutcomeService(db)
+        res = await svc.approve_decision(decision_id, principal.workspace_id, principal.principal_id)
+        return WorkDecisionResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.post("/decisions/{decision_id}/reject")
+async def public_reject_decision(
+    decision_id: str,
+    reason: Optional[str] = Query(None),
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:write")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import WorkDecisionResponse
+
+        svc = OutcomeService(db)
+        res = await svc.reject_decision(decision_id, principal.workspace_id, principal.principal_id, reason)
+        return WorkDecisionResponse.model_validate(res).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/objectives/{objective_id}/health")
+async def public_get_objective_health(
+    objective_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:read")
+        from backend.app.services.outcomes.service import OutcomeService
+
+        svc = OutcomeService(db)
+        return (await svc.get_objective_health(objective_id, principal.workspace_id)).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/objectives/{objective_id}/impact")
+async def public_get_objective_impact(
+    objective_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:read")
+        from backend.app.services.outcomes.service import OutcomeService
+        from backend.app.services.outcomes.schemas import ImpactAnalysisResponse
+
+        svc = OutcomeService(db)
+        obj = await svc.get_objective(objective_id, principal.workspace_id)
+        all_impacts = []
+        for o in obj.outcomes:
+            for imp in o.impact_analyses:
+                all_impacts.append(ImpactAnalysisResponse.model_validate(imp).model_dump())
+        return all_impacts
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/objectives/{objective_id}/work-map")
+async def public_get_objective_work_map(
+    objective_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "objectives:read")
+        from backend.app.services.outcomes.service import OutcomeService
+
+        svc = OutcomeService(db)
+        return (await svc.get_objective_work_map(objective_id, principal.workspace_id)).model_dump()
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+

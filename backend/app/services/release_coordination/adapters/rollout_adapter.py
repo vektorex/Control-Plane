@@ -1,0 +1,2 @@
+class RolloutAdapter:
+    pass\n

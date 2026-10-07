@@ -1,0 +1,2 @@
+class ReleaseCoordinationRepository:
+    pass\n

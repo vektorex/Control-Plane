@@ -1,0 +1,2 @@
+class ReleaseTrainValidator:
+    pass\n

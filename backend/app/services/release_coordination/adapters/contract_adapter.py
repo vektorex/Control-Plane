@@ -1,0 +1,2 @@
+class ContractAdapter:
+    pass\n

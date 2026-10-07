@@ -3805,3 +3805,44 @@ async def public_resume_rollout(rollout_id: str):
 @public_v1_router.post("/rollouts/{rollout_id}/abort", tags=["rollouts"])
 async def public_abort_rollout(rollout_id: str):
     return {"status": "aborted"}
+
+
+# ---------------------------------------------------------------------------
+# Release Coordination (Step 55)
+# ---------------------------------------------------------------------------
+
+@public_v1_router.get("/release-portfolios", tags=["release_coordination"])
+async def public_list_portfolios():
+    return []
+
+@public_v1_router.get("/release-trains", tags=["release_coordination"])
+async def public_list_trains():
+    return []
+
+@public_v1_router.get("/release-trains/{train_id}", tags=["release_coordination"])
+async def public_get_train(train_id: str):
+    return {"id": train_id}
+
+@public_v1_router.get("/release-trains/{train_id}/dependencies", tags=["release_coordination"])
+async def public_get_train_dependencies(train_id: str):
+    return []
+
+@public_v1_router.get("/release-trains/{train_id}/conflicts", tags=["release_coordination"])
+async def public_get_train_conflicts(train_id: str):
+    return []
+
+@public_v1_router.get("/release-trains/{train_id}/waves", tags=["release_coordination"])
+async def public_get_train_waves(train_id: str):
+    return []
+
+@public_v1_router.post("/release-trains/{train_id}/validate", tags=["release_coordination"])
+async def public_validate_train(train_id: str):
+    return {"status": "validated"}
+
+@public_v1_router.post("/release-trains/{train_id}/schedule", tags=["release_coordination"])
+async def public_schedule_train(train_id: str):
+    return {"status": "scheduled"}
+
+@public_v1_router.get("/release-coordination/calendar", tags=["release_coordination"])
+async def public_get_coordination_calendar():
+    return []

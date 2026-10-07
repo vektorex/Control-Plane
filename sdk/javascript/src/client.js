@@ -1131,6 +1131,20 @@ export class ReservationsResource {
       requestRollback: (id) => this.request(`/v1/rollouts/${id}/rollback-request`, { method: 'POST' })
     };
   }
+
+  get releaseCoordination() {
+    return {
+      listPortfolios: () => this.request('/v1/release-portfolios'),
+      listTrains: () => this.request('/v1/release-trains'),
+      getTrain: (id) => this.request(`/v1/release-trains/${id}`),
+      getTrainDependencies: (id) => this.request(`/v1/release-trains/${id}/dependencies`),
+      getTrainConflicts: (id) => this.request(`/v1/release-trains/${id}/conflicts`),
+      getTrainWaves: (id) => this.request(`/v1/release-trains/${id}/waves`),
+      validateTrain: (id) => this.request(`/v1/release-trains/${id}/validate`, { method: 'POST' }),
+      scheduleTrain: (id) => this.request(`/v1/release-trains/${id}/schedule`, { method: 'POST' }),
+      getCalendar: () => this.request('/v1/release-coordination/calendar')
+    };
+  }
 }
 
 

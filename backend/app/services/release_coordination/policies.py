@@ -1,0 +1,2 @@
+class CoordinationPolicies:
+    pass\n

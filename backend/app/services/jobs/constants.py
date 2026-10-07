@@ -126,6 +126,13 @@ class JobType(str, Enum):
     ROLLOUT_STAGE_ADVANCE = "rollout_stage_advance"
     ROLLOUT_HEALTH_REFRESH = "rollout_health_refresh"
     ROLLOUT_ROLLBACK_REQUEST = "rollout_rollback_request"
+    RELEASE_DEPENDENCY_REFRESH = "release_dependency_refresh"
+    RELEASE_CONFLICT_DETECTION = "release_conflict_detection"
+    RELEASE_WINDOW_CHECK = "release_window_check"
+    RELEASE_TRAIN_VALIDATION = "release_train_validation"
+    RELEASE_CALENDAR_REFRESH = "release_calendar_refresh"
+    RELEASE_COORDINATION_REVALIDATION = "release_coordination_revalidation"
+
 
 
 

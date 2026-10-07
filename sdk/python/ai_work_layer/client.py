@@ -711,6 +711,15 @@ class WorkPlansResource:
     def get_blockers(self, plan_id: str) -> List[Dict[str, Any]]:
         return self._client._request("GET", f"/work-plans/{plan_id}/blockers")
 
+    def create_version(self, plan_id: str) -> Dict[str, Any]:
+        return self._client._request("POST", f"/work-plans/{plan_id}/versions")
+
+    def list_versions(self, plan_id: str) -> List[Dict[str, Any]]:
+        return self._client._request("GET", f"/work-plans/{plan_id}/versions")
+
+    def get_progress(self, plan_id: str) -> Dict[str, Any]:
+        return self._client._request("GET", f"/work-plans/{plan_id}/progress")
+
 
 class PlanningScenariosResource:
     def __init__(self, client: "Client"):

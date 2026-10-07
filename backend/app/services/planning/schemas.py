@@ -378,3 +378,35 @@ class PlanValidationResult(BaseModel):
     soft_violations: List[str]
     blockers: List[PlanningBlockerResponse]
     conflicts: List[Dict[str, Any]]
+
+
+# ---------------------------------------------------------------------------
+# Progress and Conflicts Schemas
+# ---------------------------------------------------------------------------
+
+class PlanProgressResponse(BaseModel):
+    work_plan_id: str
+    version: Optional[int] = None
+    planned: int
+    started: int
+    blocked: int
+    completed: int
+    failed: int
+    cancelled: int
+    total_items: int
+    is_derived_from_execution_state: bool = True
+    completion_percentage_fabricated: bool = False
+
+
+class PlanConflictItem(BaseModel):
+    conflict_type: str
+    affected_items: List[str]
+    evidence: List[str]
+    possible_resolutions: List[str]
+
+
+class PlanConflictsResponse(BaseModel):
+    work_plan_id: str
+    version: Optional[int] = None
+    conflicts: List[PlanConflictItem]
+    conflict_count: int

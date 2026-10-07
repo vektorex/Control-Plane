@@ -159,3 +159,57 @@ class DirectExecutionForbiddenError(PlanningError):
             code="DIRECT_EXECUTION_FORBIDDEN",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+
+
+class PermissionGrantForbiddenError(PlanningError):
+    def __init__(self, message: str = "Capability declarations describe suitability only and cannot grant authorization or permissions."):
+        super().__init__(
+            message=message,
+            code="PERMISSION_GRANT_FORBIDDEN",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+class GovernanceBypassForbiddenError(PlanningError):
+    def __init__(self, message: str = "Planning cannot override or bypass Governance policies or disablement."):
+        super().__init__(
+            message=message,
+            code="GOVERNANCE_BYPASS_FORBIDDEN",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+class HITLBypassForbiddenError(PlanningError):
+    def __init__(self, message: str = "External actions and sensitive operations require Human-in-the-Loop review and cannot be auto-executed."):
+        super().__init__(
+            message=message,
+            code="HITL_BYPASS_FORBIDDEN",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+class AutoApprovalForbiddenError(PlanningError):
+    def __init__(self, message: str = "AI-generated planning suggestions cannot become approved plans automatically without human authorization."):
+        super().__init__(
+            message=message,
+            code="AUTO_APPROVAL_FORBIDDEN",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+class CrossProjectPolicyViolationError(PlanningError):
+    def __init__(self, message: str = "Cross-project planning is blocked when project policy denies cross-project access."):
+        super().__init__(
+            message=message,
+            code="CROSS_PROJECT_POLICY_VIOLATION",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+class CompletionFalsificationForbiddenError(PlanningError):
+    def __init__(self, message: str = "Planned completion dates cannot be represented as actual completion dates."):
+        super().__init__(
+            message=message,
+            code="COMPLETION_FALSIFICATION_FORBIDDEN",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )

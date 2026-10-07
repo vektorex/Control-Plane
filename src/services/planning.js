@@ -97,6 +97,20 @@ export const planningService = {
     });
   },
 
+  async createVersion(planId) {
+    return apiClient(`/work-plans/${planId}/versions`, {
+      method: "POST",
+    });
+  },
+
+  async listVersions(planId) {
+    return apiClient(`/work-plans/${planId}/versions`);
+  },
+
+  async getPlanProgress(planId) {
+    return apiClient(`/work-plans/${planId}/progress`);
+  },
+
   // ===========================================================================
   // Resources & Capacity
   // ===========================================================================

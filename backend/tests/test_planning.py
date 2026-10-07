@@ -10,13 +10,19 @@ from backend.app.services.planning.capacity import CapacityManager
 from backend.app.services.planning.constraints import ConstraintEngine
 from backend.app.services.planning.dependency_graph import PlanningDependencyGraph
 from backend.app.services.planning.errors import (
+    AutoApprovalForbiddenError,
     CapacityExceededError,
+    CompletionFalsificationForbiddenError,
+    CrossProjectPolicyViolationError,
     DependencyCycleError,
     DirectExecutionForbiddenError,
     FabricatedCapacityError,
+    GovernanceBypassForbiddenError,
     HardConstraintViolationError,
     HiddenAggregateScoreForbiddenError,
+    HITLBypassForbiddenError,
     ImmutableVersionError,
+    PermissionGrantForbiddenError,
     PlanStaleError,
     PlanningError,
     PlanningTenantViolationError,
@@ -480,3 +486,219 @@ class TestPlanLifecycleAndVersionImmutability:
         PlanLifecycleManager.validate_transition("proposed", "approved")
         PlanLifecycleManager.validate_transition("approved", "active")
         PlanLifecycleManager.validate_transition("active", "paused")
+
+
+class TestTwentyCriticalSecurityControls:
+    """
+    Direct verification of all 20 critical security constraints specified in Step 44.
+    """
+
+    def test_1_planner_cannot_grant_permissions(self):
+        """1. Planner cannot grant permissions. Capabilities describe suitability only."""
+        with pytest.raises(PermissionGrantForbiddenError) as exc_info:
+            PlanningPolicyEngine.validate_capability_never_authorizes(has_permission=False)
+        assert "cannot grant execution permissions" in str(exc_info.value)
+
+        # Authorized call succeeds
+        PlanningPolicyEngine.validate_capability_never_authorizes(has_permission=True)
+
+    def test_2_planner_cannot_bypass_governance(self):
+        """2. Planner cannot bypass Governance."""
+        with pytest.raises(GovernanceBypassForbiddenError) as exc_info:
+            PlanningPolicyEngine.validate_governance_cannot_be_bypassed(
+                governance_allowed=False,
+                details="Tool disabled by workspace governance policy.",
+            )
+        assert "Tool disabled" in str(exc_info.value)
+
+        PlanningPolicyEngine.validate_governance_cannot_be_bypassed(governance_allowed=True)
+
+    def test_3_planner_cannot_bypass_hitl(self):
+        """3. Planner cannot bypass HITL."""
+        with pytest.raises(HITLBypassForbiddenError) as exc_info:
+            PlanningPolicyEngine.validate_hitl_cannot_be_bypassed(requires_hitl=True, hitl_approved=False)
+        assert "require explicit HITL approval" in str(exc_info.value)
+
+        PlanningPolicyEngine.validate_hitl_cannot_be_bypassed(requires_hitl=True, hitl_approved=True)
+
+    def test_4_planner_cannot_access_another_tenant_resources(self):
+        """4. Planner cannot access another tenant's resources."""
+        ws_source = "tenant-workspace-alpha"
+        ws_target = "tenant-workspace-bravo"
+        with pytest.raises(PlanningTenantViolationError):
+            PlanningPolicyEngine.validate_tenant_isolation(ws_source, ws_target)
+
+    def test_5_planner_cannot_expose_private_human_availability(self):
+        """5. Planner cannot expose private human availability."""
+        with pytest.raises(PrivacyViolationError):
+            PlanningPolicyEngine.validate_human_privacy("human", ["personal_calendar", "medical"])
+
+    def test_6_planner_cannot_reserve_capacity_without_authorization(self):
+        """6. Planner cannot reserve capacity without authorization."""
+        with pytest.raises(UnauthorizedCapacityReservationError):
+            PlanningPolicyEngine.validate_reservation_authorization(is_authorized=False)
+
+    def test_7_planner_cannot_activate_stale_plan(self):
+        """7. Planner cannot activate a stale plan."""
+        with pytest.raises(PlanStaleError):
+            PlanningPolicyEngine.validate_activation_safety(
+                is_stale=True,
+                staleness_reasons=["Workflow version updated in workspace"],
+            )
+
+    def test_8_planner_cannot_execute_work_directly(self):
+        """8. Planner cannot execute work directly."""
+        with pytest.raises(DirectExecutionForbiddenError):
+            PlanningPolicyEngine.validate_no_direct_execution()
+
+    def test_9_ai_suggestions_cannot_become_approved_plans_automatically(self):
+        """9. AI-generated planning suggestions cannot become approved plans automatically."""
+        with pytest.raises(AutoApprovalForbiddenError):
+            PlanningPolicyEngine.validate_ai_cannot_auto_approve(is_ai_generated=True, target_status="approved")
+        with pytest.raises(AutoApprovalForbiddenError):
+            PlanningPolicyEngine.validate_ai_cannot_auto_approve(is_ai_generated=True, target_status="active")
+
+        # Draft or proposed remains valid for AI suggestions
+        PlanningPolicyEngine.validate_ai_cannot_auto_approve(is_ai_generated=True, target_status="proposed")
+
+    def test_10_hard_security_constraints_cannot_be_overridden_by_optimization(self):
+        """10. Hard security constraints cannot be overridden by optimization."""
+        constraint = PlanningConstraint(
+            id="c-sec",
+            work_plan_version_id="v-1",
+            constraint_type="security",
+            configuration={"policy_denied": True, "policy_name": "data_egress_policy"},
+            hard_constraint=True,
+        )
+        with pytest.raises(HardConstraintViolationError):
+            ConstraintEngine.evaluate_all(
+                constraints=[constraint],
+                candidate_schedule={"project_end": "2026-10-07T00:00:00Z"},
+                raise_on_hard_violation=True,
+            )
+
+    def test_11_capacity_data_cannot_be_fabricated(self):
+        """11. Capacity data cannot be fabricated."""
+        with pytest.raises(FabricatedCapacityError):
+            PlanningPolicyEngine.validate_no_fabricated_capacity(source="unknown", units=25.0)
+
+    def test_12_unknown_availability_is_represented_as_unknown(self):
+        """12. Unknown availability is represented as unknown."""
+        now = datetime.now(timezone.utc)
+        human_res = WorkResource(
+            id="h-unknown",
+            workspace_id="ws-1",
+            resource_type="human",
+            resource_ref="u-1",
+            name="Alice",
+            status="active",
+        )
+        cap = CapacityManager.calculate_resource_capacity(
+            resource=human_res,
+            availabilities=[],  # No declared availability
+            reservations=[],
+            window_start=now,
+            window_end=now + timedelta(days=7),
+        )
+        assert cap["is_unknown"] is True
+        assert cap["available_units"] == 0.0
+        assert cap["source"] == "unknown"
+
+    def test_13_planned_completion_cannot_be_represented_as_actual_completion(self):
+        """13. Planned completion cannot be represented as actual completion."""
+        now = datetime.now(timezone.utc)
+        with pytest.raises(CompletionFalsificationForbiddenError):
+            PlanningPolicyEngine.validate_planned_vs_actual_completion(
+                planned_end=now,
+                actual_end=now,
+                status="planned",  # Not completed yet
+            )
+
+    def test_14_forecast_values_are_labeled_as_forecasts(self):
+        """14. Forecast values are labeled as forecasts."""
+        now = datetime.now(timezone.utc)
+        forecast = CapacityManager.generate_capacity_forecast(
+            resources=[],
+            availabilities=[],
+            reservations=[],
+            planned_demands=[],
+            period_start=now,
+            period_end=now + timedelta(days=7),
+        )
+        assert forecast["is_forecast"] is True
+
+    def test_15_no_subjective_employee_productivity_ranking(self):
+        """15. No subjective employee productivity ranking is created."""
+        with pytest.raises(SubjectiveRankingForbiddenError):
+            PlanningPolicyEngine.validate_no_subjective_rankings("Delegate to the top performer")
+
+    def test_16_no_hidden_aggregate_optimization_score(self):
+        """16. No hidden aggregate optimization score is created."""
+        with pytest.raises(HiddenAggregateScoreForbiddenError):
+            PlanningPolicyEngine.validate_no_hidden_aggregate_score({"aggregate_intelligence": 99.5})
+
+    def test_17_existing_agent_runtime_limits_remain_enforced(self):
+        """17. Existing AgentRuntime limits remain enforced."""
+        res = WorkResource(
+            id="agent-limit",
+            workspace_id="ws-1",
+            resource_type="agent",
+            resource_ref="agent-1",
+            name="Worker Agent",
+            status="active",
+            capabilities=["code"],
+            availability_policy={"max_concurrent_runs": 1},
+        )
+        match = ResourceMatcher.match_item_to_resource(
+            item_capabilities=["code"],
+            resource=res,
+            current_concurrency=1,  # limit reached
+        )
+        assert match.matched is False
+        assert match.concurrency_ok is False
+
+    def test_18_existing_workflow_limits_remain_enforced(self):
+        """18. Existing workflow limits remain enforced."""
+        constraint = PlanningConstraint(
+            id="c-wf",
+            work_plan_version_id="v-1",
+            constraint_type="concurrency",
+            configuration={"max_concurrency": 2},
+            hard_constraint=True,
+        )
+        check = ConstraintEngine.evaluate_constraint(
+            constraint=constraint,
+            candidate_schedule={"peak_concurrency": 4},
+        )
+        assert check.satisfied is False
+
+    def test_19_existing_budget_limits_remain_enforced(self):
+        """19. Existing budget limits remain enforced."""
+        constraint = PlanningConstraint(
+            id="c-budget",
+            work_plan_version_id="v-1",
+            constraint_type="budget",
+            configuration={"max_cost": 50.0},
+            hard_constraint=True,
+        )
+        check = ConstraintEngine.evaluate_constraint(
+            constraint=constraint,
+            candidate_schedule={"estimated_cost": 85.50},
+        )
+        assert check.satisfied is False
+
+    def test_20_cross_project_planning_blocked_when_policy_denies_access(self):
+        """20. Cross-project planning is blocked when policy denies access."""
+        with pytest.raises(CrossProjectPolicyViolationError):
+            PlanningPolicyEngine.validate_cross_project_planning(
+                plan_project_id="project-alpha",
+                resource_project_id="project-beta",
+                policy_allows_cross_project=False,
+            )
+
+        # Cross-project allowed passes
+        PlanningPolicyEngine.validate_cross_project_planning(
+            plan_project_id="project-alpha",
+            resource_project_id="project-beta",
+            policy_allows_cross_project=True,
+        )

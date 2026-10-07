@@ -48,6 +48,8 @@ from backend.app.services.planning.schemas import (
     WorkPlanUpdate,
     WorkResourceCreate,
 )
+from backend.app.services.planning.dependency_graph import PlanningDependencyGraph
+from backend.app.services.planning.resources import ResourceMatcher
 from backend.app.services.planning.scenarios import ScenarioEngine
 from backend.app.services.planning.validators import PlanValidator
 
@@ -146,6 +148,221 @@ class PlanningService:
         plan.updated_at = datetime.now(timezone.utc)
         await self.session.commit()
         return plan
+
+    async def create_version(
+        self,
+        plan_id: str,
+        workspace_id: str,
+        user_id: str,
+    ) -> WorkPlanVersion:
+        plan = await self.get_plan(plan_id, workspace_id)
+        latest_ver = await self.repo.get_latest_version(plan.id)
+        next_ver_num = (latest_ver.version + 1) if latest_ver else 1
+
+        # Publish the prior version if it wasn't published yet
+        if latest_ver and latest_ver.published_at is None:
+            latest_ver.published_at = datetime.now(timezone.utc)
+
+        items = await self.repo.list_items_for_version(latest_ver.id) if latest_ver else []
+        constraints = await self.repo.list_constraints_for_version(latest_ver.id) if latest_ver else []
+
+        new_version = WorkPlanVersion(
+            work_plan_id=plan.id,
+            version=next_ver_num,
+            plan_snapshot={
+                "items_count": len(items),
+                "name": plan.name,
+                "status": plan.status,
+            },
+            constraint_snapshot={
+                "constraints_count": len(constraints),
+            },
+            capacity_snapshot={},
+            resource_snapshot={},
+            created_by=user_id,
+        )
+        created = await self.repo.create_version(new_version)
+
+        # Clone items and constraints from previous version to new version
+        for it in items:
+            cloned_it = PlanningItem(
+                work_plan_version_id=created.id,
+                resource_type=it.resource_type,
+                resource_id=it.resource_id,
+                name=it.name,
+                description=it.description,
+                priority=it.priority,
+                estimated_duration=it.estimated_duration,
+                estimated_cost=it.estimated_cost,
+                required_capabilities=list(it.required_capabilities or []),
+                status=it.status,
+                planned_start=it.planned_start,
+                planned_end=it.planned_end,
+                actual_start=it.actual_start,
+                actual_end=it.actual_end,
+            )
+            await self.repo.create_item(cloned_it)
+
+        for c in constraints:
+            cloned_c = PlanningConstraint(
+                work_plan_version_id=created.id,
+                constraint_type=c.constraint_type,
+                configuration=dict(c.configuration or {}),
+                priority=c.priority,
+                hard_constraint=c.hard_constraint,
+            )
+            await self.repo.create_constraint(cloned_c)
+
+        await self.session.commit()
+
+        await self.events.emit_plan_event(
+            event_type="work_plan.version_created",
+            workspace_id=workspace_id,
+            plan_id=plan.id,
+            payload={"version": created.version, "version_id": created.id},
+            actor_id=user_id,
+        )
+        return created
+
+    async def list_versions(
+        self,
+        plan_id: str,
+        workspace_id: str,
+    ) -> List[WorkPlanVersion]:
+        plan = await self.get_plan(plan_id, workspace_id)
+        return plan.versions
+
+    async def get_plan_progress(
+        self,
+        plan_id: str,
+        workspace_id: str,
+    ) -> Dict[str, Any]:
+        plan = await self.get_plan(plan_id, workspace_id)
+        latest_ver = await self.repo.get_latest_version(plan.id)
+        if not latest_ver:
+            return {
+                "work_plan_id": plan.id,
+                "version": None,
+                "planned": 0,
+                "started": 0,
+                "blocked": 0,
+                "completed": 0,
+                "failed": 0,
+                "cancelled": 0,
+                "total_items": 0,
+                "is_derived_from_execution_state": True,
+                "completion_percentage_fabricated": False,
+            }
+
+        items = await self.repo.list_items_for_version(latest_ver.id)
+        planned = sum(1 for it in items if it.status in ("planned", "draft", "pending"))
+        started = sum(1 for it in items if it.status in ("started", "in_progress", "running"))
+        blocked = sum(1 for it in items if it.status == "blocked")
+        completed = sum(1 for it in items if it.status == "completed")
+        failed = sum(1 for it in items if it.status == "failed")
+        cancelled = sum(1 for it in items if it.status == "cancelled")
+
+        return {
+            "work_plan_id": plan.id,
+            "version": latest_ver.version,
+            "planned": planned,
+            "started": started,
+            "blocked": blocked,
+            "completed": completed,
+            "failed": failed,
+            "cancelled": cancelled,
+            "total_items": len(items),
+            "is_derived_from_execution_state": True,
+            "completion_percentage_fabricated": False,
+        }
+
+    async def detect_conflicts(
+        self,
+        plan_id: str,
+        workspace_id: str,
+    ) -> Dict[str, Any]:
+        plan = await self.get_plan(plan_id, workspace_id)
+        latest_ver = await self.repo.get_latest_version(plan.id)
+        if not latest_ver:
+            return {"work_plan_id": plan.id, "version": None, "conflicts": [], "conflict_count": 0}
+
+        items = await self.repo.list_items_for_version(latest_ver.id)
+        deps = await self.repo.list_dependencies_for_version(latest_ver.id)
+        resources = await self.repo.list_resources(workspace_id)
+        constraints = await self.repo.list_constraints_for_version(latest_ver.id)
+
+        conflicts = []
+
+        # 1. Dependency cycles
+        graph = PlanningDependencyGraph()
+        for it in items:
+            graph.add_node(it.id, float(it.estimated_duration or 30))
+        for dep in deps:
+            graph.add_edge(dep.predecessor_item_id, dep.successor_item_id, dep.dependency_type, dep.lag)
+
+        cycle = graph.detect_cycles()
+        if cycle:
+            conflicts.append({
+                "conflict_type": "dependency_conflict",
+                "affected_items": cycle,
+                "evidence": [f"Cyclic dependency path: {' -> '.join(cycle)}"],
+                "possible_resolutions": [
+                    "Remove redundant dependency edge",
+                    "Sequence tasks asynchronously with decoupled inputs",
+                ],
+            })
+
+        # 2. Capability mismatch
+        for it in items:
+            req_caps = it.required_capabilities or []
+            if req_caps:
+                matches = ResourceMatcher.find_matching_resources(req_caps, resources)
+                if not any(m.matched for m in matches):
+                    conflicts.append({
+                        "conflict_type": "capability_conflict",
+                        "affected_items": [it.id],
+                        "evidence": [f"Item '{it.name}' requires {req_caps}; no matching active resource in workspace."],
+                        "possible_resolutions": [
+                            "Register an agent with required capabilities",
+                            "Assign an authorized human or workflow",
+                        ],
+                    })
+
+        # 3. Constraints (deadline or budget)
+        for c in constraints:
+            if c.constraint_type == "deadline":
+                deadline_val = c.configuration.get("deadline")
+                if deadline_val and plan.planning_horizon_end:
+                    if plan.planning_horizon_end.isoformat() > str(deadline_val):
+                        conflicts.append({
+                            "conflict_type": "deadline_conflict",
+                            "affected_items": [it.id for it in items],
+                            "evidence": [f"Plan horizon end exceeds constraint deadline {deadline_val}."],
+                            "possible_resolutions": [
+                                "Adjust deadline with stakeholder approval",
+                                "Reduce scope or split tasks",
+                            ],
+                        })
+            elif c.constraint_type == "budget":
+                max_cost = float(c.configuration.get("max_cost", 0.0))
+                total_est = sum(float(it.estimated_cost or 0.0) for it in items)
+                if max_cost > 0 and total_est > max_cost:
+                    conflicts.append({
+                        "conflict_type": "budget_conflict",
+                        "affected_items": [it.id for it in items if it.estimated_cost],
+                        "evidence": [f"Total estimated cost ${total_est:.2f} exceeds budget limit ${max_cost:.2f}."],
+                        "possible_resolutions": [
+                            "Use lower-cost model tiers",
+                            "Request budget increase",
+                        ],
+                    })
+
+        return {
+            "work_plan_id": plan.id,
+            "version": latest_ver.version,
+            "conflicts": conflicts,
+            "conflict_count": len(conflicts),
+        }
 
     # -----------------------------------------------------------------------
     # Planning Items & Dependencies

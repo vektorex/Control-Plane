@@ -61,6 +61,8 @@ from backend.app.services.planning.schemas import (
     WorkResourceCreate,
     WorkResourceResponse,
     WorkloadSnapshotResponse,
+    PlanProgressResponse,
+    PlanConflictsResponse,
 )
 from backend.app.services.planning.service import PlanningService
 
@@ -157,6 +159,38 @@ async def update_work_plan(
     try:
         plan = await svc.update_plan(plan_id, ws_id, data)
         return WorkPlanResponse.model_validate(plan)
+    except Exception as ex:
+        _handle_planning_exception(ex)
+
+
+@work_plans_router.post("/{plan_id}/versions", response_model=WorkPlanVersionResponse, status_code=status.HTTP_201_CREATED)
+async def create_work_plan_version(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    x_workspace_id: Optional[str] = Header(None),
+):
+    ws_id = _extract_workspace(current_user, x_workspace_id)
+    svc = PlanningService(db)
+    try:
+        ver = await svc.create_version(plan_id, ws_id, str(current_user.id))
+        return WorkPlanVersionResponse.model_validate(ver)
+    except Exception as ex:
+        _handle_planning_exception(ex)
+
+
+@work_plans_router.get("/{plan_id}/versions", response_model=List[WorkPlanVersionResponse])
+async def list_work_plan_versions(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    x_workspace_id: Optional[str] = Header(None),
+):
+    ws_id = _extract_workspace(current_user, x_workspace_id)
+    svc = PlanningService(db)
+    try:
+        versions = await svc.list_versions(plan_id, ws_id)
+        return [WorkPlanVersionResponse.model_validate(v) for v in versions]
     except Exception as ex:
         _handle_planning_exception(ex)
 
@@ -314,7 +348,7 @@ async def get_plan_resources(
         _handle_planning_exception(ex)
 
 
-@work_plans_router.get("/{plan_id}/conflicts")
+@work_plans_router.get("/{plan_id}/conflicts", response_model=PlanConflictsResponse)
 async def get_plan_conflicts(
     plan_id: str,
     current_user: User = Depends(get_current_user),
@@ -324,8 +358,24 @@ async def get_plan_conflicts(
     ws_id = _extract_workspace(current_user, x_workspace_id)
     svc = PlanningService(db)
     try:
-        val = await svc.validate_plan(plan_id, ws_id)
-        return {"conflicts": val.get("conflicts", []), "hard_violations": val.get("hard_violations", [])}
+        conflicts_data = await svc.detect_conflicts(plan_id, ws_id)
+        return PlanConflictsResponse(**conflicts_data)
+    except Exception as ex:
+        _handle_planning_exception(ex)
+
+
+@work_plans_router.get("/{plan_id}/progress", response_model=PlanProgressResponse)
+async def get_plan_progress(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    x_workspace_id: Optional[str] = Header(None),
+):
+    ws_id = _extract_workspace(current_user, x_workspace_id)
+    svc = PlanningService(db)
+    try:
+        prog = await svc.get_plan_progress(plan_id, ws_id)
+        return PlanProgressResponse(**prog)
     except Exception as ex:
         _handle_planning_exception(ex)
 

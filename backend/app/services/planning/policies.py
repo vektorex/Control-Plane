@@ -3,10 +3,16 @@ Policy Engine and Safety Guardrails for Step 44: AI Work Planning, Capacity & Re
 """
 from typing import Any, Dict, List, Optional
 from backend.app.services.planning.errors import (
+    AutoApprovalForbiddenError,
+    CompletionFalsificationForbiddenError,
+    CrossProjectPolicyViolationError,
     DirectExecutionForbiddenError,
     FabricatedCapacityError,
+    GovernanceBypassForbiddenError,
     HardConstraintViolationError,
     HiddenAggregateScoreForbiddenError,
+    HITLBypassForbiddenError,
+    PermissionGrantForbiddenError,
     PlanStaleError,
     PlanningTenantViolationError,
     PrivacyViolationError,
@@ -119,3 +125,63 @@ class PlanningPolicyEngine:
         """Rejects fabricated capacity or availability."""
         if source == "unknown" and units > 0:
             raise FabricatedCapacityError("Cannot assign non-zero capacity to a source marked as 'unknown'.")
+
+    @staticmethod
+    def validate_capability_never_authorizes(has_permission: bool) -> None:
+        """
+        Capability declarations describe suitability only and never grant authorization.
+        Actual permissions still come from RBAC, Governance, and Connector permissions.
+        """
+        if not has_permission:
+            raise PermissionGrantForbiddenError(
+                "Resource suitability or capability declaration cannot grant execution permissions without explicit RBAC/Governance authorization."
+            )
+
+    @staticmethod
+    def validate_governance_cannot_be_bypassed(governance_allowed: bool, details: Optional[str] = None) -> None:
+        """Planning cannot override or weaken Governance decisions."""
+        if not governance_allowed:
+            raise GovernanceBypassForbiddenError(
+                f"Planning cannot bypass Governance constraints: {details or 'Governance policy denies execution.'}"
+            )
+
+    @staticmethod
+    def validate_hitl_cannot_be_bypassed(requires_hitl: bool, hitl_approved: bool) -> None:
+        """External actions and sensitive operations require human review and cannot bypass HITL."""
+        if requires_hitl and not hitl_approved:
+            raise HITLBypassForbiddenError(
+                "External actions and high-risk plan items require explicit HITL approval and cannot proceed autonomously."
+            )
+
+    @staticmethod
+    def validate_ai_cannot_auto_approve(is_ai_generated: bool, target_status: str) -> None:
+        """AI-generated planning suggestions cannot become approved plans automatically."""
+        if is_ai_generated and target_status in ("approved", "active"):
+            raise AutoApprovalForbiddenError(
+                "AI-generated plan proposals cannot be set to 'approved' or 'active' without authorized human review."
+            )
+
+    @staticmethod
+    def validate_cross_project_planning(
+        plan_project_id: Optional[str],
+        resource_project_id: Optional[str],
+        policy_allows_cross_project: bool = True,
+    ) -> None:
+        """Cross-project planning is blocked when policy denies cross-project access."""
+        if plan_project_id and resource_project_id and plan_project_id != resource_project_id:
+            if not policy_allows_cross_project:
+                raise CrossProjectPolicyViolationError(
+                    f"Resource is scoped to project '{resource_project_id}' and cannot be planned for project '{plan_project_id}' without cross-project authorization."
+                )
+
+    @staticmethod
+    def validate_planned_vs_actual_completion(
+        planned_end: Optional[Any],
+        actual_end: Optional[Any],
+        status: str,
+    ) -> None:
+        """Planned completion must never be represented as actual completion."""
+        if status != "completed" and actual_end is not None:
+            raise CompletionFalsificationForbiddenError(
+                "Incomplete work items cannot have an actual_end timestamp recorded."
+            )

@@ -3,6 +3,7 @@ Planning Engines: RuleBasedPlanner, AIPlanningAssistant, and HybridPlanningEngin
 """
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from backend.app.services.ai_gateway import AIGateway, GatewayRequest, default_ai_gateway
 from backend.app.services.planning.constraints import ConstraintEngine
 from backend.app.services.planning.dependency_graph import PlanningDependencyGraph
 from backend.app.services.planning.models import (
@@ -60,9 +61,12 @@ class RuleBasedPlanner:
 class AIPlanningAssistant:
     """
     Optional AI-assisted planning helper.
-    Interprets goals and suggests decomposition and assignments.
+    Interprets goals and suggests decomposition and assignments using AIGateway.
     AI suggestions must be validated by deterministic rules and cannot override hard constraints.
     """
+
+    def __init__(self, ai_gateway: Optional[AIGateway] = None):
+        self.gateway = ai_gateway or default_ai_gateway
 
     @classmethod
     async def suggest_plan_enhancements(
@@ -70,6 +74,7 @@ class AIPlanningAssistant:
         goal_description: str,
         items: List[PlanningItem],
         resources: List[WorkResource],
+        ai_gateway: Optional[AIGateway] = None,
     ) -> Dict[str, Any]:
         # Structured advice proposal
         suggested_decompositions = []
@@ -81,13 +86,41 @@ class AIPlanningAssistant:
                     "reason": f"Item '{it.name}' duration ({it.estimated_duration} mins) exceeds 2 hours; splitting reduces blocker risk.",
                 })
 
+        bottleneck_insights = [
+            "Ensure required human approvals have assigned reviewers in advance.",
+            "Verify connector rate limits for data-intensive workflow steps.",
+        ]
+        gateway_used = False
+
+        gw = ai_gateway or default_ai_gateway
+        if gw:
+            try:
+                prompt = (
+                    f"Analyze work plan for goal: {goal_description}\n"
+                    f"Items count: {len(items)}\n"
+                    f"Resources count: {len(resources)}\n"
+                    "Suggest missing constraints or potential bottlenecks.\n"
+                    "Do NOT invent constraints, fake capacity, or subjective ratings."
+                )
+                req = GatewayRequest(
+                    prompt=prompt,
+                    model_preference="fast",
+                    temperature=0.1,
+                    max_tokens=300,
+                )
+                resp = await gw.execute(req)
+                if resp and hasattr(resp, "content") and resp.content:
+                    bottleneck_insights.append(str(resp.content)[:200])
+                    gateway_used = True
+            except Exception:
+                pass
+
         return {
             "ai_suggestions_labeled": True,
             "is_proposal": True,
+            "gateway_used": gateway_used,
             "suggested_decompositions": suggested_decompositions,
-            "bottleneck_insights": [
-                "Ensure required human approvals have assigned reviewers in advance."
-            ],
+            "bottleneck_insights": bottleneck_insights,
         }
 
 

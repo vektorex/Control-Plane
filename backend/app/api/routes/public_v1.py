@@ -3369,8 +3369,23 @@ async def public_get_work_plan_conflicts(
         from backend.app.services.planning.service import PlanningService
 
         svc = PlanningService(db)
-        val = await svc.validate_plan(plan_id, principal.workspace_id)
-        return {"conflicts": val.get("conflicts", []), "hard_violations": val.get("hard_violations", [])}
+        return await svc.detect_conflicts(plan_id, principal.workspace_id)
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+
+@public_v1_router.get("/work-plans/{plan_id}/progress")
+async def public_get_work_plan_progress(
+    plan_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "plans:read")
+        from backend.app.services.planning.service import PlanningService
+
+        svc = PlanningService(db)
+        return await svc.get_plan_progress(plan_id, principal.workspace_id)
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)
 

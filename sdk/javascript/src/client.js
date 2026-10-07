@@ -973,6 +973,18 @@ export class WorkPlansResource {
   async getBlockers(planId) {
     return this.client.request("GET", `/work-plans/${planId}/blockers`);
   }
+
+  async createVersion(planId) {
+    return this.client.request("POST", `/work-plans/${planId}/versions`);
+  }
+
+  async listVersions(planId) {
+    return this.client.request("GET", `/work-plans/${planId}/versions`);
+  }
+
+  async getProgress(planId) {
+    return this.client.request("GET", `/work-plans/${planId}/progress`);
+  }
 }
 
 export class PlanningScenariosResource {

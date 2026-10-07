@@ -66,6 +66,7 @@ from backend.app.api.routes.planning import (
     capacity_router,
     reservations_router,
 )
+from backend.app.api.routes.control_tower import router as control_tower_router
 from backend.app.api.routes.public_v1 import public_v1_router
 
 api_router = APIRouter(prefix="/api")
@@ -132,6 +133,7 @@ api_router.include_router(planning_scenarios_router)
 api_router.include_router(resources_router)
 api_router.include_router(capacity_router)
 api_router.include_router(reservations_router)
+api_router.include_router(control_tower_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

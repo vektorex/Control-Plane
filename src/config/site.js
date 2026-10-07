@@ -19,6 +19,12 @@ export const siteConfig = {
       description: "System overview, active workloads, and orchestration status",
     },
     {
+      label: "Control Tower",
+      href: "/app/control-tower",
+      icon: "Activity",
+      description: "Unified command center for real-time visibility",
+    },
+    {
       label: "Tasks",
       href: "/app/tasks",
       icon: "ListTodo",

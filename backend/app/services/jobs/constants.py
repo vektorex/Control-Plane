@@ -98,6 +98,11 @@ class JobType(str, Enum):
     PLANNING_SCENARIO = "planning_scenario"
     PLAN_STALENESS_CHECK = "plan_staleness_check"
     PLANNING_RECOMMENDATION = "planning_recommendation"
+    # Step 45: Control Tower jobs
+    CONTROL_TOWER_SNAPSHOT = "control_tower_snapshot"
+    CONTROL_TOWER_REFRESH = "control_tower_refresh"
+    ATTENTION_RECONCILIATION = "attention_reconciliation"
+    WORKSTREAM_REFRESH = "workstream_refresh"
 
 
 class JobEventType(str, Enum):

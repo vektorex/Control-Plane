@@ -1,0 +1,2 @@
+class StageManager:
+    pass\n

@@ -1,0 +1,2 @@
+class RolloutEventDispatcher:
+    pass\n

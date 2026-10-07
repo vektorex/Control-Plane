@@ -76,6 +76,7 @@ from backend.app.api.routes.intent import router as intent_router
 from backend.app.api.routes.decisions import router as decisions_router
 from backend.app.api.endpoints.changes import router as changes_router
 from backend.app.api.endpoints.releases import router as releases_router
+from backend.app.api.endpoints.rollouts import router as rollouts_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -150,6 +151,7 @@ api_router.include_router(intent_router)
 api_router.include_router(decisions_router)
 api_router.include_router(changes_router, prefix='/changes', tags=['changes'])
 api_router.include_router(releases_router, prefix='/releases', tags=['releases'])
+api_router.include_router(rollouts_router, prefix='/rollouts', tags=['rollouts'])
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

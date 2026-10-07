@@ -1,0 +1,2 @@
+class RollbackDelegator:
+    pass\n

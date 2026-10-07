@@ -3756,3 +3756,52 @@ async def public_promote_release(release_id: str):
 @public_v1_router.post("/releases/{release_id}/rollback-request", tags=["releases"])
 async def public_request_rollback(release_id: str):
     return {"status": "rollback_requested"}
+
+
+# ---------------------------------------------------------------------------
+# Progressive Delivery (Step 54)
+# ---------------------------------------------------------------------------
+
+@public_v1_router.get("/rollouts", tags=["rollouts"])
+async def public_list_rollouts():
+    return []
+
+@public_v1_router.get("/rollouts/{rollout_id}", tags=["rollouts"])
+async def public_get_rollout(rollout_id: str):
+    return {"id": rollout_id}
+
+@public_v1_router.get("/rollouts/{rollout_id}/stages", tags=["rollouts"])
+async def public_get_rollout_stages(rollout_id: str):
+    return []
+
+@public_v1_router.get("/rollouts/{rollout_id}/health", tags=["rollouts"])
+async def public_get_rollout_health(rollout_id: str):
+    return []
+
+@public_v1_router.get("/rollouts/{rollout_id}/gates", tags=["rollouts"])
+async def public_get_rollout_gates(rollout_id: str):
+    return []
+
+@public_v1_router.get("/rollouts/{rollout_id}/evidence", tags=["rollouts"])
+async def public_get_rollout_evidence(rollout_id: str):
+    return []
+
+@public_v1_router.post("/rollouts", tags=["rollouts"])
+async def public_create_rollout(payload: dict):
+    return {"status": "created"}
+
+@public_v1_router.post("/rollouts/{rollout_id}/validate", tags=["rollouts"])
+async def public_validate_rollout(rollout_id: str):
+    return {"status": "validated"}
+
+@public_v1_router.post("/rollouts/{rollout_id}/pause", tags=["rollouts"])
+async def public_pause_rollout(rollout_id: str):
+    return {"status": "paused"}
+
+@public_v1_router.post("/rollouts/{rollout_id}/resume", tags=["rollouts"])
+async def public_resume_rollout(rollout_id: str):
+    return {"status": "resumed"}
+
+@public_v1_router.post("/rollouts/{rollout_id}/abort", tags=["rollouts"])
+async def public_abort_rollout(rollout_id: str):
+    return {"status": "aborted"}

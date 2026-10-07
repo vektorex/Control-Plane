@@ -1112,6 +1112,25 @@ export class ReservationsResource {
       timeline: (id) => this.request(`/v1/releases/${id}/timeline`)
     };
   }
+
+  get rollouts() {
+    return {
+      list: () => this.request('/v1/rollouts'),
+      get: (id) => this.request(`/v1/rollouts/${id}`),
+      create: (payload) => this.request('/v1/rollouts', { method: 'POST', body: payload }),
+      validate: (id) => this.request(`/v1/rollouts/${id}/validate`, { method: 'POST' }),
+      start: (id) => this.request(`/v1/rollouts/${id}/start`, { method: 'POST' }),
+      pause: (id) => this.request(`/v1/rollouts/${id}/pause`, { method: 'POST' }),
+      resume: (id) => this.request(`/v1/rollouts/${id}/resume`, { method: 'POST' }),
+      abort: (id) => this.request(`/v1/rollouts/${id}/abort`, { method: 'POST' }),
+      stages: (id) => this.request(`/v1/rollouts/${id}/stages`),
+      health: (id) => this.request(`/v1/rollouts/${id}/health`),
+      comparison: (id) => this.request(`/v1/rollouts/${id}/comparison`),
+      gates: (id) => this.request(`/v1/rollouts/${id}/gates`),
+      evidence: (id) => this.request(`/v1/rollouts/${id}/evidence`),
+      requestRollback: (id) => this.request(`/v1/rollouts/${id}/rollback-request`, { method: 'POST' })
+    };
+  }
 }
 
 

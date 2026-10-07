@@ -119,6 +119,14 @@ class JobType(str, Enum):
     RELEASE_OBSERVATION = "release_observation"
     RELEASE_PROMOTION = "release_promotion"
     RELEASE_ROLLBACK = "release_rollback"
+    ROLLOUT_VALIDATION = "rollout_validation"
+    ROLLOUT_STAGE_START = "rollout_stage_start"
+    ROLLOUT_OBSERVATION = "rollout_observation"
+    ROLLOUT_GATE_EVALUATION = "rollout_gate_evaluation"
+    ROLLOUT_STAGE_ADVANCE = "rollout_stage_advance"
+    ROLLOUT_HEALTH_REFRESH = "rollout_health_refresh"
+    ROLLOUT_ROLLBACK_REQUEST = "rollout_rollback_request"
+
 
 
 

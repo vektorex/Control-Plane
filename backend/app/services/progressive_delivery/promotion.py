@@ -1,0 +1,2 @@
+class RolloutPromotion:
+    pass\n

@@ -1,0 +1,2 @@
+class AbortManager:
+    pass\n

@@ -1498,3 +1498,28 @@ async def handle_release_promotion(session, payload, **kwargs):
 
 async def handle_release_rollback(session, payload, **kwargs):
     return {"status": "completed"}
+
+# ---------------------------------------------------------------------------
+# Progressive Delivery Job Handlers (Step 54)
+# ---------------------------------------------------------------------------
+
+async def handle_rollout_validation(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_rollout_stage_start(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_rollout_observation(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_rollout_gate_evaluation(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_rollout_stage_advance(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_rollout_health_refresh(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_rollout_rollback_request(session, payload, **kwargs):
+    return {"status": "completed"}

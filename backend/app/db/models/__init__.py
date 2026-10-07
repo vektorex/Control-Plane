@@ -526,3 +526,5 @@ __all__ = [
 
 
 from backend.app.db.models.release import Release, ReleaseCandidate, ReleaseEnvironment, ReleasePlan, ReleaseStageRecord, ReleaseFreeze, ReleaseLock, ReleaseObservation, ReleaseVerification, ReleaseRollback, ReleaseEvidence, ReleaseTimelineEvent
+
+from backend.app.db.models.progressive_delivery import ProgressiveRollout, RolloutPlan, RolloutStage, RolloutTarget, RolloutCohort, RolloutHealthSnapshot, RolloutComparison, RolloutGate, RolloutEvidence, RolloutTimelineEvent, RolloutPause

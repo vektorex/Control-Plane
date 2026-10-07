@@ -234,6 +234,14 @@ from backend.app.services.planning.models import (
     PlanningRecommendation,
     PlanStalenessRecord,
 )
+from backend.app.db.models.organizational_knowledge import (
+    OrganizationalKnowledgeItem,
+    KnowledgeProvenance,
+    KnowledgeEvidence,
+    KnowledgeVersion,
+    KnowledgeCandidate,
+    KnowledgeConflict,
+)
 
 
 __all__ = [
@@ -436,6 +444,12 @@ __all__ = [
     "PlanningScenario",
     "PlanningRecommendation",
     "PlanStalenessRecord",
+    "OrganizationalKnowledgeItem",
+    "KnowledgeProvenance",
+    "KnowledgeEvidence",
+    "KnowledgeVersion",
+    "KnowledgeCandidate",
+    "KnowledgeConflict",
 ]
 
 

@@ -1,0 +1,1 @@
+export default function ContractImpact() { return <div />; }

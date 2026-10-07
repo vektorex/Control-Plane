@@ -1072,6 +1072,22 @@ export class ReservationsResource {
       refresh: (id) => this.request(`/v1/decisions/${id}/refresh`, { method: 'POST' }),
     };
   }
+
+  get changes() {
+    return {
+      list: () => this.request('/v1/changes'),
+      get: (id) => this.request(`/v1/changes/${id}`),
+      create: (payload) => this.request('/v1/changes', { method: 'POST', body: payload }),
+      parse: (id) => this.request(`/v1/changes/${id}/parse`, { method: 'POST' }),
+      analyze: (id) => this.request(`/v1/changes/${id}/analyze`, { method: 'POST' }),
+      impact: (id) => this.request(`/v1/changes/${id}/impact`),
+      risks: (id) => this.request(`/v1/changes/${id}/risks`),
+      evidence: (id) => this.request(`/v1/changes/${id}/evidence`),
+      revalidation: (id) => this.request(`/v1/changes/${id}/revalidation`),
+      rollback: (id) => this.request(`/v1/changes/${id}/rollback`),
+      simulate: (id) => this.request(`/v1/changes/${id}/simulate`, { method: 'POST' })
+    };
+  }
 }
 
 

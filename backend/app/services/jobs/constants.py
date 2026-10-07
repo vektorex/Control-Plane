@@ -108,6 +108,12 @@ class JobType(str, Enum):
     DECISION_EVIDENCE_REFRESH = "decision_evidence_refresh"
     DECISION_READINESS_REFRESH = "decision_readiness_refresh"
     DECISION_FRESHNESS_CHECK = "decision_freshness_check"
+    CHANGE_ANALYSIS = "change_analysis"
+    CHANGE_DEPENDENCY_REFRESH = "change_dependency_refresh"
+    CHANGE_IMPACT_REFRESH = "change_impact_refresh"
+    CHANGE_SIMULATION = "change_simulation"
+    CHANGE_FRESHNESS_CHECK = "change_freshness_check"
+
 
 
 class JobEventType(str, Enum):

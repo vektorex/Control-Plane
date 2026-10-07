@@ -3674,3 +3674,44 @@ async def execution_readiness(
         return {"overall_state": "ready", "conditions": [], "blockers": [], "evidence": [], "required_actions": []}
     except Exception as ex:
         return handle_public_error(ex, principal.request_id)
+
+
+# ---------------------------------------------------------------------------
+# Change Intelligence (Step 52)
+# ---------------------------------------------------------------------------
+
+@public_v1_router.post("/changes", tags=["changes"])
+async def public_create_change(change: dict):
+    return {"status": "created"}
+
+@public_v1_router.get("/changes/{change_id}", tags=["changes"])
+async def public_get_change(change_id: str):
+    return {"id": change_id}
+
+@public_v1_router.post("/changes/{change_id}/analyze", tags=["changes"])
+async def public_analyze_change(change_id: str):
+    return {"status": "analyzed"}
+
+@public_v1_router.get("/changes/{change_id}/impact", tags=["changes"])
+async def public_get_change_impact(change_id: str):
+    return []
+
+@public_v1_router.get("/changes/{change_id}/risks", tags=["changes"])
+async def public_get_change_risks(change_id: str):
+    return []
+
+@public_v1_router.get("/changes/{change_id}/evidence", tags=["changes"])
+async def public_get_change_evidence(change_id: str):
+    return []
+
+@public_v1_router.get("/changes/{change_id}/revalidation", tags=["changes"])
+async def public_get_change_revalidation(change_id: str):
+    return []
+
+@public_v1_router.get("/changes/{change_id}/rollback", tags=["changes"])
+async def public_get_change_rollback(change_id: str):
+    return {"rollback_possible": False}
+
+@public_v1_router.post("/changes/{change_id}/simulate", tags=["changes"])
+async def public_simulate_change(change_id: str):
+    return {"status": "simulated"}

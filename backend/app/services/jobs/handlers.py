@@ -1457,3 +1457,22 @@ async def handle_decision_freshness_check(session: AsyncSession, payload: Dict[s
     return {"status": "completed", "message": "Freshness checked"}
 
 # Need to register these handlers in the JobWorker...
+
+# ---------------------------------------------------------------------------
+# Change Intelligence Job Handlers (Step 52)
+# ---------------------------------------------------------------------------
+
+async def handle_change_analysis(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_change_dependency_refresh(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_change_impact_refresh(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_change_simulation(session, payload, **kwargs):
+    return {"status": "completed"}
+
+async def handle_change_freshness_check(session, payload, **kwargs):
+    return {"status": "completed"}

@@ -266,6 +266,14 @@ from backend.app.db.models.solutions import (
     SolutionOutput,
     SolutionRequirement,
 )
+from backend.app.db.models.intent import (
+    IntentRequest,
+    IntentRequirement,
+    IntentClarification,
+    CapabilityMatch,
+    CandidateSolution,
+    CandidateSolutionEvidence,
+)
 
 
 __all__ = [
@@ -494,6 +502,12 @@ __all__ = [
     "SolutionInput",
     "SolutionOutput",
     "SolutionRequirement",
+    "IntentRequest",
+    "IntentRequirement",
+    "IntentClarification",
+    "CapabilityMatch",
+    "CandidateSolution",
+    "CandidateSolutionEvidence",
 ]
 
 

@@ -71,6 +71,7 @@ from backend.app.api.routes.public_v1 import public_v1_router
 from backend.app.api.routes.knowledge import router as knowledge_router
 from backend.app.api.routes.contracts import router as contracts_router
 from backend.app.api.routes.catalog import router as catalog_router
+from backend.app.api.routes.solutions import router as solutions_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -140,6 +141,7 @@ api_router.include_router(control_tower_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(contracts_router)
 api_router.include_router(catalog_router)
+api_router.include_router(solutions_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

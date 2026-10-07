@@ -257,6 +257,15 @@ from backend.app.db.models.contracts import (
     ContractWaiver,
 )
 from backend.app.db.models.service_catalog import ServiceCatalogItem
+from backend.app.db.models.solutions import (
+    Solution,
+    SolutionVersion,
+    SolutionComponent,
+    SolutionConnection,
+    SolutionInput,
+    SolutionOutput,
+    SolutionRequirement,
+)
 
 
 __all__ = [
@@ -478,6 +487,13 @@ __all__ = [
     "ContractEscalationPolicy",
     "ContractWaiver",
     "ServiceCatalogItem",
+    "Solution",
+    "SolutionVersion",
+    "SolutionComponent",
+    "SolutionConnection",
+    "SolutionInput",
+    "SolutionOutput",
+    "SolutionRequirement",
 ]
 
 

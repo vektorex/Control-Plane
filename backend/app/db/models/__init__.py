@@ -274,6 +274,12 @@ from backend.app.db.models.intent import (
     CandidateSolution,
     CandidateSolutionEvidence,
 )
+from backend.app.db.models.decision import (
+    DecisionRequest,
+    DecisionEvidence,
+    DecisionRecord,
+    DecisionRequiredAction,
+)
 
 
 __all__ = [
@@ -508,6 +514,10 @@ __all__ = [
     "CapabilityMatch",
     "CandidateSolution",
     "CandidateSolutionEvidence",
+    "DecisionRequest",
+    "DecisionEvidence",
+    "DecisionRecord",
+    "DecisionRequiredAction",
 ]
 
 

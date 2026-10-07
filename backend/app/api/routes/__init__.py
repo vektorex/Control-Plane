@@ -73,6 +73,7 @@ from backend.app.api.routes.contracts import router as contracts_router
 from backend.app.api.routes.catalog import router as catalog_router
 from backend.app.api.routes.solutions import router as solutions_router
 from backend.app.api.routes.intent import router as intent_router
+from backend.app.api.routes.decisions import router as decisions_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health_router)
@@ -144,6 +145,7 @@ api_router.include_router(contracts_router)
 api_router.include_router(catalog_router)
 api_router.include_router(solutions_router)
 api_router.include_router(intent_router)
+api_router.include_router(decisions_router)
 api_router.include_router(public_v1_router)
 
 __all__ = ["api_router"]

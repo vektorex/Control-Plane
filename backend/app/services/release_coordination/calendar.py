@@ -1,2 +1,2 @@
 class ReleaseCalendarService:
-    pass\n
+    pass

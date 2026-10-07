@@ -1,2 +1,2 @@
 class GovernanceAdapter:
-    pass\n
+    pass

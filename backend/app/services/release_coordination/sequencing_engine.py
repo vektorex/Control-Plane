@@ -1,2 +1,2 @@
 class ReleaseSequencingEngine:
-    pass\n
+    pass

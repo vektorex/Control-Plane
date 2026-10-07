@@ -33,4 +33,4 @@ class ReleaseCoordinationService:
         )
         self.session.add(train)
         await self.session.commit()
-        return train\n
+        return train

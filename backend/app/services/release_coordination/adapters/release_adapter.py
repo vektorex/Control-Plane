@@ -1,2 +1,2 @@
 class ReleaseAdapter:
-    pass\n
+    pass

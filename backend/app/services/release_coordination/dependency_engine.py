@@ -1,2 +1,2 @@
 class ReleaseDependencyEngine:
-    pass\n
+    pass

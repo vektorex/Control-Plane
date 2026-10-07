@@ -1,2 +1,2 @@
 class PlanningAdapter:
-    pass\n
+    pass

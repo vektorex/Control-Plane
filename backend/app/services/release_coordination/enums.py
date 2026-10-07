@@ -37,4 +37,4 @@ class ChangeWindowType(str, Enum):
     security_freeze = "security_freeze"
     contract_restricted = "contract_restricted"
     availability_restricted = "availability_restricted"
-    emergency = "emergency"\n
+    emergency = "emergency"

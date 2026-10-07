@@ -1,2 +1,2 @@
 class ContractAdapter:
-    pass\n
+    pass

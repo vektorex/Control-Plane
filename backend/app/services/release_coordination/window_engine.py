@@ -1,2 +1,2 @@
 class ReleaseWindowEngine:
-    pass\n
+    pass

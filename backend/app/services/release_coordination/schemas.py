@@ -17,4 +17,4 @@ class TrainCreate(BaseModel):
 
 class TrainResponse(TrainCreate):
     id: str
-    status: TrainStatus\n
+    status: TrainStatus

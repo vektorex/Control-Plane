@@ -1,2 +1,2 @@
 class ReleaseCoordinator:
-    pass\n
+    pass

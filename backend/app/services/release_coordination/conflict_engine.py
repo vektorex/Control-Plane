@@ -1,2 +1,2 @@
 class ReleaseConflictEngine:
-    pass\n
+    pass

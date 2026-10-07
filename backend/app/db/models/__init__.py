@@ -256,6 +256,7 @@ from backend.app.db.models.contracts import (
     ContractEscalationPolicy,
     ContractWaiver,
 )
+from backend.app.db.models.service_catalog import ServiceCatalogItem
 
 
 __all__ = [
@@ -476,6 +477,7 @@ __all__ = [
     "ContractBreach",
     "ContractEscalationPolicy",
     "ContractWaiver",
+    "ServiceCatalogItem",
 ]
 
 

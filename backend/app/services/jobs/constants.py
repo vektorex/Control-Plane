@@ -113,6 +113,13 @@ class JobType(str, Enum):
     CHANGE_IMPACT_REFRESH = "change_impact_refresh"
     CHANGE_SIMULATION = "change_simulation"
     CHANGE_FRESHNESS_CHECK = "change_freshness_check"
+    RELEASE_VALIDATION = "release_validation"
+    RELEASE_STAGING = "release_staging"
+    RELEASE_VERIFICATION = "release_verification"
+    RELEASE_OBSERVATION = "release_observation"
+    RELEASE_PROMOTION = "release_promotion"
+    RELEASE_ROLLBACK = "release_rollback"
+
 
 
 

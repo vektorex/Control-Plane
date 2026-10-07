@@ -1,0 +1,2 @@
+class ReleaseRepository:
+    pass\n

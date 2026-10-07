@@ -1088,6 +1088,30 @@ export class ReservationsResource {
       simulate: (id) => this.request(`/v1/changes/${id}/simulate`, { method: 'POST' })
     };
   }
+
+  get releases() {
+    return {
+      list: () => this.request('/v1/releases'),
+      get: (id) => this.request(`/v1/releases/${id}`),
+      create: (payload) => this.request('/v1/releases', { method: 'POST', body: payload }),
+      buildPlan: (id) => this.request(`/v1/releases/${id}/build-plan`, { method: 'POST' }),
+      plan: (id) => this.request(`/v1/releases/${id}/plan`),
+      validate: (id) => this.request(`/v1/releases/${id}/validate`, { method: 'POST' }),
+      submitApproval: (id) => this.request(`/v1/releases/${id}/submit-approval`, { method: 'POST' }),
+      stage: (id) => this.request(`/v1/releases/${id}/stage`, { method: 'POST' }),
+      verifyStaging: (id) => this.request(`/v1/releases/${id}/verify-staging`, { method: 'POST' }),
+      promote: (id) => this.request(`/v1/releases/${id}/promote`, { method: 'POST' }),
+      verifyProduction: (id) => this.request(`/v1/releases/${id}/verify-production`, { method: 'POST' }),
+      observe: (id) => this.request(`/v1/releases/${id}/observe`, { method: 'POST' }),
+      observations: (id) => this.request(`/v1/releases/${id}/observations`),
+      complete: (id) => this.request(`/v1/releases/${id}/complete`, { method: 'POST' }),
+      cancel: (id) => this.request(`/v1/releases/${id}/cancel`, { method: 'POST' }),
+      requestRollback: (id) => this.request(`/v1/releases/${id}/rollback-request`, { method: 'POST' }),
+      rollback: (id) => this.request(`/v1/releases/${id}/rollback`, { method: 'POST' }),
+      evidence: (id) => this.request(`/v1/releases/${id}/evidence`),
+      timeline: (id) => this.request(`/v1/releases/${id}/timeline`)
+    };
+  }
 }
 
 

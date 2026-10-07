@@ -1,0 +1,2 @@
+class ReleaseFreezeService:
+    pass\n

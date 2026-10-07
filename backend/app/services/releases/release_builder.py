@@ -1,0 +1,2 @@
+class ReleasePlanBuilder:
+    pass\n

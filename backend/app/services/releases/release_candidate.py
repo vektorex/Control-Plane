@@ -1,0 +1,2 @@
+class ReleaseCandidateManager:
+    pass\n

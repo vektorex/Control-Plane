@@ -1,0 +1,2 @@
+class ReleasePlanManager:
+    pass\n

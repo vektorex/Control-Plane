@@ -3715,3 +3715,44 @@ async def public_get_change_rollback(change_id: str):
 @public_v1_router.post("/changes/{change_id}/simulate", tags=["changes"])
 async def public_simulate_change(change_id: str):
     return {"status": "simulated"}
+
+
+# ---------------------------------------------------------------------------
+# Release & Deployment (Step 53)
+# ---------------------------------------------------------------------------
+
+@public_v1_router.post("/releases", tags=["releases"])
+async def public_create_release(payload: dict):
+    return {"status": "created"}
+
+@public_v1_router.get("/releases", tags=["releases"])
+async def public_list_releases():
+    return []
+
+@public_v1_router.get("/releases/{release_id}", tags=["releases"])
+async def public_get_release(release_id: str):
+    return {"id": release_id}
+
+@public_v1_router.get("/releases/{release_id}/plan", tags=["releases"])
+async def public_get_release_plan(release_id: str):
+    return {"stages": []}
+
+@public_v1_router.get("/releases/{release_id}/evidence", tags=["releases"])
+async def public_get_release_evidence(release_id: str):
+    return []
+
+@public_v1_router.get("/releases/{release_id}/timeline", tags=["releases"])
+async def public_get_release_timeline(release_id: str):
+    return []
+
+@public_v1_router.post("/releases/{release_id}/validate", tags=["releases"])
+async def public_validate_release(release_id: str):
+    return {"status": "validated"}
+
+@public_v1_router.post("/releases/{release_id}/promote", tags=["releases"])
+async def public_promote_release(release_id: str):
+    return {"status": "promoted"}
+
+@public_v1_router.post("/releases/{release_id}/rollback-request", tags=["releases"])
+async def public_request_rollback(release_id: str):
+    return {"status": "rollback_requested"}

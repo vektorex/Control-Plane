@@ -242,6 +242,20 @@ from backend.app.db.models.organizational_knowledge import (
     KnowledgeCandidate,
     KnowledgeConflict,
 )
+from backend.app.db.models.contracts import (
+    WorkContract,
+    WorkContractVersion,
+    ContractParty,
+    ContractScope,
+    ContractDeliverable,
+    ContractAcceptanceCriterion,
+    ServiceLevelAgreement,
+    SLAMeasurement,
+    SLAClock,
+    ContractBreach,
+    ContractEscalationPolicy,
+    ContractWaiver,
+)
 
 
 __all__ = [
@@ -450,6 +464,18 @@ __all__ = [
     "KnowledgeVersion",
     "KnowledgeCandidate",
     "KnowledgeConflict",
+    "WorkContract",
+    "WorkContractVersion",
+    "ContractParty",
+    "ContractScope",
+    "ContractDeliverable",
+    "ContractAcceptanceCriterion",
+    "ServiceLevelAgreement",
+    "SLAMeasurement",
+    "SLAClock",
+    "ContractBreach",
+    "ContractEscalationPolicy",
+    "ContractWaiver",
 ]
 
 

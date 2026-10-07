@@ -103,6 +103,11 @@ class JobType(str, Enum):
     CONTROL_TOWER_REFRESH = "control_tower_refresh"
     ATTENTION_RECONCILIATION = "attention_reconciliation"
     WORKSTREAM_REFRESH = "workstream_refresh"
+    # Step 51: Decision Intelligence jobs
+    DECISION_EVALUATION = "decision_evaluation"
+    DECISION_EVIDENCE_REFRESH = "decision_evidence_refresh"
+    DECISION_READINESS_REFRESH = "decision_readiness_refresh"
+    DECISION_FRESHNESS_CHECK = "decision_freshness_check"
 
 
 class JobEventType(str, Enum):

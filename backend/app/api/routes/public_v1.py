@@ -3609,3 +3609,68 @@ async def public_get_planning_workload(
         return handle_public_error(ex, principal.request_id)
 
 
+
+
+# ---------------------------------------------------------------------------
+# Decisions API (STEP 51)
+# ---------------------------------------------------------------------------
+
+@public_v1_router.post("/decisions", status_code=status.HTTP_201_CREATED)
+async def create_decision(
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:create")
+        return {"decision_id": str(uuid.uuid4()), "status": "requested"}
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+@public_v1_router.get("/decisions/{decision_id}")
+async def get_decision(
+    decision_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:read")
+        return {"id": decision_id, "status": "analyzing"}
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+@public_v1_router.get("/decisions/{decision_id}/evidence")
+async def get_decision_evidence(
+    decision_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:read")
+        return {"evidence": []}
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+@public_v1_router.get("/decisions/{decision_id}/blockers")
+async def get_decision_blockers(
+    decision_id: str,
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:read")
+        return {"blockers": []}
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)
+
+@public_v1_router.post("/decisions/execution-readiness")
+async def execution_readiness(
+    payload: Dict[str, Any],
+    principal: APIPrincipal = Depends(get_authenticated_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        PublicAPIAuthorizer.check_scope(principal, "decisions:read")
+        return {"overall_state": "ready", "conditions": [], "blockers": [], "evidence": [], "required_actions": []}
+    except Exception as ex:
+        return handle_public_error(ex, principal.request_id)

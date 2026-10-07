@@ -1060,6 +1060,18 @@ export class ReservationsResource {
     const query = resourceId ? `?resource_id=${encodeURIComponent(resourceId)}` : "";
     return this.client.request("GET", `/capacity-reservations${query}`);
   }
+
+  get decisions() {
+    return {
+      create: (payload) => this.request('/v1/decisions', { method: 'POST', body: payload }),
+      get: (id) => this.request(`/v1/decisions/${id}`),
+      evaluate: (id) => this.request(`/v1/decisions/${id}/evaluate`, { method: 'POST' }),
+      executionReadiness: (payload) => this.request('/v1/decisions/execution-readiness', { method: 'POST', body: payload }),
+      evidence: (id) => this.request(`/v1/decisions/${id}/evidence`),
+      blockers: (id) => this.request(`/v1/decisions/${id}/blockers`),
+      refresh: (id) => this.request(`/v1/decisions/${id}/refresh`, { method: 'POST' }),
+    };
+  }
 }
 
 

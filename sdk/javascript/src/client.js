@@ -1145,6 +1145,19 @@ export class ReservationsResource {
       getCalendar: () => this.request('/v1/release-coordination/calendar')
     };
   }
+
+  get releaseOptimization() {
+    return {
+      listScenarios: () => this.request('/v1/release-optimization/scenarios'),
+      getScenario: (id) => this.request(`/v1/release-optimization/scenarios/${id}`),
+      analyzeScenario: (id) => this.request(`/v1/release-optimization/scenarios/${id}/analyze`, { method: 'POST' }),
+      getCandidates: (id) => this.request(`/v1/release-optimization/scenarios/${id}/candidates`),
+      getComparison: (id) => this.request(`/v1/release-optimization/scenarios/${id}/comparison`),
+      getBottlenecks: (id) => this.request(`/v1/release-optimization/scenarios/${id}/bottlenecks`),
+      getRecommendations: (id) => this.request(`/v1/release-optimization/scenarios/${id}/recommendations`),
+      runWhatIf: (id, payload) => this.request(`/v1/release-optimization/scenarios/${id}/what-if`, { method: 'POST', body: JSON.stringify(payload) })
+    };
+  }
 }
 
 

@@ -132,6 +132,12 @@ class JobType(str, Enum):
     RELEASE_TRAIN_VALIDATION = "release_train_validation"
     RELEASE_CALENDAR_REFRESH = "release_calendar_refresh"
     RELEASE_COORDINATION_REVALIDATION = "release_coordination_revalidation"
+    RELEASE_OPTIMIZATION_RUN = "release_optimization_run"
+    RELEASE_SCENARIO_VALIDATION = "release_scenario_validation"
+    RELEASE_BOTTLENECK_ANALYSIS = "release_bottleneck_analysis"
+    RELEASE_SENSITIVITY_ANALYSIS = "release_sensitivity_analysis"
+    RELEASE_OPTIMIZATION_REFRESH = "release_optimization_refresh"
+
 
 
 

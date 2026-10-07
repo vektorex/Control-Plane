@@ -3846,3 +3846,40 @@ async def public_schedule_train(train_id: str):
 @public_v1_router.get("/release-coordination/calendar", tags=["release_coordination"])
 async def public_get_coordination_calendar():
     return []
+
+
+# ---------------------------------------------------------------------------
+# Release Optimization (Step 56)
+# ---------------------------------------------------------------------------
+
+@public_v1_router.get("/release-optimization/scenarios", tags=["release_optimization"])
+async def public_list_optimization_scenarios():
+    return []
+
+@public_v1_router.get("/release-optimization/scenarios/{scenario_id}", tags=["release_optimization"])
+async def public_get_optimization_scenario(scenario_id: str):
+    return {"id": scenario_id}
+
+@public_v1_router.post("/release-optimization/scenarios/{scenario_id}/analyze", tags=["release_optimization"])
+async def public_analyze_optimization_scenario(scenario_id: str):
+    return {"status": "analyzed"}
+
+@public_v1_router.get("/release-optimization/scenarios/{scenario_id}/candidates", tags=["release_optimization"])
+async def public_get_optimization_candidates(scenario_id: str):
+    return []
+
+@public_v1_router.get("/release-optimization/scenarios/{scenario_id}/comparison", tags=["release_optimization"])
+async def public_get_optimization_comparison(scenario_id: str):
+    return {}
+
+@public_v1_router.get("/release-optimization/scenarios/{scenario_id}/bottlenecks", tags=["release_optimization"])
+async def public_get_optimization_bottlenecks(scenario_id: str):
+    return []
+
+@public_v1_router.get("/release-optimization/scenarios/{scenario_id}/recommendations", tags=["release_optimization"])
+async def public_get_optimization_recommendations(scenario_id: str):
+    return []
+
+@public_v1_router.post("/release-optimization/scenarios/{scenario_id}/what-if", tags=["release_optimization"])
+async def public_run_what_if_scenario(scenario_id: str):
+    return {"status": "what_if_run"}

@@ -521,3 +521,207 @@ model AdversarialQuarantine {
 
   @@index([tenantId])
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND 49: COLLECTIVE CYBER DEFENSE INTELLIGENCE
+// -----------------------------------------------------------------------------
+
+model CollectiveIntelligence {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceProvenance Json
+  confidence      Float
+  verificationStatus String
+  classification  String
+  usageTerms      Json
+  isRevoked       Boolean  @default(false)
+  data            Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([classification])
+}
+
+model CollectivePrivacyDecision {
+  id              String   @id @default(uuid())
+  tenantId        String
+  intelligenceId  String
+  decision        String
+  redactions      Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model IntelligenceAggregation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  cohortSize      Int
+  aggregatedData  Json
+  privacyBudget   Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model CollectiveThreatPattern {
+  id              String   @id @default(uuid())
+  tenantId        String
+  patternData     Json
+  lifecycleState  String
+  evidenceCount   Int
+  confidence      Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SharedIndicator {
+  id              String   @id @default(uuid())
+  tenantId        String
+  indicatorType   String
+  value           String
+  confidence      Float
+  isRevoked       Boolean  @default(false)
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([indicatorType, value])
+}
+
+model ThreatCampaignHypothesis {
+  id              String   @id @default(uuid())
+  tenantId        String
+  indicators      Json
+  confidence      Float
+  lifecycleState  String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model CollectiveExposureCorrelation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  matchData       Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SharedDetectionRule {
+  id              String   @id @default(uuid())
+  tenantId        String
+  ruleData        Json
+  compatibility   String
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DefensivePatternLibrary {
+  id              String   @id @default(uuid())
+  tenantId        String
+  patternData     Json
+  validationState String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SharedRemediationKnowledge {
+  id              String   @id @default(uuid())
+  tenantId        String
+  strategyData    Json
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ControlBenchmark {
+  id              String   @id @default(uuid())
+  tenantId        String
+  peerGroupSize   Int
+  metrics         Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ContributorReputation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceId        String
+  reputationScore Float
+  history         Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model IntelligenceConflict {
+  id              String   @id @default(uuid())
+  tenantId        String
+  evidence        Json
+  resolution      String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model OrganizationFederationPolicy {
+  id              String   @id @default(uuid())
+  tenantId        String
+  isEnabled       Boolean  @default(false)
+  settings        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model IntegrationConnector {
+  id              String   @id @default(uuid())
+  tenantId        String
+  provider        String
+  status          String
+  syncState       Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model LocalIntelligenceAdoption {
+  id              String   @id @default(uuid())
+  tenantId        String
+  intelligenceId  String
+  status          String // PREVIEW, SHADOW, ADOPTED
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model CollectiveAnalytics {
+  id              String   @id @default(uuid())
+  tenantId        String
+  metricType      String
+  value           Float
+  evidenceCount   Int
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model CollectiveGovernanceAudit {
+  id              String   @id @default(uuid())
+  tenantId        String
+  action          String
+  actor           String
+  decision        String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}

@@ -290,3 +290,234 @@ model ImmunityAgentDecision {
 
   @@index([tenantId])
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND 48: CONTINUOUS DEFENSE LEARNING
+// -----------------------------------------------------------------------------
+
+model LearningEvent {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceSystem    String
+  schemaVersion   String
+  provenance      Json
+  verificationState String // UNVERIFIED, PENDING, VERIFIED_SUCCESS, VERIFIED_FAILURE, PARTIAL_SUCCESS, CONFLICTING_EVIDENCE, UNKNOWN
+  confidence      Float
+  eventData       Json     // No raw secrets
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([verificationState])
+}
+
+model OutcomeVerification {
+  id              String   @id @default(uuid())
+  tenantId        String
+  learningEventId String
+  status          String
+  evidenceSources Json
+  verificationMethod String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model FeedbackTrust {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceId        String
+  trustClass      String   // TRUSTED, LIMITED, QUARANTINED, REJECTED
+  reliabilityScore Float
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityPattern {
+  id              String   @id @default(uuid())
+  tenantId        String
+  patternType     String
+  lifecycleState  String   // CANDIDATE, UNDER_REVIEW, VALIDATED, DEPRECATED, REJECTED
+  evidence        Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([lifecycleState])
+}
+
+model LearningGraphRelation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceNode      String
+  relationType    String
+  targetNode      String
+  provenance      Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([sourceNode])
+}
+
+model DetectionEffectivenessMetric {
+  id              String   @id @default(uuid())
+  tenantId        String
+  ruleVersion     String
+  precision       Float?
+  recall          Float?
+  isProxyMetric   Boolean
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model PolicyRecommendation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  policyId        String
+  diff            Json
+  expectedBenefits Json
+  confidence      Float
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model RemediationStrategy {
+  id              String   @id @default(uuid())
+  tenantId        String
+  vulnerabilityType String
+  successProbability Float?
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ControlEffectiveness {
+  id              String   @id @default(uuid())
+  tenantId        String
+  controlId       String
+  effectivenessScore Float
+  blindSpots      Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model BaselineCandidate {
+  id              String   @id @default(uuid())
+  tenantId        String
+  baselineId      String
+  candidateData   Json
+  status          String   // PROPOSED, SHADOW, APPROVED, REJECTED
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DefenseExperiment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  hypothesis      String
+  status          String
+  scope           Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ExperimentEvaluation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  experimentId    String
+  metrics         Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model KnowledgeRegression {
+  id              String   @id @default(uuid())
+  tenantId        String
+  knowledgeId     String
+  state           String   // HEALTHY, WATCH, REGRESSED, STALE, UNKNOWN
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model KnowledgeVersion {
+  id              String   @id @default(uuid())
+  tenantId        String
+  knowledgeType   String
+  versionId       String
+  provenance      Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model LearningModelRegistry {
+  id              String   @id @default(uuid())
+  tenantId        String
+  modelId         String
+  version         String
+  approvalStatus  String
+  limitations     Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model RecommendationExplanation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  recommendationId String
+  explanation     Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model LearningOrchestrationState {
+  id              String   @id @default(uuid())
+  tenantId        String
+  workflowId      String
+  state           String
+  retries         Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model PromotionDecision {
+  id              String   @id @default(uuid())
+  tenantId        String
+  candidateId     String
+  decision        String   // REJECT, HOLD, SHADOW, STAGED, APPROVED_FOR_PROMOTION
+  authorization   Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AdversarialQuarantine {
+  id              String   @id @default(uuid())
+  tenantId        String
+  eventId         String
+  threatModel     String
+  explanation     Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}

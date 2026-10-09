@@ -1,0 +1,292 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DigitalImmunityState {
+  id              String   @id @default(uuid())
+  tenantId        String
+  immunityScore   Float
+  healthState     String   // HEALTHY, WATCH, DEGRADED, CRITICAL, RECOVERING, UNKNOWN
+  degradationState String
+  trend           String
+  confidence      Float
+  evidenceRefs    Json     // Array of references
+  criticalWeaknesses Json
+  protectiveStrengths Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([healthState])
+  @@index([createdAt])
+}
+
+model SecurityBehaviorBaseline {
+  id              String   @id @default(uuid())
+  tenantId        String
+  entityType      String   // assets, services, identities, policies, agents, etc.
+  entityId        String?
+  baselineData    Json
+  seasonality     String?
+  environment     String?
+  confidence      Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+}
+
+model DefenseBaseline {
+  id              String   @id @default(uuid())
+  tenantId        String
+  controlId       String
+  normalDetectionRate Float
+  normalValidationRate Float
+  normalResponseLatency Float
+  normalRecoveryLatency Float
+  normalControlFailures Int
+  normalFalsePositives  Int
+  confidence      Float
+  evidence        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([controlId])
+}
+
+model SecurityDegradation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  controlId       String?
+  degradationType String   // SUDDEN_DEGRADATION, GRADUAL_DEGRADATION
+  severity        String
+  metric          String
+  baselineValue   Float
+  currentValue    Float
+  confidence      Float
+  evidence        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+model DefenseFatigue {
+  id              String   @id @default(uuid())
+  tenantId        String
+  systemId        String
+  fatigueState    String   // NORMAL, STRESSED, OVERLOADED, CRITICAL
+  stressIndicators Json
+  severity        String
+  confidence      Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([fatigueState])
+}
+
+model SecuritySignalQuality {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceId        String
+  qualityState    String   // BLIND_SIGNAL, NOISY_SIGNAL, STALE_SIGNAL, DUPLICATE_SIGNAL, LOW_CONFIDENCE_SIGNAL, HIGH_VALUE_SIGNAL
+  metrics         Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([qualityState])
+}
+
+model SecurityBlindSpot {
+  id              String   @id @default(uuid())
+  tenantId        String
+  zoneId          String
+  blindSpotType   String   // unknown asset zones, unmonitored services, unvalidated controls, etc.
+  confidence      Float
+  evidence        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model EmergingAttackPath {
+  id              String   @id @default(uuid())
+  tenantId        String
+  pathState       String   // EMERGING, STABLE, WORSENING, RESOLVED
+  severity        String
+  nodes           Json
+  changes         Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([pathState])
+}
+
+model ImmunityResponsePattern {
+  id              String   @id @default(uuid())
+  tenantId        String
+  patternName     String
+  trigger         String
+  contextRequirements Json
+  recommendedResponse Json
+  approvalRequired Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model DefenseAdaptation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  actionType      String
+  targetId        String
+  status          String
+  policyEvaluated Boolean
+  approvalStatus  String
+  evidence        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model ImmunityPolicyEvaluation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  policyId        String
+  decision        String
+  context         Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model SecurityHealthForecast {
+  id              String   @id @default(uuid())
+  tenantId        String
+  timeHorizon     String
+  forecastState   String
+  confidence      Float
+  drivers         Json
+  assumptions     Json
+  evidence        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model SecurityFailureWarning {
+  id              String   @id @default(uuid())
+  tenantId        String
+  warningType     String
+  signals         Json
+  evidence        Json
+  confidence      Float
+  potentialImpact String
+  recommendedAction String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model SecurityCascadePrediction {
+  id              String   @id @default(uuid())
+  tenantId        String
+  cascadeChain    Json
+  probability     Float
+  impactEstimate  String
+  confidence      Float
+  mitigationOptions Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model ImmunityTwinSnapshot {
+  id              String   @id @default(uuid())
+  tenantId        String
+  stateData       Json
+  snapshotType    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model DefenseAdaptationSimulation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  scenario        Json
+  results         Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model SecurityImmunityScore {
+  id              String   @id @default(uuid())
+  tenantId        String
+  overallScore    Float
+  dimensions      Json
+  trend           String
+  confidence      Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model ImmunityGraphRelation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceNode      String
+  relationType    String   // AFFECTS, CAUSED_BY, IMPACTS, INCREASES, IMPROVES, REDUCES, PRECEDES, EMERGES_FROM
+  targetNode      String
+  properties      Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([sourceNode, relationType])
+}
+
+model ImmunityAgentDecision {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decision        String
+  evidence        Json
+  confidence      Float
+  policy          String
+  autonomyLevel   String
+  approvalRequired Boolean
+  action          String
+  result          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}

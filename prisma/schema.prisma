@@ -725,3 +725,211 @@ model CollectiveGovernanceAudit {
 
   @@index([tenantId])
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND 50: GLOBAL CYBER DEFENSE SIMULATION & FUTURES
+// -----------------------------------------------------------------------------
+
+model CyberFutureScenario {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  objectives      Json
+  scope           Json
+  assumptions     Json
+  validationState String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityTwinSnapshot {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceTimestamp DateTime
+  stateData       Json
+  missingData     Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AttackPathSimulation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  scenarioId      String
+  baselinePath    Json
+  hypotheticalPath Json
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DefenseStrategyComparison {
+  id              String   @id @default(uuid())
+  tenantId        String
+  baselineStrategy Json
+  candidateStrategies Json
+  evaluationCriteria Json
+  outcomes        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model UncertaintyModel {
+  id              String   @id @default(uuid())
+  tenantId        String
+  inputVariable   String
+  distribution    Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MonteCarloSimulation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  scenarioId      String
+  iterations      Int
+  distributions   Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SystemicCascadeSimulation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  initialFailure  String
+  propagationGraph Json
+  assumptions     Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ResilienceStressTest {
+  id              String   @id @default(uuid())
+  tenantId        String
+  scenarioId      String
+  stressLevel     String
+  outcomes        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ControlCombinationOptimization {
+  id              String   @id @default(uuid())
+  tenantId        String
+  objectives      Json
+  evaluatedCombinations Json
+  optimalSet      Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model InvestmentScenario {
+  id              String   @id @default(uuid())
+  tenantId        String
+  budget          Float
+  priorities      Json
+  simulatedOutcomes Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ResourceCapacityModel {
+  id              String   @id @default(uuid())
+  tenantId        String
+  workloadForecast Json
+  capacityConstraints Json
+  saturationRisk  Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityForesightForecast {
+  id              String   @id @default(uuid())
+  tenantId        String
+  timeHorizon     String
+  forecastData    Json
+  confidence      Float
+  calibrationId   String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ScenarioWarningCorrelation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  signals         Json
+  scenarioId      String
+  severity        String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model StrategyRobustnessEvaluation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  strategyId      String
+  testConditions  Json
+  robustnessScore Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AdversarialEvaluationLab {
+  id              String   @id @default(uuid())
+  tenantId        String
+  scenarioId      String
+  syntheticFixtures Json
+  evaluationResults Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SimulationCalibration {
+  id              String   @id @default(uuid())
+  tenantId        String
+  forecastId      String
+  verifiedObservation Json
+  errorMargin     Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ScenarioKnowledgeGraph {
+  id              String   @id @default(uuid())
+  tenantId        String
+  nodeType        String
+  nodeId          String
+  edges           Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ScenarioGovernanceDecision {
+  id              String   @id @default(uuid())
+  tenantId        String
+  scenarioId      String
+  decision        String
+  actor           String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}

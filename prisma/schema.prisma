@@ -933,3 +933,221 @@ model ScenarioGovernanceDecision {
 
   @@index([tenantId])
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND 51: UNIVERSAL SECURITY INTELLIGENCE FABRIC & AUTONOMOUS DECISION ENGINE
+// -----------------------------------------------------------------------------
+
+model UniversalSecuritySignal {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceSystem    String
+  schemaVersion   String
+  provenance      Json
+  confidence      Float
+  classification  String
+  eventData       Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([sourceSystem])
+}
+
+model SecurityContextManifest {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  resolvedContext Json
+  missingContext  Json
+  provenance      Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityEvidenceEvaluation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  signalId        String
+  reliabilityScore Float
+  contradictions  Json
+  explanation     Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityDecisionGraphNode {
+  id              String   @id @default(uuid())
+  tenantId        String
+  nodeType        String
+  nodeData        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityDecisionGraphEdge {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceNodeId    String
+  targetNodeId    String
+  relationType    String
+  evidenceId      String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([sourceNodeId, relationType])
+}
+
+model SecurityDecisionObjective {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  priority        Int
+  constraints     Json
+  version         String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DecisionCandidateEvaluation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  candidateData   Json
+  objectiveScores Json
+  reversibility   String
+  safetyStatus    String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DecisionUncertaintyAssessment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  uncertainFactors Json
+  sensitivityAnalysis Json
+  confidence      Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model UniversalApprovalRequirement {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  requiredRoles   Json
+  status          String
+  evidenceSnapshot Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DecisionSimulationBridge {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  scenarioId      String
+  simulationResult Json
+  regressionDetected Boolean
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DecisionCalibrationRecord {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  verifiedOutcome Json
+  accuracyMetric  Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model CrossDomainCorrelation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  domains         Json
+  compoundRisk    Json
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model PolicyConflictReconciliation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  conflictType    String
+  involvedEntities Json
+  resolution      String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DecisionWorkflowCompilation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  workflowSchema  Json
+  validationState String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AutonomyGovernorPolicy {
+  id              String   @id @default(uuid())
+  tenantId        String
+  actionClass     String
+  maxImpactMode   String
+  evidenceRequired Boolean
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityDecisionQueueItem {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionType    String
+  priorityScore   Float
+  status          String
+  assignee        String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model SecurityPlaybookTemplate {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  templateData    Json
+  approvalPolicy  Json
+  version         String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DecisionAuditRecord {
+  id              String   @id @default(uuid())
+  tenantId        String
+  decisionId      String
+  timeline        Json
+  replayMetadata  Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}

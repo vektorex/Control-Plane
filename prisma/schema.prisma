@@ -1612,3 +1612,229 @@ model EngineeringMissionOrchestratorState {
 
   @@index([tenantId])
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND 54: AUTONOMOUS SECURITY RELIABILITY & CONTINUOUS RELEASE ASSURANCE
+// -----------------------------------------------------------------------------
+
+model AssuranceQualitySignal {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceType      String
+  repositoryRef   String
+  findingDetails  Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceRegressionKnowledge {
+  id              String   @id @default(uuid())
+  tenantId        String
+  rootCause       String
+  affectedComponent String
+  failureMode     String
+  evidence        Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceChangeTraceability {
+  id              String   @id @default(uuid())
+  tenantId        String
+  patchHash       String
+  affectedModules Json
+  validationEvidence Json
+  coverageState   String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceInvariantRegistry {
+  id              String   @id @default(uuid())
+  tenantId        String
+  invariantName   String
+  severity        String
+  assertionRules  Json
+  verificationStatus String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceTestSelection {
+  id              String   @id @default(uuid())
+  tenantId        String
+  patchHash       String
+  selectedSuites  Json
+  omittedSuites   Json
+  rationale       String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceFlakyTestAnalysis {
+  id              String   @id @default(uuid())
+  tenantId        String
+  testName        String
+  failureHistory  Json
+  nondeterminismScore Float
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssurancePropertyTest {
+  id              String   @id @default(uuid())
+  tenantId        String
+  propertyName    String
+  syntheticFixtures Json
+  counterExamples Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceStateMachineValidation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  machineName     String
+  transitionHistory Json
+  violations      Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceApiContract {
+  id              String   @id @default(uuid())
+  tenantId        String
+  endpoint        String
+  schemaDefinition Json
+  compatibilityStatus String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceMigrationValidation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  migrationName   String
+  executionResult Json
+  destructiveOps  Boolean
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceBuildReproducibility {
+  id              String   @id @default(uuid())
+  tenantId        String
+  buildHash       String
+  lockfileIntegrity String
+  environmentalDiff Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceEnvironmentParity {
+  id              String   @id @default(uuid())
+  tenantId        String
+  environmentName String
+  configurationDiff Json
+  driftScore      Float
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceChaosExperiment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  scenarioName    String
+  injectedFaults  Json
+  recoveryStatus  String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceFailureRecoveryTest {
+  id              String   @id @default(uuid())
+  tenantId        String
+  workflowName    String
+  compensationSteps Json
+  cleanState      Boolean
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssurancePerformanceRegression {
+  id              String   @id @default(uuid())
+  tenantId        String
+  endpoint        String
+  baselineLatency Float
+  candidateLatency Float
+  regressionDetected Boolean
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceReleaseEvidence {
+  id              String   @id @default(uuid())
+  tenantId        String
+  releaseVersion  String
+  mandatoryGates  Json
+  readinessDecision String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceStagedRollout {
+  id              String   @id @default(uuid())
+  tenantId        String
+  releaseVersion  String
+  rolloutStage    String
+  healthMetrics   Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssurancePostReleaseVerification {
+  id              String   @id @default(uuid())
+  tenantId        String
+  releaseVersion  String
+  verificationChecks Json
+  postReleaseStatus String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AssuranceServiceLevelObjective {
+  id              String   @id @default(uuid())
+  tenantId        String
+  serviceName     String
+  errorBudget     Float
+  consumedBudget  Float
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}

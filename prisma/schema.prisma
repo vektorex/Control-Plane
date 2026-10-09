@@ -1151,3 +1151,241 @@ model DecisionAuditRecord {
 
   @@index([tenantId])
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND 52: AUTONOMOUS SECURITY MISSION CONTROL & GOVERNED MULTI-AGENT ORCHESTRATION
+// -----------------------------------------------------------------------------
+
+model AutonomousSecurityMission {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  objectives      Json
+  missionState    String   // DRAFT, APPROVED, RUNNING, WAITING_FOR_APPROVAL, COMPLETED, FAILED, CANCELLED
+  riskTier        String
+  deadline        DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([missionState])
+}
+
+model SecurityAgentProfile {
+  id              String   @id @default(uuid())
+  tenantId        String
+  roleName        String
+  capabilities    Json
+  permittedTools  Json
+  status          String
+  version         String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionTaskPlan {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  taskGraph       Json
+  uncertainties   Json
+  validationState String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AgentDelegationRecord {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  sourceAgentId   String
+  targetAgentId   String
+  contextPassed   Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model GovernedToolInvocation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  agentId         String
+  toolName        String
+  argumentsHash   String
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MultiAgentEvidenceReconciliation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  findingClaims   Json
+  resolution      String   // CONFIRMED, CONTRADICTED, PARTIALLY_SUPPORTED, UNVERIFIED, UNKNOWN
+  explanation     Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionContextMemory {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  memoryType      String
+  facts           Json
+  provenance      Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model InterAgentMessage {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  senderId        String
+  receiverId      String
+  messageType     String
+  payloadHash     String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionTaskSchedule {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  taskId          String
+  status          String
+  scheduledFor    DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model MissionResourceBudget {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  taskLimit       Int
+  toolCallLimit   Int
+  consumed        Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model AgentFailureRecovery {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  taskId          String
+  failureType     String
+  retryCount      Int
+  recoveryAction  String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionVerificationRecord {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  verificationStatus String // VERIFIED_SUCCESS, VERIFIED_FAILURE, PARTIAL_SUCCESS, CONFLICTING_EVIDENCE, UNKNOWN
+  evidenceSnapshot Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SecurityReviewCouncilDecision {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  reviewerIds     Json
+  decision        String
+  adjudicationNotes Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionRiskAssessment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  blastRadius     String
+  criticality     String
+  reversibility   String
+  riskScore       Float
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SafeRemediationOrchestration {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  planSteps       Json
+  executionStatus String
+  rollbackReady   Boolean
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionConflictResolution {
+  id              String   @id @default(uuid())
+  tenantId        String
+  conflictingMissionIds Json
+  conflictType    String
+  resolutionAction String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ContinuousMissionLearning {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  verifiedOutcomes Json
+  proposedTemplateImprovements Json
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionTemplateMarketplace {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  templateDefinition Json
+  approvalStatus  String
+  version         String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model MissionForensicTimeline {
+  id              String   @id @default(uuid())
+  tenantId        String
+  missionId       String
+  eventSequence   Json
+  replayIntegrity String
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}

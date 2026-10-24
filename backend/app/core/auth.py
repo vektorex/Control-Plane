@@ -15,13 +15,29 @@ from backend.app.services.auth_service import AuthService
 # Bearer security scheme
 security_scheme = HTTPBearer(auto_error=False)
 
-# Fallback secret for local development/testing when SUPABASE_JWT_SECRET is not set
+# Fallback secret for local development/testing ONLY — must never be used in production
 DEV_JWT_SECRET = "dev-secret-super-safe-ai-work-layer-local-only-key-32b"
 
 
 def get_jwt_secret() -> str:
-    """Returns the configured Supabase JWT secret or local development fallback."""
-    return settings.SUPABASE_JWT_SECRET or DEV_JWT_SECRET
+    """
+    Returns the configured Supabase JWT secret.
+
+    Falls back to DEV_JWT_SECRET only in the 'development' environment.
+    Raises a RuntimeError if SUPABASE_JWT_SECRET is missing in staging/production
+    to prevent accidental use of the hardcoded fallback secret in deployed environments.
+    """
+    if settings.SUPABASE_JWT_SECRET:
+        return settings.SUPABASE_JWT_SECRET
+
+    if settings.ENVIRONMENT != "development":
+        raise RuntimeError(
+            "SUPABASE_JWT_SECRET must be set in non-development environments. "
+            f"Current ENVIRONMENT='{settings.ENVIRONMENT}'. "
+            "Refusing to use the insecure DEV_JWT_SECRET fallback in production/staging."
+        )
+
+    return DEV_JWT_SECRET
 
 
 def create_access_token(

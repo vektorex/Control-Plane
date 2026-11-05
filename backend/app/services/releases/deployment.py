@@ -1,2 +1,2 @@
 class DeploymentService:
-    pass\n
+    pass

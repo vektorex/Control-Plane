@@ -11,4 +11,4 @@ class FreshnessState(str, Enum):
     fresh = "fresh"
     aging = "aging"
     stale = "stale"
-    unknown = "unknown"\n
+    unknown = "unknown"

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum, JSON, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, relationship as orm_relationship
 from sqlalchemy.sql import func
-from app.db.base import Base
+from backend.app.db.base import Base
 import enum
 
 class ChangeStatus(str, enum.Enum):
@@ -110,7 +110,7 @@ class ChangeEvidence(Base):
     relationship = Column(String(100), nullable=False)
     observed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    change_request = relationship("ChangeRequest", back_populates="evidence")
+    change_request = orm_relationship("ChangeRequest", back_populates="evidence")
 
 class ChangeAnalysisRecord(Base):
     __tablename__ = "change_analysis_records"

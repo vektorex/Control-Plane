@@ -12,4 +12,4 @@ class ReleaseCreate(BaseModel):
 
 class ReleaseResponse(ReleaseCreate):
     id: str
-    status: ReleaseStatus\n
+    status: ReleaseStatus

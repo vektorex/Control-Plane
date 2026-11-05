@@ -9,4 +9,4 @@ class DecisionEngine:
             "explanation": "Decision allowed",
             "required_actions": [],
             "confidence_state": "high"
-        }\n
+        }

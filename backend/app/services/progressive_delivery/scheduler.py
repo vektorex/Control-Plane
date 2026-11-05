@@ -1,2 +1,2 @@
 class RolloutScheduler:
-    pass\n
+    pass

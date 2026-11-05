@@ -1,10 +1,32 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function IntentRequirements({ params }) {
   // params.requestId
+  const [explicitReqs, setExplicitReqs] = useState([
+    { id: 1, type: "Capability", desc: "Security Vulnerability Scanning", required: "Yes" },
+    { id: 2, type: "Output", desc: "Verified Security Report", required: "Yes" },
+  ]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newType, setNewType] = useState("Capability");
+  const [newDesc, setNewDesc] = useState("");
+
+  const handleAddRequirement = (e) => {
+    e.preventDefault();
+    if (!newDesc.trim()) return;
+    setExplicitReqs((prev) => [
+      ...prev,
+      { id: Date.now(), type: newType, desc: newDesc, required: "Yes" }
+    ]);
+    setNewDesc("");
+    setShowAddModal(false);
+  };
+
+  const handleRemove = (id) => {
+    setExplicitReqs((prev) => prev.filter((r) => r.id !== id));
+  };
   
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -26,7 +48,10 @@ export default function IntentRequirements({ params }) {
           <p className="text-gray-500 mt-2">These requirements will drive the Service Catalog capability discovery.</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 border border-gray-300 bg-white rounded-lg text-sm font-medium hover:bg-gray-50">
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 border border-gray-300 bg-white rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer"
+          >
             + Add Requirement
           </button>
         </div>
@@ -48,18 +73,27 @@ export default function IntentRequirements({ params }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                <tr>
-                  <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs border border-blue-100">Capability</span></td>
-                  <td className="p-4 font-medium">Security Vulnerability Scanning</td>
-                  <td className="p-4"><span className="text-green-600 font-medium">Yes</span></td>
-                  <td className="p-4 text-blue-600 hover:underline cursor-pointer text-xs">Edit</td>
-                </tr>
-                <tr>
-                  <td className="p-4"><span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs border border-purple-100">Output</span></td>
-                  <td className="p-4 font-medium">Verified Security Report</td>
-                  <td className="p-4"><span className="text-green-600 font-medium">Yes</span></td>
-                  <td className="p-4 text-blue-600 hover:underline cursor-pointer text-xs">Edit</td>
-                </tr>
+                {explicitReqs.map((req) => (
+                  <tr key={req.id}>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded text-xs border ${
+                        req.type === 'Capability' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-purple-50 text-purple-700 border-purple-100'
+                      }`}>
+                        {req.type}
+                      </span>
+                    </td>
+                    <td className="p-4 font-medium">{req.desc}</td>
+                    <td className="p-4"><span className="text-green-600 font-medium">{req.required}</span></td>
+                    <td className="p-4">
+                      <button 
+                        onClick={() => handleRemove(req.id)}
+                        className="text-red-500 hover:text-red-700 text-xs font-medium cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -93,11 +127,66 @@ export default function IntentRequirements({ params }) {
 
       <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end gap-3">
         <Link href={`/app/intent/${params.requestId}/candidates`}>
-          <button className="px-6 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800">
+          <button className="px-6 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 cursor-pointer">
             Confirm & Generate Candidates →
           </button>
         </Link>
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleAddRequirement} className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Add Requirement</h3>
+              <button 
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Requirement Type</label>
+              <select 
+                value={newType} 
+                onChange={(e) => setNewType(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="Capability">Capability</option>
+                <option value="Output">Output</option>
+                <option value="Constraint">Constraint</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+              <input 
+                type="text" 
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                placeholder="E.g. Static code linting with 0 errors"
+                className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button 
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 cursor-pointer"
+              >
+                Add
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
     </div>
   );

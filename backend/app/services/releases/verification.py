@@ -1,2 +1,2 @@
 class VerificationService:
-    pass\n
+    pass

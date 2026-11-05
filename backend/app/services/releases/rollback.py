@@ -1,2 +1,2 @@
 class RollbackService:
-    pass\n
+    pass

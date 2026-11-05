@@ -1,2 +1,2 @@
 class ReleaseLockManager:
-    pass\n
+    pass

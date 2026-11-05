@@ -42,7 +42,7 @@ from backend.app.api.routes.recovery import router as recovery_router
 from backend.app.api.routes.developer import developer_router
 from backend.app.api.routes.marketplace import router as marketplace_router
 from backend.app.api.routes.collaboration import router as collaboration_router
-from backend.app.api.routes.agents import agents_router, teams_router, runs_router
+from backend.app.api.routes.agents import agents_router, teams_router, runs_router as agent_runs_router
 from backend.app.api.routes.simulation import (
     simulations_router,
     scenarios_router,
@@ -126,7 +126,7 @@ api_router.include_router(marketplace_router)
 api_router.include_router(collaboration_router)
 api_router.include_router(agents_router)
 api_router.include_router(teams_router)
-api_router.include_router(runs_router)
+api_router.include_router(agent_runs_router)
 api_router.include_router(simulations_router)
 api_router.include_router(scenarios_router)
 api_router.include_router(suites_router)

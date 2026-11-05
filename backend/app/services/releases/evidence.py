@@ -1,2 +1,2 @@
 class EvidenceCollector:
-    pass\n
+    pass

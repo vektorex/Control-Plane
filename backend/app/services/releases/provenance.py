@@ -1,2 +1,2 @@
 class ProvenanceTracker:
-    pass\n
+    pass

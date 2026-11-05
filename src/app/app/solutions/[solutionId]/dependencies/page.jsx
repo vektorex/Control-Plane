@@ -1,10 +1,48 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function SolutionDependencies({ params }) {
   // params.solutionId
+  const [exported, setExported] = useState(false);
+
+  const handleExport = () => {
+    const manifest = {
+      solution_id: params?.solutionId || "sol-demo-1",
+      name: "Automated GitHub Security Review",
+      version: "2.1.0",
+      dependencies: [
+        {
+          id: "agent-team-sast",
+          type: "agent_team",
+          name: "Static Code Analysis Team",
+          children: [
+            { id: "agent-sast-reviewer", type: "agent", name: "SAST Reviewer v1.2" },
+            { id: "model-gpt4", type: "model", name: "GPT-4" },
+            { id: "tool-sonarqube", type: "tool", name: "SonarQube Scanner" },
+            { id: "agent-dep-auditor", type: "agent", name: "Dependency Auditor v1.0" }
+          ]
+        },
+        {
+          id: "connector-github",
+          type: "connector",
+          name: "GitHub Repository Extractor"
+        }
+      ],
+      exported_at: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `solution-${params?.solutionId || "manifest"}-dependencies.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExported(true);
+    setTimeout(() => setExported(false), 3000);
+  };
   
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -25,8 +63,11 @@ export default function SolutionDependencies({ params }) {
           <h1 className="text-3xl font-bold">Dependency Tree</h1>
           <p className="text-gray-500 mt-2">Trace capabilities back to their foundational resources.</p>
         </div>
-        <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">
-          Export Dependency Manifest
+        <button 
+          onClick={handleExport}
+          className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer"
+        >
+          {exported ? "✓ Manifest Exported" : "Export Dependency Manifest"}
         </button>
       </div>
 

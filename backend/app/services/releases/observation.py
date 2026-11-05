@@ -1,2 +1,2 @@
 class ObservationService:
-    pass\n
+    pass

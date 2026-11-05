@@ -1,2 +1,2 @@
 class HealthMonitor:
-    pass\n
+    pass

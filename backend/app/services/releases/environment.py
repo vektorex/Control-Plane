@@ -1,2 +1,2 @@
 class EnvironmentService:
-    pass\n
+    pass

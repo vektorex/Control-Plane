@@ -1,2 +1,2 @@
 class AbortManager:
-    pass\n
+    pass

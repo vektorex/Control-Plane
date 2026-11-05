@@ -1,2 +1,2 @@
 class RolloutGateEngine:
-    pass\n
+    pass

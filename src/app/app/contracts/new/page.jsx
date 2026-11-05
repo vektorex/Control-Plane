@@ -1,9 +1,22 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function NewContract() {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [name, setName] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setIsSubmitting(false);
+    router.push('/app/contracts');
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <nav className="mb-6 text-sm">
@@ -16,13 +29,19 @@ export default function NewContract() {
 
       <h1 className="text-3xl font-bold mb-8">Draft Work Contract</h1>
 
-      <div className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-8">
         <div className="bg-white p-6 rounded-xl border border-gray-200">
           <h2 className="text-xl font-semibold mb-6">Basic Information</h2>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Contract Name</label>
-              <input type="text" className="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g. Q4 Competitor Analysis" />
+              <input 
+                type="text" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                className="w-full p-2 border border-gray-300 rounded-md" 
+                placeholder="e.g. Q4 Competitor Analysis" 
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Objective Link (Optional)</label>
@@ -45,7 +64,7 @@ export default function NewContract() {
         <div className="bg-white p-6 rounded-xl border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">Service Level Agreements</h2>
-            <button className="text-sm text-blue-600 font-medium">Add SLA +</button>
+            <button type="button" onClick={() => {}} className="text-sm text-blue-600 font-medium">Add SLA +</button>
           </div>
           <div className="p-4 border border-gray-200 rounded-lg mb-4 bg-gray-50">
             <div className="grid grid-cols-3 gap-4">
@@ -74,11 +93,17 @@ export default function NewContract() {
         
         <div className="flex justify-end gap-4">
           <Link href="/app/contracts">
-            <button className="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">Cancel</button>
+            <button type="button" className="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">Cancel</button>
           </Link>
-          <button className="px-6 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800">Propose Contract</button>
+          <button 
+            type="submit" 
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 cursor-pointer"
+          >
+            {isSubmitting ? 'Submitting...' : 'Propose Contract'}
+          </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

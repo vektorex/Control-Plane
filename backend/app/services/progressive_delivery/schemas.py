@@ -12,4 +12,4 @@ class RolloutCreate(BaseModel):
 
 class RolloutResponse(RolloutCreate):
     id: str
-    status: RolloutStatus\n
+    status: RolloutStatus

@@ -5,6 +5,19 @@ import Link from 'next/link';
 
 export default function KnowledgeBase() {
   const [activeTab, setActiveTab] = useState('recently_verified');
+  const [showModal, setShowModal] = useState(false);
+  const [items, setItems] = useState([1, 2, 3]);
+  const [newTitle, setNewTitle] = useState('');
+  const [newContent, setNewContent] = useState('');
+
+  const handleCreateKnowledge = (e) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+    setItems(prev => [Date.now(), ...prev]);
+    setShowModal(false);
+    setNewTitle('');
+    setNewContent('');
+  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -24,11 +37,61 @@ export default function KnowledgeBase() {
               Conflicts
             </button>
           </Link>
-          <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium">
+          <button 
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium cursor-pointer"
+          >
             New Knowledge
           </button>
         </div>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-gray-200">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Add Knowledge Item</h3>
+            <form onSubmit={handleCreateKnowledge} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input 
+                  type="text" 
+                  required
+                  value={newTitle} 
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="e.g. Rate Limiting Policy for LLM Calls"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Content / Rule</label>
+                <textarea 
+                  rows={4}
+                  value={newContent} 
+                  onChange={(e) => setNewContent(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="Detail the verified policy or pattern..."
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-3">
+                <button 
+                  type="button" 
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-black text-white rounded-lg text-sm hover:bg-gray-800"
+                >
+                  Save Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">

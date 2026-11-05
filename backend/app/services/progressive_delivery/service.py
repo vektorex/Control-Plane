@@ -24,4 +24,4 @@ class ProgressiveDeliveryService:
         )
         self.session.add(rollout)
         await self.session.commit()
-        return rollout\n
+        return rollout

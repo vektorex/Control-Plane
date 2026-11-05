@@ -530,4 +530,4 @@ from backend.app.db.models.release import Release, ReleaseCandidate, ReleaseEnvi
 from backend.app.db.models.progressive_delivery import ProgressiveRollout, RolloutPlan, RolloutStage, RolloutTarget, RolloutCohort, RolloutHealthSnapshot, RolloutComparison, RolloutGate, RolloutEvidence, RolloutTimelineEvent, RolloutPause
 
 from backend.app.db.models.release_coordination import ReleasePortfolio, ReleaseTrain, ReleaseGroup, ReleaseWave, ReleaseSequence, ReleaseWaveItem, ReleaseDependency, ReleaseConflict, ChangeWindow, ReleaseCalendarEntry, CoordinationDecision
-\nfrom .release_optimization import *\n
+from backend.app.db.models.release_optimization import *

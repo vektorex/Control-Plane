@@ -1,2 +1,2 @@
 class BaselineComparison:
-    pass\n
+    pass

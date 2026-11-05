@@ -1,2 +1,2 @@
 class RolloutPolicy:
-    pass\n
+    pass

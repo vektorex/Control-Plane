@@ -3,4 +3,4 @@ class DecisionEventDispatcher:
         self.event_bus = event_bus
         
     def dispatch(self, event_type, payload):
-        self.event_bus.publish(f"decision.{event_type}", payload)\n
+        self.event_bus.publish(f"decision.{event_type}", payload)

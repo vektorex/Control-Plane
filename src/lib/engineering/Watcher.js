@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class EngineeringWatcher {
+
   /** Feature 1 — Continuous Security Engineering Watcher */
   async logEvent(tenantId, source, repo, findings, severity) {
     return await prisma.securityEngineeringWatcherEvent.create({
@@ -80,3 +81,6 @@ export class EngineeringWatcher {
     });
   }
 }
+
+export { EngineeringWatcher as Watcher };
+

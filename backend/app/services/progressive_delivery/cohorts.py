@@ -1,2 +1,2 @@
 class CohortManager:
-    pass\n
+    pass

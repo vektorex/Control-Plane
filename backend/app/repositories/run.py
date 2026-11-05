@@ -38,6 +38,16 @@ class RunRepository:
             raise NotFoundError(f"Run with id '{run_id}' not found.")
         return run
 
+    async def get_workspace_id_for_run(self, run_id: UUID) -> Optional[UUID]:
+        stmt = (
+            select(Project.workspace_id)
+            .join(Task, Task.project_id == Project.id)
+            .join(Run, Run.task_id == Task.id)
+            .where(Run.id == run_id)
+        )
+        res = await self.session.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def list_by_task(
         self, task_id: UUID, owner_user_id: UUID, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Run], int]:

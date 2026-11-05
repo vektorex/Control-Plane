@@ -34,4 +34,4 @@ class StageStatus(str, Enum):
     failed = "failed"
     paused = "paused"
     skipped = "skipped"
-    rolled_back = "rolled_back"\n
+    rolled_back = "rolled_back"

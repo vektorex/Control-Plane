@@ -24,9 +24,27 @@ export default function IntentWorkspace() {
         ></textarea>
         <div className="bg-gray-50 p-4 border-t border-gray-100 flex justify-between items-center">
           <div className="flex gap-2">
-            <button className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">Data Analysis</button>
-            <button className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">Security Review</button>
-            <button className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">Document Processing</button>
+            <button 
+              type="button"
+              onClick={() => setIntent("Perform comprehensive data analysis on quarterly financial spreadsheets and summarize key trends.")}
+              className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 cursor-pointer"
+            >
+              Data Analysis
+            </button>
+            <button 
+              type="button"
+              onClick={() => setIntent("Review repository codebase and dependencies for security vulnerabilities and produce an audit report.")}
+              className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 cursor-pointer"
+            >
+              Security Review
+            </button>
+            <button 
+              type="button"
+              onClick={() => setIntent("Extract structured entities and key metrics from uploaded PDF documents into JSON.")}
+              className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 cursor-pointer"
+            >
+              Document Processing
+            </button>
           </div>
           <Link href={`/app/intent/req-123`}>
             <button className="px-6 py-2 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors">

@@ -37,10 +37,10 @@ class ComplianceEvidenceService:
         Retrieves the most recent evidence_hash in the chain for an organization or workspace.
         """
         query = select(ComplianceEvidence.evidence_hash).where(
-            ComplianceEvidence.organization_id == organization_id
+            ComplianceEvidence.organization_id == str(organization_id)
         )
         if workspace_id:
-            query = query.where(ComplianceEvidence.workspace_id == workspace_id)
+            query = query.where(ComplianceEvidence.workspace_id == str(workspace_id))
         query = query.order_by(desc(ComplianceEvidence.timestamp), desc(ComplianceEvidence.id)).limit(1)
 
         result = await self.session.execute(query)
@@ -67,23 +67,30 @@ class ComplianceEvidenceService:
         Creates an immutable, cryptographically chained compliance evidence record.
         Sanitizes metadata to prevent secret leakage in evidence logs.
         """
+        org_id_str = str(organization_id)
+        ws_id_str = str(workspace_id) if workspace_id is not None else None
+        subj_id_str = str(subject_id)
+        act_id_str = str(actor_id) if actor_id is not None else None
+        pol_ver_str = str(policy_version_id) if policy_version_id is not None else None
+        gov_dec_str = str(governance_decision_id) if governance_decision_id is not None else None
+
         ts = timestamp or datetime.now(timezone.utc)
         sanitized_meta = sanitize_payload(metadata or {})
 
-        prev_hash = await self.get_latest_hash(organization_id, workspace_id)
+        prev_hash = await self.get_latest_hash(org_id_str, ws_id_str)
 
         canonical_content = canonical_json({
-            "organization_id": organization_id,
-            "workspace_id": workspace_id,
+            "organization_id": org_id_str,
+            "workspace_id": ws_id_str,
             "evidence_type": evidence_type,
             "subject_type": subject_type,
-            "subject_id": str(subject_id),
+            "subject_id": subj_id_str,
             "action": action,
             "result": result,
             "actor_type": actor_type,
-            "actor_id": str(actor_id) if actor_id else None,
-            "policy_version_id": str(policy_version_id) if policy_version_id else None,
-            "governance_decision_id": str(governance_decision_id) if governance_decision_id else None,
+            "actor_id": act_id_str,
+            "policy_version_id": pol_ver_str,
+            "governance_decision_id": gov_dec_str,
             "timestamp": ts.isoformat(),
             "metadata": sanitized_meta,
         })
@@ -91,17 +98,17 @@ class ComplianceEvidenceService:
         record_hash = compute_evidence_hash(prev_hash, canonical_content)
 
         record = ComplianceEvidence(
-            organization_id=organization_id,
-            workspace_id=workspace_id,
+            organization_id=org_id_str,
+            workspace_id=ws_id_str,
             evidence_type=evidence_type,
             subject_type=subject_type,
-            subject_id=str(subject_id),
+            subject_id=subj_id_str,
             action=action,
             result=result,
-            policy_version_id=str(policy_version_id) if policy_version_id else None,
-            governance_decision_id=str(governance_decision_id) if governance_decision_id else None,
+            policy_version_id=pol_ver_str,
+            governance_decision_id=gov_dec_str,
             actor_type=actor_type,
-            actor_id=str(actor_id) if actor_id else None,
+            actor_id=act_id_str,
             timestamp=ts,
             evidence_hash=record_hash,
             previous_evidence_hash=prev_hash,
@@ -123,10 +130,10 @@ class ComplianceEvidenceService:
         Returns (is_valid, total_checked, broken_record_ids).
         """
         query = select(ComplianceEvidence).where(
-            ComplianceEvidence.organization_id == organization_id
+            ComplianceEvidence.organization_id == str(organization_id)
         )
         if workspace_id:
-            query = query.where(ComplianceEvidence.workspace_id == workspace_id)
+            query = query.where(ComplianceEvidence.workspace_id == str(workspace_id))
         query = query.order_by(ComplianceEvidence.timestamp.asc(), ComplianceEvidence.id.asc())
 
         res = await self.session.execute(query)

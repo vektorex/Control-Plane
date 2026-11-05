@@ -8,4 +8,4 @@ class GovernanceReadinessRule(BaseReadinessRule):
 
 class SecurityReadinessRule(BaseReadinessRule):
     def evaluate(self, state, context):
-        return {"satisfied": True, "blocking": True}\n
+        return {"satisfied": True, "blocking": True}

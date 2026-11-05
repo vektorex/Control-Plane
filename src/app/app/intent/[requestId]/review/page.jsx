@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function CandidateReview({ params }) {
-  // params.requestId
+  const router = useRouter();
   const [status, setStatus] = useState('review_required'); // review_required, converting, converted
 
   const handleConvert = () => {
@@ -12,6 +13,10 @@ export default function CandidateReview({ params }) {
     setTimeout(() => {
       setStatus('converted');
     }, 1500);
+  };
+
+  const handleReject = () => {
+    router.push(`/app/intent/${params.requestId}/candidates`);
   };
 
   return (
@@ -34,7 +39,10 @@ export default function CandidateReview({ params }) {
           <p className="text-gray-500">Review the synthesized solution blueprint and execution constraints.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-black">
+          <button 
+            onClick={handleReject}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 bg-white text-black cursor-pointer"
+          >
             Reject & Regenerate
           </button>
           <button 

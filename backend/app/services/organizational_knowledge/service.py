@@ -15,7 +15,7 @@ from backend.app.db.models.organizational_knowledge import (
     KnowledgeConflict,
 )
 from backend.app.services.events.service import EventBus
-from backend.app.services.auth_service import get_current_user
+from backend.app.core.auth import get_current_user
 
 class OrganizationalKnowledgeService:
     def __init__(self, session: Session, event_bus: EventBus):

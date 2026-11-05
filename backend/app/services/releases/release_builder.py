@@ -1,2 +1,2 @@
 class ReleasePlanBuilder:
-    pass\n
+    pass

@@ -1,2 +1,2 @@
 class ReleasePolicies:
-    pass\n
+    pass

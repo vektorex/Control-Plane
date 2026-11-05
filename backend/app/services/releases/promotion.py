@@ -1,2 +1,2 @@
 class PromotionService:
-    pass\n
+    pass

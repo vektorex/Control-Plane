@@ -1,9 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function ContractAcceptanceView({ params }) {
+  const [manualVerified, setManualVerified] = useState(false);
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <nav className="mb-6 text-sm">
@@ -43,17 +45,27 @@ export default function ContractAcceptanceView({ params }) {
               <h3 className="text-lg font-semibold">2. PDF Format</h3>
               <p className="text-sm text-gray-500 mt-1">The final deliverable must be a correctly formatted PDF document.</p>
             </div>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              Pending
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              manualVerified ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+            }`}>
+              {manualVerified ? "Passed" : "Pending"}
             </span>
           </div>
           <div className="bg-gray-50 p-4 rounded-lg flex justify-between items-center">
             <div>
-              <p className="text-sm text-gray-700">Awaiting file submission.</p>
+              <p className="text-sm text-gray-700">
+                {manualVerified ? "Verified manually by authorized reviewer." : "Awaiting file submission."}
+              </p>
             </div>
-            <button className="px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-medium">
-              Manual Verification
-            </button>
+            {!manualVerified && (
+              <button 
+                type="button"
+                onClick={() => setManualVerified(true)}
+                className="px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-medium cursor-pointer"
+              >
+                Manual Verification
+              </button>
+            )}
           </div>
         </div>
       </div>

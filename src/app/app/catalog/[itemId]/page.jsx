@@ -2,8 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function CatalogDetailView({ params }) {
+  const router = useRouter();
   // params.itemId
   
   return (
@@ -33,11 +35,13 @@ export default function CatalogDetailView({ params }) {
           <p className="text-gray-500 max-w-2xl text-lg">A specialized team of agents configured to scrape, synthesize, and cite sources for deep market research.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium">
-            Use in Workflow
-          </button>
+          <Link href="/app/workflows">
+            <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium cursor-pointer">
+              Use in Workflow
+            </button>
+          </Link>
           <Link href="/app/contracts/new">
-            <button className="px-4 py-2 border border-gray-200 bg-white text-black rounded-lg hover:bg-gray-50 font-medium">
+            <button className="px-4 py-2 border border-gray-200 bg-white text-black rounded-lg hover:bg-gray-50 font-medium cursor-pointer">
               Create Contract
             </button>
           </Link>
@@ -150,7 +154,11 @@ export default function CatalogDetailView({ params }) {
               </li>
             </ul>
             <div className="mt-6">
-              <button className="w-full py-2 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+              <button 
+                type="button"
+                onClick={() => router.push('/app/agent-teams')}
+                className="w-full py-2 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              >
                 View Source Resource ↗
               </button>
             </div>

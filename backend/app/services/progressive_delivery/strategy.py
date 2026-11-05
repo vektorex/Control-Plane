@@ -1,2 +1,2 @@
 class RolloutStrategyEngine:
-    pass\n
+    pass

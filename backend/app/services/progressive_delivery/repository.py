@@ -1,2 +1,2 @@
 class RolloutRepository:
-    pass\n
+    pass

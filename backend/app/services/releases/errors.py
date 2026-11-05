@@ -5,4 +5,4 @@ class AuthorizationError(ReleaseError):
 class PreconditionError(ReleaseError):
     pass
 class VerificationError(ReleaseError):
-    pass\n
+    pass

@@ -1,2 +1,2 @@
 class MetricsCollector:
-    pass\n
+    pass

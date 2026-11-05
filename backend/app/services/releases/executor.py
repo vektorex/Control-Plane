@@ -1,2 +1,2 @@
 class ReleaseExecutor:
-    pass\n
+    pass

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Menu, Search, ChevronRight, Activity, Bell } from "lucide-react";
 import { UserDropdown } from "./UserDropdown";
@@ -11,6 +11,7 @@ import { useEventStream } from "@/lib/events";
 
 export function AppHeader({ onToggleMobile }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { activeWorkspace } = useWorkspace();
   const [unreadCount, setUnreadCount] = React.useState(0);
 
@@ -88,7 +89,7 @@ export function AppHeader({ onToggleMobile }) {
         {/* Quick Search Shell */}
         <button
           type="button"
-          onClick={() => {}}
+          onClick={() => router.push("/app/tasks")}
           className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 hover:text-slate-300 transition-colors cursor-pointer"
         >
           <Search className="w-3.5 h-3.5" />

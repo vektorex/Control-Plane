@@ -1,2 +1,2 @@
 class ReleaseValidator:
-    pass\n
+    pass

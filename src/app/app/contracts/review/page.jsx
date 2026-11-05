@@ -1,9 +1,20 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function ContractReview() {
+  const router = useRouter();
+  const [decision, setDecision] = useState(null);
+
+  const handleAction = (status) => {
+    setDecision(status);
+    setTimeout(() => {
+      router.push('/app/contracts');
+    }, 800);
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <nav className="mb-6 text-sm">
@@ -18,6 +29,14 @@ export default function ContractReview() {
         <h1 className="text-3xl font-bold">Contract Review</h1>
         <p className="text-gray-500 mt-2">Approve or reject proposed work contracts before they become active.</p>
       </div>
+
+      {decision && (
+        <div className={`mb-6 p-4 rounded-xl text-sm font-medium ${
+          decision === 'approved' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          Contract {decision === 'approved' ? 'approved and activated successfully' : 'rejected'}. Redirecting to contracts...
+        </div>
+      )}
 
       <div className="space-y-6">
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -59,10 +78,20 @@ export default function ContractReview() {
           <div className="bg-gray-50 px-6 py-4 flex justify-between items-center">
             <span className="text-sm text-gray-500">Approvals required: 1 / 1</span>
             <div className="flex gap-3">
-              <button className="px-6 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-100 font-medium">
+              <button 
+                type="button" 
+                onClick={() => handleAction('rejected')}
+                disabled={!!decision}
+                className="px-6 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-100 font-medium cursor-pointer disabled:opacity-50"
+              >
                 Reject
               </button>
-              <button className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium">
+              <button 
+                type="button" 
+                onClick={() => handleAction('approved')}
+                disabled={!!decision}
+                className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium cursor-pointer disabled:opacity-50"
+              >
                 Approve & Activate
               </button>
             </div>

@@ -1,2 +1,2 @@
 class PauseManager:
-    pass\n
+    pass

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, DateTime, Text, JSON, Boolean, ForeignKey, Integer
 from sqlalchemy.sql import func
-from app.db.base import Base
+from backend.app.db.base import Base
 
 class ProgressiveRollout(Base):
     __tablename__ = "progressive_rollouts"

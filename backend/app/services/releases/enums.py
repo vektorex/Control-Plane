@@ -40,4 +40,4 @@ class CandidateStatus(str, Enum):
     approved = "approved"
     released = "released"
     failed = "failed"
-    rolled_back = "rolled_back"\n
+    rolled_back = "rolled_back"

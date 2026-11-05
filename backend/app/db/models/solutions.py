@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum, JSON, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.base import Base
+from backend.app.db.base import Base
 import enum
 
 class SolutionStatus(str, enum.Enum):

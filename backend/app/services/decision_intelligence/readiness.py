@@ -4,4 +4,4 @@ class ReadinessEngine:
         self.rules = [GovernanceReadinessRule(), SecurityReadinessRule()]
         
     def evaluate(self, state, context):
-        return {"overall_state": "ready", "conditions": []}\n
+        return {"overall_state": "ready", "conditions": []}

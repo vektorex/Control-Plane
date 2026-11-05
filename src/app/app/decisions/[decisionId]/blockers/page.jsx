@@ -1,11 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function BlockersView({ params }) {
-  // params.decisionId
-  
+  const [approvalRequested, setApprovalRequested] = useState(false);
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <nav className="mb-6 text-sm">
@@ -38,7 +38,19 @@ export default function BlockersView({ params }) {
             <p className="text-sm text-gray-600 mb-3">Execution on Confidential data requires Data Steward sign-off.</p>
             <div className="flex items-center justify-between pt-3 border-t border-gray-100">
               <span className="text-xs text-gray-500">Domain: Data Governance</span>
-              <button className="px-3 py-1 bg-black text-white rounded text-xs font-medium hover:bg-gray-800">Remediate: Request Approval</button>
+              {approvalRequested ? (
+                <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded text-xs font-semibold">
+                  ✓ Approval Requested
+                </span>
+              ) : (
+                <button 
+                  type="button"
+                  onClick={() => setApprovalRequested(true)}
+                  className="px-3 py-1 bg-black text-white rounded text-xs font-medium hover:bg-gray-800 cursor-pointer"
+                >
+                  Remediate: Request Approval
+                </button>
+              )}
             </div>
           </div>
         </div>

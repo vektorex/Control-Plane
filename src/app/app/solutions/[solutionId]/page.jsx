@@ -1,10 +1,20 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function SolutionDetailView({ params }) {
   // params.solutionId
+  const [instantiated, setInstantiated] = useState(false);
+  const [addedToPlan, setAddedToPlan] = useState(false);
+
+  const handleInstantiate = () => {
+    setInstantiated(true);
+  };
+
+  const handleAddToPlan = () => {
+    setAddedToPlan(true);
+  };
   
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -15,6 +25,24 @@ export default function SolutionDetailView({ params }) {
         <span className="mx-2 text-gray-400">/</span>
         <span className="text-gray-900">Automated GitHub Security Review</span>
       </nav>
+
+      {instantiated && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center justify-between">
+          <span>Solution instantiated successfully into the Workflow Engine!</span>
+          <Link href="/app/workflows" className="font-semibold underline hover:text-green-900">
+            View Workflows →
+          </Link>
+        </div>
+      )}
+
+      {addedToPlan && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm flex items-center justify-between">
+          <span>Added to current release work plan.</span>
+          <Link href="/app/releases" className="font-semibold underline hover:text-blue-900">
+            View Release Coordination →
+          </Link>
+        </div>
+      )}
 
       <div className="flex justify-between items-start mb-8">
         <div>
@@ -149,11 +177,17 @@ export default function SolutionDetailView({ params }) {
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h3 className="font-bold text-gray-900 mb-4">Instantiation</h3>
             <p className="text-sm text-gray-600 mb-4">This solution can be instantiated as a managed run.</p>
-            <button className="w-full py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
-              Instantiate in Workflow Engine
+            <button 
+              onClick={handleInstantiate}
+              className="w-full py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+            >
+              {instantiated ? "✓ Instantiated" : "Instantiate in Workflow Engine"}
             </button>
-            <button className="w-full py-2 mt-2 border border-gray-300 text-black text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-              Add to Work Plan
+            <button 
+              onClick={handleAddToPlan}
+              className="w-full py-2 mt-2 border border-gray-300 text-black text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              {addedToPlan ? "✓ Added to Plan" : "Add to Work Plan"}
             </button>
           </div>
         </div>

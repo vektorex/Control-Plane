@@ -1,2 +1,2 @@
 class RolloutController:
-    pass\n
+    pass

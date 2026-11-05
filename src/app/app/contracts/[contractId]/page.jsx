@@ -1,10 +1,18 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function ContractDetail({ params }) {
-  // params.contractId
+  const [isPaused, setIsPaused] = useState(false);
+  const [statusMsg, setStatusMsg] = useState(null);
+
+  const togglePause = () => {
+    setIsPaused((prev) => !prev);
+    setStatusMsg(!isPaused ? "Contract paused." : "Contract resumed.");
+    setTimeout(() => setStatusMsg(null), 3000);
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Breadcrumb */}
@@ -16,12 +24,20 @@ export default function ContractDetail({ params }) {
         <span className="text-gray-900">Q4 Competitor Pricing Analysis</span>
       </nav>
 
+      {statusMsg && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-lg">
+          {statusMsg}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-start mb-8">
         <div>
           <div className="flex items-center gap-3 mb-3">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              Active
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              isPaused ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+            }`}>
+              {isPaused ? 'Paused' : 'Active'}
             </span>
             <span className="text-sm font-medium text-gray-500">v2 (Published Oct 1, 2026)</span>
           </div>
@@ -29,12 +45,17 @@ export default function ContractDetail({ params }) {
           <p className="text-gray-500 max-w-2xl">Generate a comprehensive report comparing our pricing tiers against top 5 competitors, including feature-level breakdown.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium">
-            Pause
+          <button 
+            onClick={togglePause}
+            className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium cursor-pointer"
+          >
+            {isPaused ? "Resume Contract" : "Pause"}
           </button>
-          <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium">
-            Edit Contract
-          </button>
+          <Link href="/app/contracts/new">
+            <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 text-sm font-medium cursor-pointer">
+              Edit Contract
+            </button>
+          </Link>
         </div>
       </div>
 

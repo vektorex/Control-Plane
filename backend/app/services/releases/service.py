@@ -24,4 +24,4 @@ class ReleaseService:
         )
         self.session.add(new_release)
         await self.session.commit()
-        return new_release\n
+        return new_release

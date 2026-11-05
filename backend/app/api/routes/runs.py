@@ -44,9 +44,8 @@ async def get_run_trace(
     Enforces ownership isolation. Never exposes hidden chain-of-thought.
     """
     run_repo = RunRepository(session)
-    run = await run_repo.get_by_id_and_owner_or_raise(run_id, user.id)
-    # Get workspace id from task -> project -> workspace
-    ws_id = run.task.project.workspace_id if (run.task and run.task.project) else None
+    await run_repo.get_by_id_and_owner_or_raise(run_id, user.id)
+    ws_id = await run_repo.get_workspace_id_for_run(run_id)
     if not ws_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace context for run not found.")
 
@@ -64,8 +63,8 @@ async def get_run_usage(
     Retrieve granular LLM usage records for a run across planning, generation, evaluation, and revision.
     """
     run_repo = RunRepository(session)
-    run = await run_repo.get_by_id_and_owner_or_raise(run_id, user.id)
-    ws_id = run.task.project.workspace_id if (run.task and run.task.project) else None
+    await run_repo.get_by_id_and_owner_or_raise(run_id, user.id)
+    ws_id = await run_repo.get_workspace_id_for_run(run_id)
     if not ws_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace context for run not found.")
 
@@ -83,8 +82,8 @@ async def get_run_telemetry(
     Retrieve consolidated execution telemetry record for a run.
     """
     run_repo = RunRepository(session)
-    run = await run_repo.get_by_id_and_owner_or_raise(run_id, user.id)
-    ws_id = run.task.project.workspace_id if (run.task and run.task.project) else None
+    await run_repo.get_by_id_and_owner_or_raise(run_id, user.id)
+    ws_id = await run_repo.get_workspace_id_for_run(run_id)
     if not ws_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace context for run not found.")
 

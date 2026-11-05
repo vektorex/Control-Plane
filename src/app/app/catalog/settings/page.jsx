@@ -1,9 +1,23 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function CatalogSettings() {
+  const router = useRouter();
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedMessage, setSavedMessage] = useState('');
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    // Simulate save persistence
+    await new Promise(resolve => setTimeout(resolve, 600));
+    setIsSaving(false);
+    setSavedMessage('Settings saved successfully.');
+    setTimeout(() => setSavedMessage(''), 3000);
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <nav className="mb-6 text-sm">
@@ -15,6 +29,12 @@ export default function CatalogSettings() {
       </nav>
 
       <h1 className="text-3xl font-bold mb-8">Catalog Settings</h1>
+
+      {savedMessage && (
+        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm">
+          {savedMessage}
+        </div>
+      )}
 
       <div className="space-y-6">
         <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -51,8 +71,21 @@ export default function CatalogSettings() {
         </div>
         
         <div className="flex justify-end gap-3 mt-8">
-          <button className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">Cancel</button>
-          <button className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium">Save Settings</button>
+          <button 
+            type="button" 
+            onClick={() => router.push('/app/catalog')} 
+            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            type="button" 
+            onClick={handleSave} 
+            disabled={isSaving}
+            className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium cursor-pointer disabled:opacity-50"
+          >
+            {isSaving ? 'Saving...' : 'Save Settings'}
+          </button>
         </div>
       </div>
     </div>

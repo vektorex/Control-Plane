@@ -1,9 +1,28 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function KnowledgeFreshness() {
+  const [items, setItems] = useState([
+    {
+      id: "kf-1",
+      name: "OAuth Provider Configuration",
+      category: "Security Rule",
+      status: "Stale",
+      reason: "Source policy was modified 3 days ago.",
+      verified: false
+    }
+  ]);
+
+  const handleReverify = (id) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, status: "Verified", reason: "Re-verified just now", verified: true } : item
+      )
+    );
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <nav className="mb-6 text-sm">
@@ -59,23 +78,36 @@ export default function KnowledgeFreshness() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            <tr>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="font-medium text-sm text-gray-900">OAuth Provider Configuration</div>
-                <div className="text-xs text-gray-500">Security Rule</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  Stale
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <div className="text-sm text-gray-900">Source policy was modified 3 days ago.</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <button className="text-blue-600 hover:text-blue-900">Re-verify</button>
-              </td>
-            </tr>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="font-medium text-sm text-gray-900">{item.name}</div>
+                  <div className="text-xs text-gray-500">{item.category}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    item.status === 'Verified' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {item.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-900">{item.reason}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  {item.verified ? (
+                    <span className="text-green-600">✓ Verified</span>
+                  ) : (
+                    <button 
+                      onClick={() => handleReverify(item.id)}
+                      className="text-blue-600 hover:text-blue-900 font-semibold cursor-pointer"
+                    >
+                      Re-verify
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

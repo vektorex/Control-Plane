@@ -87,7 +87,7 @@ Search APIs are abstracted behind `WebSearchProvider`:
 - **`DuckDuckGoSearchProvider`**: Zero-key out-of-the-box search provider
 - **`TavilySearchProvider`**: AI-optimized search with native snippets and dates
 - **`SerperSearchProvider`**: Google Search API adapter
-- **`MockWebSearchProvider`**: Deterministic test provider for CI/CD
+- **`MockWebSearchProvider`**: Deterministic test provider for automated testing
 
 ### 5. Untrusted Data Boundary & Prompt Injection Safety
 Web search content is strictly treated as **UNTRUSTED EXTERNAL DATA**:

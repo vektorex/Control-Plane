@@ -1,4 +1,0 @@
-# Disables all GitLab CI/CD pipelines for this repository
-workflow:
-  rules:
-    - when: never

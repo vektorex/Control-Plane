@@ -211,11 +211,11 @@ class TaskExecutionService:
             manual_model_pref=request.model or getattr(task, "preferred_model", None),
         )
 
-        if model_mode == "manual" and (request.model or getattr(task, "preferred_model", None)):
+        if (model_mode == "manual" or request.model) and (request.model or getattr(task, "preferred_model", None)):
             target_manual = request.model or getattr(task, "preferred_model", settings.GENERATION_DEFAULT_MODEL)
             model_selection = default_model_router.validate_manual_selection(
                 model_id=target_manual,
-                provider=request.provider,
+                provider=getattr(request, "provider", None),
                 requirements=model_reqs,
             )
         else:
@@ -936,11 +936,11 @@ class TaskExecutionService:
             manual_model_pref=request.model or getattr(task, "preferred_model", None),
         )
 
-        if model_mode == "manual" and (request.model or getattr(task, "preferred_model", None)):
+        if (model_mode == "manual" or request.model) and (request.model or getattr(task, "preferred_model", None)):
             target_manual = request.model or getattr(task, "preferred_model", settings.GENERATION_DEFAULT_MODEL)
             model_selection = default_model_router.validate_manual_selection(
                 model_id=target_manual,
-                provider=request.provider,
+                provider=getattr(request, "provider", None),
                 requirements=model_reqs,
             )
         else:

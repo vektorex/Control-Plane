@@ -44,6 +44,17 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: Optional[str] = None
     OPENAI_TIMEOUT_SECONDS: float = 60.0
 
+    # Anthropic Provider Settings
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_DEFAULT_MODEL: str = "claude-3-5-sonnet"
+    ANTHROPIC_BASE_URL: Optional[str] = None
+    ANTHROPIC_TIMEOUT_SECONDS: float = 60.0
+
+    # Google Gemini Provider Settings
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_DEFAULT_MODEL: str = "gemini-1.5-flash"
+    GEMINI_TIMEOUT_SECONDS: float = 60.0
+
     # Database Settings (PostgreSQL + AsyncPG)
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_work_layer"
     DATABASE_ECHO: bool = False

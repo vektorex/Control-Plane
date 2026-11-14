@@ -3,6 +3,8 @@ from backend.app.core.logging import logger
 from backend.app.services.ai_gateway.adapters import (
     ModelProviderAdapter,
     OpenAIAdapter,
+    AnthropicAdapter,
+    GeminiAdapter,
     MockAdapter,
 )
 from backend.app.services.ai_gateway.errors import ProviderUnavailableError
@@ -21,12 +23,24 @@ class ProviderRegistry:
         self._initialize_builtins()
 
     def _initialize_builtins(self):
-        """Register built-in OpenAI and Mock adapters."""
+        """Register built-in OpenAI, Anthropic, Gemini, and Mock adapters."""
         try:
             openai_adapter = OpenAIAdapter()
             self.register(openai_adapter)
         except Exception as e:
             logger.warning(f"[ProviderRegistry] Failed to initialize default OpenAI adapter: {e}")
+
+        try:
+            anthropic_adapter = AnthropicAdapter()
+            self.register(anthropic_adapter)
+        except Exception as e:
+            logger.warning(f"[ProviderRegistry] Failed to initialize default Anthropic adapter: {e}")
+
+        try:
+            gemini_adapter = GeminiAdapter()
+            self.register(gemini_adapter)
+        except Exception as e:
+            logger.warning(f"[ProviderRegistry] Failed to initialize default Gemini adapter: {e}")
 
         mock_adapter = MockAdapter()
         self.register(mock_adapter)
@@ -51,6 +65,12 @@ class ProviderRegistry:
             factory_fn = app.dependency_overrides.get(get_llm_factory)
             factory = factory_fn() if factory_fn else None
             if factory:
+                if "mock" in pid and "mock_provider" in factory._providers:
+                    from backend.app.services.ai_gateway.adapters import BaseProviderAdapter
+                    return BaseProviderAdapter(factory._providers["mock_provider"])
+                if pid in factory._providers:
+                    from backend.app.services.ai_gateway.adapters import BaseProviderAdapter
+                    return BaseProviderAdapter(factory._providers[pid])
                 for reg_id, prov in factory._providers.items():
                     if pid in reg_id.lower() or reg_id.lower() in pid:
                         from backend.app.services.ai_gateway.adapters import BaseProviderAdapter

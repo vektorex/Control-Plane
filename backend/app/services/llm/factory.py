@@ -4,6 +4,8 @@ from backend.app.core.logging import logger
 from backend.app.schemas.models import ModelInfo, ModelListResponse, ProviderInfo
 from backend.app.services.llm.base import BaseLLMProvider
 from backend.app.services.llm.providers.openai import OpenAIProvider
+from backend.app.services.llm.providers.anthropic import AnthropicProvider
+from backend.app.services.llm.providers.gemini import GeminiProvider
 from backend.app.services.llm.providers.mock import MockLLMProvider
 
 
@@ -20,9 +22,10 @@ class LLMProviderFactory:
 
     def _initialize_default_providers(self):
         """Register the built-in provider adapters."""
-        openai_provider = OpenAIProvider()
-        self.register_provider(openai_provider)
-        logger.info("[LLMFactory] Initialized default provider registry.")
+        self.register_provider(OpenAIProvider())
+        self.register_provider(AnthropicProvider())
+        self.register_provider(GeminiProvider())
+        logger.info("[LLMFactory] Initialized default provider registry with OpenAI, Anthropic, and Gemini.")
 
     def register_provider(self, provider: BaseLLMProvider):
         """Register or override an LLM provider adapter."""

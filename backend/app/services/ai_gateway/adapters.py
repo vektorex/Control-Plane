@@ -340,3 +340,22 @@ class MockAdapter(BaseProviderAdapter):
     @property
     def is_configured(self) -> bool:
         return True
+
+
+class AnthropicAdapter(BaseProviderAdapter):
+    """Anthropic Claude Provider Adapter for AI Gateway runtime."""
+    def __init__(self, provider: Optional[BaseLLMProvider] = None):
+        if provider is None:
+            from backend.app.services.llm.providers.anthropic import AnthropicProvider
+            provider = AnthropicProvider()
+        super().__init__(provider)
+
+
+class GeminiAdapter(BaseProviderAdapter):
+    """Google Gemini Provider Adapter for AI Gateway runtime."""
+    def __init__(self, provider: Optional[BaseLLMProvider] = None):
+        if provider is None:
+            from backend.app.services.llm.providers.gemini import GeminiProvider
+            provider = GeminiProvider()
+        super().__init__(provider)
+

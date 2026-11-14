@@ -3,6 +3,8 @@ from backend.app.services.ai_gateway.adapters import (
     MockAdapter,
     ModelProviderAdapter,
     OpenAIAdapter,
+    AnthropicAdapter,
+    GeminiAdapter,
 )
 from backend.app.services.ai_gateway.errors import (
     AllFallbacksFailedError,
@@ -55,6 +57,8 @@ __all__ = [
     "ModelProviderAdapter",
     "BaseProviderAdapter",
     "OpenAIAdapter",
+    "AnthropicAdapter",
+    "GeminiAdapter",
     "MockAdapter",
     "ProviderRegistry",
     "default_provider_registry",

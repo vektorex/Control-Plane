@@ -697,7 +697,7 @@ def test_public_webhook_signature_verification(client, user1_auth):
 
     # 1. Unsigned request fails with 401
     raw_payload = b'{"msg":"hello world"}'
-    fail_res = client.post(f"/api/webhooks/{public_id}", data=raw_payload, headers={"Content-Type": "application/json"})
+    fail_res = client.post(f"/api/webhooks/{public_id}", content=raw_payload, headers={"Content-Type": "application/json"})
     assert fail_res.status_code == 401
 
     # 2. Correct HMAC signature succeeds with 202
@@ -708,7 +708,7 @@ def test_public_webhook_signature_verification(client, user1_auth):
         "X-Webhook-Timestamp": str(int(time.time())),
         "X-Idempotency-Key": f"idemp-{uuid.uuid4().hex[:8]}",
     }
-    ok_res = client.post(f"/api/webhooks/{public_id}", data=raw_payload, headers=headers)
+    ok_res = client.post(f"/api/webhooks/{public_id}", content=raw_payload, headers=headers)
     assert ok_res.status_code == 202
     assert ok_res.json()["accepted"] is True
 

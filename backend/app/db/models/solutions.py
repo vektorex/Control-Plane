@@ -37,7 +37,7 @@ class Solution(Base):
     owner_type = Column(String(50), nullable=False)
     owner_id = Column(String(36), nullable=False)
 
-    current_version_id = Column(String(36), ForeignKey("solution_versions.id"), nullable=True)
+    current_version_id = Column(String(36), ForeignKey("solution_versions.id", use_alter=True), nullable=True)
 
     created_by = Column(String(36), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

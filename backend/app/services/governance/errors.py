@@ -34,7 +34,7 @@ class GovernancePolicyVersionError(GovernanceError):
 
 class GovernancePolicyMalformedError(GovernanceError):
     """Raised when a policy rule set is invalid or cannot be activated."""
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     detail = "Governance policy is malformed and cannot be activated"
 
 
@@ -70,5 +70,5 @@ class GovernanceConflictError(GovernanceError):
 
 class GovernanceReservationError(GovernanceError):
     """Raised when budget reservation cannot be created."""
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     detail = "Budget reservation failed"

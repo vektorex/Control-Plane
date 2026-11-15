@@ -1,7 +1,7 @@
 """
 Pydantic schemas for Step 34: AI Security Operations, Threat Detection & Incident Response Layer.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ class SecurityEventNormalized(BaseModel):
     source_type: str = "api"  # auth, rbac, governance, gateway, tool, connector, workflow, job, trigger, artifact, memory, cache
     source_id: Optional[str] = None
 
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     request_id: Optional[str] = None
     correlation_id: Optional[str] = None
     causation_id: Optional[str] = None

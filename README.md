@@ -1,11 +1,12 @@
 # LLM Work Orchestration Layer (AI Work Layer)
 
+[![Release](https://img.shields.io/badge/Release-v1.0.0-blue?style=for-the-badge)](package.json)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.2.1-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
 [![Tailwind CSS 4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![Tests Passing](https://img.shields.io/badge/Tests-909%20Passing-brightgreen?style=for-the-badge&logo=pytest)](https://docs.pytest.org/)
+[![Tests Passing](https://img.shields.io/badge/Tests-917%20Passing-brightgreen?style=for-the-badge&logo=pytest)](https://docs.pytest.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 > **"One enterprise platform for orchestrating real, mission-critical work with Large Language Models."**

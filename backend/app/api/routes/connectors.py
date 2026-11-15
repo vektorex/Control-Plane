@@ -334,7 +334,7 @@ async def execute_connector_operation(
         elif res.error_code == "CONNECTOR_RATE_LIMITED":
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=res.error_message)
         elif res.error_code == "CONNECTOR_INVALID_ARGUMENTS":
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=res.error_message)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=res.error_message)
         else:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=res.error_message)
 

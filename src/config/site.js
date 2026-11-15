@@ -4,7 +4,7 @@ export const siteConfig = {
   description:
     "A universal LLM work orchestration platform that accepts complex tasks and intelligently coordinates models, context sources, retrieval strategies, and specialized tools.",
   url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-  version: "0.1.0-alpha",
+  version: "1.0.0",
   mainNav: [
     { label: "Overview", href: "/#overview" },
     { label: "Architecture", href: "/#architecture" },

@@ -57,7 +57,7 @@ class BadRequestError(AppError):
 class ValidationError(AppError):
     """Raised when domain or policy validation fails for an entity, plan, or model selection."""
     code = "VALIDATION_ERROR"
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class UnsupportedMediaTypeError(AppError):
@@ -75,7 +75,7 @@ class StorageError(AppError):
 class ExtractionError(AppError):
     """Raised when document content parsing or text extraction fails."""
     code = "EXTRACTION_ERROR"
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class DatabaseError(AppError):
@@ -151,7 +151,7 @@ llm_error_handler = app_error_handler
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    status_code = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY)
+    status_code = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_CONTENT)
     return JSONResponse(
         status_code=status_code,
         content=format_error_response(

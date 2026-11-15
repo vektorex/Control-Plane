@@ -75,7 +75,7 @@ async def create_memory(
     except MemorySecretDetectedError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
     except MemoryValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.message)
     except MemoryError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
@@ -105,7 +105,7 @@ async def create_memory_from_source(
     except MemorySecretDetectedError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
     except MemoryValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.message)
     except MemoryError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
@@ -224,7 +224,7 @@ async def resolve_conflict(
     except MemoryNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except MemoryValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.message)
 
 
 @router.post("/conflicts/{conflict_id}/dismiss", response_model=MemoryConflictResponse)

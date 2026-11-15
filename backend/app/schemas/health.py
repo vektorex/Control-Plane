@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
@@ -6,6 +6,6 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = Field(default="healthy", description="Backend service status")
     version: str = Field(description="Backend semantic version")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="UTC timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="UTC timestamp")
     environment: str = Field(description="Runtime environment")
     providers_configured: List[str] = Field(default_factory=list, description="List of configured LLM providers")

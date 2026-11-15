@@ -74,7 +74,7 @@ class HardConstraintViolationError(PlanningError):
         super().__init__(
             message=f"Hard constraint '{constraint_type}' violated: {reason}. Optimization cannot override hard constraints.",
             code="HARD_CONSTRAINT_VIOLATION",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             details={"constraint_type": constraint_type, "reason": reason},
         )
 
@@ -112,7 +112,7 @@ class FabricatedCapacityError(PlanningError):
         super().__init__(
             message=message,
             code="FABRICATED_CAPACITY_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
 
@@ -121,7 +121,7 @@ class SubjectiveRankingForbiddenError(PlanningError):
         super().__init__(
             message=message,
             code="SUBJECTIVE_RANKING_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
 
@@ -130,7 +130,7 @@ class HiddenAggregateScoreForbiddenError(PlanningError):
         super().__init__(
             message=message,
             code="HIDDEN_AGGREGATE_SCORE_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
 
@@ -211,5 +211,5 @@ class CompletionFalsificationForbiddenError(PlanningError):
         super().__init__(
             message=message,
             code="COMPLETION_FALSIFICATION_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )

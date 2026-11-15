@@ -74,7 +74,7 @@ class HumanImpersonationError(OutcomeError):
         super().__init__(
             message=message,
             code="HUMAN_IMPERSONATION_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
 
@@ -83,7 +83,7 @@ class FabricatedMetricError(OutcomeError):
         super().__init__(
             message=message,
             code="FABRICATED_METRIC_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
 
@@ -112,7 +112,7 @@ class RequirementNotMetError(OutcomeError):
         super().__init__(
             message=message,
             code="REQUIREMENT_NOT_MET",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             details={"missing_requirements": missing_requirements or []},
         )
 
@@ -141,7 +141,7 @@ class CausalityClaimForbiddenError(OutcomeError):
         super().__init__(
             message=message,
             code="CAUSALITY_CLAIM_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
 
@@ -150,7 +150,7 @@ class SubjectiveScoreForbiddenError(OutcomeError):
         super().__init__(
             message=message,
             code="SUBJECTIVE_SCORE_FORBIDDEN",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
 
@@ -177,6 +177,6 @@ class MissingBaselineError(OutcomeError):
         super().__init__(
             message=f"Baseline measurement for '{metric_name}' is not established. Cannot fabricate savings or impact without baseline.",
             code="MISSING_BASELINE",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             details={"metric_name": metric_name},
         )

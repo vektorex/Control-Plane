@@ -45,4 +45,4 @@ class OwnershipTransferError(AccessControlError):
 class QuotaExceededError(AccessControlError):
     """Raised when an organization, workspace, or project reaches membership safety limits."""
     code = "QUOTA_EXCEEDED"
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT

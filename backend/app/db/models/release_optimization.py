@@ -1,9 +1,13 @@
-
 import uuid
 from sqlalchemy import Column, String, DateTime, Text, JSON, ForeignKey, Boolean, Integer
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.app.db.base import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 class ReleaseOptimizationScenario(Base):
     __tablename__ = "release_optimization_scenarios"
@@ -19,8 +23,8 @@ class ReleaseOptimizationScenario(Base):
     scenario_type = Column(String(50), nullable=False)
     base_snapshot_id = Column(String(36), nullable=True)
     created_by = Column(String(36), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 class ReleaseOptimizationScenarioVersion(Base):
     __tablename__ = "release_optimization_scenario_versions"
@@ -34,7 +38,7 @@ class ReleaseOptimizationScenarioVersion(Base):
     planning_snapshot = Column(JSON, nullable=False)
     contract_snapshot = Column(JSON, nullable=False)
     governance_snapshot = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 class OptimizationConstraint(Base):
     __tablename__ = "release_optimization_constraints"
@@ -49,7 +53,7 @@ class OptimizationConstraint(Base):
     hard_constraint = Column(Boolean, default=True)
     active = Column(Boolean, default=True)
     evidence = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 class OptimizationCandidate(Base):
     __tablename__ = "release_optimization_candidates"
@@ -62,7 +66,7 @@ class OptimizationCandidate(Base):
     status = Column(String(50), nullable=False, default="valid")
     sequence_hash = Column(String(64), nullable=False)
     constraint_hash = Column(String(64), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 class OptimizationCandidateRelease(Base):
     __tablename__ = "release_optimization_candidate_releases"
@@ -108,7 +112,7 @@ class OptimizationComparison(Base):
     approval_changes = Column(JSON, nullable=False)
     revalidation_changes = Column(JSON, nullable=False)
     evidence = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 class OptimizationBottleneck(Base):
     __tablename__ = "release_optimization_bottlenecks"
@@ -120,7 +124,7 @@ class OptimizationBottleneck(Base):
     description = Column(Text, nullable=False)
     affected_release_ids = Column(JSON, nullable=False)
     evidence = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 class OptimizationRecommendation(Base):
     __tablename__ = "release_optimization_recommendations"
@@ -132,7 +136,7 @@ class OptimizationRecommendation(Base):
     affected_releases = Column(JSON, nullable=False)
     constraints = Column(JSON, nullable=False)
     confidence_basis = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 class OptimizationRun(Base):
     __tablename__ = "release_optimization_runs"
@@ -146,7 +150,7 @@ class OptimizationRun(Base):
     constraint_count = Column(Integer, default=0)
     finding_count = Column(Integer, default=0)
     error = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 class OptimizationSensitivity(Base):
     __tablename__ = "release_optimization_sensitivities"
@@ -156,4 +160,4 @@ class OptimizationSensitivity(Base):
     variable_name = Column(String(100), nullable=False)
     thresholds = Column(JSON, nullable=False)
     evidence = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)

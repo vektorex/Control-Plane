@@ -332,6 +332,7 @@ def test_tenant_boundaries_validation():
 @pytest.mark.asyncio
 async def test_indicator_fingerprinting():
     session = AsyncMock()
+    session.add = MagicMock()
     ind_svc = SecurityIndicatorService(session)
 
     # Mock no existing indicator
@@ -358,6 +359,7 @@ async def test_indicator_fingerprinting():
 @pytest.mark.asyncio
 async def test_correlation_spawns_incident_on_critical_signal():
     session = AsyncMock()
+    session.add = MagicMock()
     engine = IncidentCorrelationEngine(session)
 
     # Mock no existing open incident
@@ -390,6 +392,7 @@ async def test_correlation_spawns_incident_on_critical_signal():
 @pytest.mark.asyncio
 async def test_containment_execution_flow():
     session = AsyncMock()
+    session.add = MagicMock()
     containment_svc = SecurityContainmentService(session)
     containment_svc.evidence_service.record_evidence = AsyncMock()
 
@@ -432,6 +435,7 @@ async def test_containment_execution_flow():
 
 def test_playbook_simulation():
     session = AsyncMock()
+    session.add = MagicMock()
     pb_svc = SecurityPlaybookService(session)
 
     pb = MagicMock(

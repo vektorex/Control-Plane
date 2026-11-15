@@ -24,7 +24,7 @@ class AnalyzerTimeoutError(AnalyzerError):
 class RequirementValidationError(TaskIntelligenceError):
     """Raised when execution requirements violate policy, limits, or invariants."""
     code: str = "REQUIREMENT_VALIDATION_ERROR"
-    status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code: int = status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class PolicyViolationError(TaskIntelligenceError):

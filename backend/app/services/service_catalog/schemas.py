@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class ServiceCatalogItemBase(BaseModel):
     organization_id: str
@@ -71,8 +71,7 @@ class ServiceCatalogItemResponse(ServiceCatalogItemBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CompatibilityRequest(BaseModel):
     input_requirements: Optional[List[str]] = None

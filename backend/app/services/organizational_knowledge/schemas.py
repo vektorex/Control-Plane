@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class KnowledgeProvenanceBase(BaseModel):
     source_type: str
@@ -17,8 +17,7 @@ class KnowledgeProvenanceResponse(KnowledgeProvenanceBase):
     knowledge_item_id: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class KnowledgeEvidenceBase(BaseModel):
     source_type: str
@@ -36,8 +35,7 @@ class KnowledgeEvidenceResponse(KnowledgeEvidenceBase):
     knowledge_item_id: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OrganizationalKnowledgeItemBase(BaseModel):
     workspace_id: str
@@ -72,8 +70,7 @@ class OrganizationalKnowledgeItemResponse(OrganizationalKnowledgeItemBase):
     updated_at: datetime
     last_verified_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class KnowledgeVersionBase(BaseModel):
     version: int
@@ -89,8 +86,7 @@ class KnowledgeVersionResponse(KnowledgeVersionBase):
     created_by: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class KnowledgeCandidateBase(BaseModel):
     workspace_id: str
@@ -112,8 +108,7 @@ class KnowledgeCandidateResponse(KnowledgeCandidateBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class KnowledgeConflictBase(BaseModel):
     workspace_id: str
@@ -134,5 +129,4 @@ class KnowledgeConflictResponse(KnowledgeConflictBase):
     resolved_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

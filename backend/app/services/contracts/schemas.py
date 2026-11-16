@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class WorkContractBase(BaseModel):
     workspace_id: str
@@ -30,8 +30,7 @@ class WorkContractResponse(WorkContractBase):
     completed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ContractDeliverableBase(BaseModel):
     name: str
@@ -52,8 +51,7 @@ class ContractDeliverableResponse(ContractDeliverableBase):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ServiceLevelAgreementBase(BaseModel):
     name: str
@@ -93,5 +91,4 @@ class SLAMeasurementResponse(BaseModel):
     source_id: str
     measured_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

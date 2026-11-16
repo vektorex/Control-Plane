@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class SolutionComponentBase(BaseModel):
     catalog_item_id: str
@@ -19,8 +19,7 @@ class SolutionComponentResponse(SolutionComponentBase):
     id: str
     solution_version_id: str
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SolutionConnectionBase(BaseModel):
     source_component_id: str
@@ -34,8 +33,7 @@ class SolutionConnectionResponse(SolutionConnectionBase):
     id: str
     solution_version_id: str
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SolutionBase(BaseModel):
     organization_id: str
@@ -80,8 +78,7 @@ class SolutionVersionResponse(SolutionVersionBase):
     components: List[SolutionComponentResponse] = []
     connections: List[SolutionConnectionResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SolutionResponse(SolutionBase):
     id: str
@@ -90,8 +87,7 @@ class SolutionResponse(SolutionBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ValidationFinding(BaseModel):
     code: str

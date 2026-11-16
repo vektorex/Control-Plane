@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function IntentAnalysis({ params }) {
-  // params.requestId
+  const resolvedParams = React.use ? React.use(params) : params;
+  const requestId = resolvedParams?.requestId || "request";
   const [repoUrl, setRepoUrl] = useState("");
   const [clarificationSubmitted, setClarificationSubmitted] = useState(false);
 
@@ -21,7 +22,7 @@ export default function IntentAnalysis({ params }) {
           Intent Workspace
         </Link>
         <span className="mx-2 text-gray-400">/</span>
-        <span className="text-gray-900">Request #{params.requestId}</span>
+        <span className="text-gray-900">Request #{requestId}</span>
       </nav>
 
       <div className="mb-8">

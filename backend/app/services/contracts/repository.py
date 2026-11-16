@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from backend.app.db.models.contracts import (
@@ -21,11 +22,10 @@ from .schemas import (
 )
 
 class ContractRepository:
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         self.session = session
 
-    def create_contract(self, contract_in: WorkContractCreate, created_by: str) -> WorkContract:
-        import uuid
+    async def create_contract(self, contract_in: WorkContractCreate, created_by: str) -> WorkContract:
         contract_id = str(uuid.uuid4())
         contract = WorkContract(
             id=contract_id,
@@ -33,23 +33,33 @@ class ContractRepository:
             created_by=created_by
         )
         self.session.add(contract)
-        self.session.flush()
+        await self.session.flush()
+        await self.session.refresh(contract)
         return contract
 
-    def get_contract(self, contract_id: str) -> Optional[WorkContract]:
-        return self.session.execute(
+    async def get_contract(self, contract_id: str) -> Optional[WorkContract]:
+        result = await self.session.execute(
             select(WorkContract).where(WorkContract.id == contract_id)
-        ).scalar_one_or_none()
+        )
+        return result.scalar_one_or_none()
 
-    def update_contract_status(self, contract_id: str, status: str) -> Optional[WorkContract]:
-        contract = self.get_contract(contract_id)
+    async def list_contracts(self, workspace_id: Optional[str] = None) -> List[WorkContract]:
+        query = select(WorkContract)
+        if workspace_id:
+            query = query.where(WorkContract.workspace_id == workspace_id)
+        query = query.order_by(desc(WorkContract.created_at))
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def update_contract_status(self, contract_id: str, status: str) -> Optional[WorkContract]:
+        contract = await self.get_contract(contract_id)
         if contract:
             contract.status = status
-            self.session.flush()
+            await self.session.flush()
+            await self.session.refresh(contract)
         return contract
 
-    def create_version(self, contract_id: str, created_by: str, version: int = 1) -> WorkContractVersion:
-        import uuid
+    async def create_version(self, contract_id: str, created_by: str, version: int = 1) -> WorkContractVersion:
         cv = WorkContractVersion(
             id=str(uuid.uuid4()),
             contract_id=contract_id,
@@ -63,42 +73,43 @@ class ContractRepository:
             created_by=created_by
         )
         self.session.add(cv)
-        self.session.flush()
+        await self.session.flush()
         return cv
 
-    def add_deliverable(self, version_id: str, deliverable_in: ContractDeliverableCreate) -> ContractDeliverable:
-        import uuid
+    async def add_deliverable(self, version_id: str, deliverable_in: ContractDeliverableCreate) -> ContractDeliverable:
         d = ContractDeliverable(
             id=str(uuid.uuid4()),
             contract_version_id=version_id,
             **deliverable_in.model_dump()
         )
         self.session.add(d)
-        self.session.flush()
+        await self.session.flush()
         return d
         
-    def add_sla(self, version_id: str, sla_in: ServiceLevelAgreementCreate) -> ServiceLevelAgreement:
-        import uuid
+    async def add_sla(self, version_id: str, sla_in: ServiceLevelAgreementCreate) -> ServiceLevelAgreement:
         sla = ServiceLevelAgreement(
             id=str(uuid.uuid4()),
             contract_version_id=version_id,
             **sla_in.model_dump()
         )
         self.session.add(sla)
-        self.session.flush()
+        await self.session.flush()
         return sla
 
-    def get_deliverables(self, version_id: str) -> List[ContractDeliverable]:
-        return list(self.session.execute(
+    async def get_deliverables(self, version_id: str) -> List[ContractDeliverable]:
+        result = await self.session.execute(
             select(ContractDeliverable).where(ContractDeliverable.contract_version_id == version_id)
-        ).scalars().all())
+        )
+        return list(result.scalars().all())
 
-    def get_slas(self, version_id: str) -> List[ServiceLevelAgreement]:
-        return list(self.session.execute(
+    async def get_slas(self, version_id: str) -> List[ServiceLevelAgreement]:
+        result = await self.session.execute(
             select(ServiceLevelAgreement).where(ServiceLevelAgreement.contract_version_id == version_id)
-        ).scalars().all())
+        )
+        return list(result.scalars().all())
 
-    def get_measurements(self, contract_id: str) -> List[SLAMeasurement]:
-        return list(self.session.execute(
+    async def get_measurements(self, contract_id: str) -> List[SLAMeasurement]:
+        result = await self.session.execute(
             select(SLAMeasurement).where(SLAMeasurement.contract_id == contract_id).order_by(desc(SLAMeasurement.measured_at))
-        ).scalars().all())
+        )
+        return list(result.scalars().all())

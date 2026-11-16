@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from .enums import ReleaseStatus, ReleaseType
 
@@ -13,3 +13,4 @@ class ReleaseCreate(BaseModel):
 class ReleaseResponse(ReleaseCreate):
     id: str
     status: ReleaseStatus
+    model_config = ConfigDict(from_attributes=True)

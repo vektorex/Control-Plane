@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class IntentRequestCreate(BaseModel):
     organization_id: str
@@ -21,8 +21,7 @@ class IntentRequirementSchema(BaseModel):
 class IntentRequirementResponse(IntentRequirementSchema):
     id: str
     intent_request_id: str
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IntentClarificationSchema(BaseModel):
     question: str
@@ -36,8 +35,7 @@ class IntentClarificationResponse(IntentClarificationSchema):
     answer: Optional[str] = None
     answered_by: Optional[str] = None
     answered_at: Optional[datetime] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CandidateSolutionSchema(BaseModel):
     name: str
@@ -56,8 +54,7 @@ class CandidateSolutionResponse(CandidateSolutionSchema):
     status: str
     created_at: datetime
     updated_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IntentRequestResponse(BaseModel):
     id: str
@@ -80,8 +77,7 @@ class IntentRequestResponse(BaseModel):
     clarifications: List[IntentClarificationResponse] = []
     candidates: List[CandidateSolutionResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ValidationResponse(BaseModel):
     is_valid: bool

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from .enums import RolloutStatus, StrategyType
 
@@ -13,3 +13,4 @@ class RolloutCreate(BaseModel):
 class RolloutResponse(RolloutCreate):
     id: str
     status: RolloutStatus
+    model_config = ConfigDict(from_attributes=True)

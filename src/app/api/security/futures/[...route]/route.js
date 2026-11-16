@@ -5,7 +5,8 @@ import { ScenarioEngine } from '@/lib/futures/ScenarioEngine';
 /** Feature 22 — Simulation API & Event Contracts */
 export async function GET(request, { params }) {
   const tenantId = request.headers.get('x-tenant-id') || 'tenant-1';
-  const routeParams = params.route || [];
+  const resolvedParams = await params;
+  const routeParams = resolvedParams?.route || [];
   const action = routeParams[0];
 
   try {
@@ -27,7 +28,8 @@ export async function GET(request, { params }) {
 
 export async function POST(request, { params }) {
   const tenantId = request.headers.get('x-tenant-id') || 'tenant-1';
-  const routeParams = params.route || [];
+  const resolvedParams = await params;
+  const routeParams = resolvedParams?.route || [];
   const action = routeParams[0];
 
   try {

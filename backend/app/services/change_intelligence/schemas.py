@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -37,8 +37,7 @@ class ChangeRequestResponse(BaseModel):
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ImpactSummary(BaseModel):
@@ -46,4 +45,3 @@ class ImpactSummary(BaseModel):
     indirect_impacts: int = 0
     unknown_impacts: int = 0
     revalidation_reqs: int = 0
-

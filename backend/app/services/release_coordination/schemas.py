@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from .enums import PortfolioStatus, TrainStatus
 
@@ -9,6 +9,7 @@ class PortfolioCreate(BaseModel):
 class PortfolioResponse(PortfolioCreate):
     id: str
     status: PortfolioStatus
+    model_config = ConfigDict(from_attributes=True)
 
 class TrainCreate(BaseModel):
     name: str
@@ -18,3 +19,4 @@ class TrainCreate(BaseModel):
 class TrainResponse(TrainCreate):
     id: str
     status: TrainStatus
+    model_config = ConfigDict(from_attributes=True)

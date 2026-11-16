@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class DecisionRequestCreate(BaseModel):
     organization_id: str
@@ -27,8 +27,7 @@ class DecisionEvidenceResponse(DecisionEvidenceSchema):
     id: str
     decision_request_id: str
     observed_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DecisionRequiredActionResponse(BaseModel):
     id: str
@@ -40,8 +39,7 @@ class DecisionRequiredActionResponse(BaseModel):
     requires_approval: bool
     status: str
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DecisionRecordResponse(BaseModel):
     id: str
@@ -54,8 +52,7 @@ class DecisionRecordResponse(BaseModel):
     policy_snapshot: Dict[str, Any] = {}
     explanation: Optional[str] = None
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DecisionRequestResponse(BaseModel):
     id: str
@@ -76,5 +73,4 @@ class DecisionRequestResponse(BaseModel):
     records: List[DecisionRecordResponse] = []
     required_actions: List[DecisionRequiredActionResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

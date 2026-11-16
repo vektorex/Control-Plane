@@ -1,6 +1,5 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .repository import ContractRepository
 from .schemas import (
@@ -16,15 +15,15 @@ from backend.app.db.models.contracts import (
 from backend.app.services.events.service import EventBus
 
 class ContractService:
-    def __init__(self, session: Session, event_bus: EventBus):
+    def __init__(self, session: AsyncSession, event_bus: EventBus):
         self.session = session
         self.repository = ContractRepository(session)
         self.event_bus = event_bus
 
-    def create_draft(self, contract_in: WorkContractCreate, current_user_id: str) -> WorkContract:
-        contract = self.repository.create_contract(contract_in, current_user_id)
+    async def create_draft(self, contract_in: WorkContractCreate, current_user_id: str) -> WorkContract:
+        contract = await self.repository.create_contract(contract_in, current_user_id)
         # Create initial version
-        self.repository.create_version(contract.id, current_user_id, version=1)
+        await self.repository.create_version(contract.id, current_user_id, version=1)
         
         self.event_bus.publish(
             "contract.created",
@@ -36,11 +35,14 @@ class ContractService:
         )
         return contract
         
-    def get_contract(self, contract_id: str) -> Optional[WorkContract]:
-        return self.repository.get_contract(contract_id)
+    async def get_contract(self, contract_id: str) -> Optional[WorkContract]:
+        return await self.repository.get_contract(contract_id)
 
-    def propose_contract(self, contract_id: str, current_user_id: str) -> Optional[WorkContract]:
-        contract = self.repository.update_contract_status(contract_id, "proposed")
+    async def list_contracts(self, workspace_id: Optional[str] = None) -> List[WorkContract]:
+        return await self.repository.list_contracts(workspace_id)
+
+    async def propose_contract(self, contract_id: str, current_user_id: str) -> Optional[WorkContract]:
+        contract = await self.repository.update_contract_status(contract_id, "proposed")
         if contract:
             self.event_bus.publish(
                 "contract.proposed",
@@ -52,8 +54,8 @@ class ContractService:
             )
         return contract
 
-    def approve_contract(self, contract_id: str, approver_id: str) -> Optional[WorkContract]:
-        contract = self.repository.update_contract_status(contract_id, "approved")
+    async def approve_contract(self, contract_id: str, approver_id: str) -> Optional[WorkContract]:
+        contract = await self.repository.update_contract_status(contract_id, "approved")
         if contract:
             self.event_bus.publish(
                 "contract.approved",
@@ -65,12 +67,12 @@ class ContractService:
             )
         return contract
 
-    def activate_contract(self, contract_id: str, actor_id: str) -> Optional[WorkContract]:
-        contract = self.repository.get_contract(contract_id)
+    async def activate_contract(self, contract_id: str, actor_id: str) -> Optional[WorkContract]:
+        contract = await self.repository.get_contract(contract_id)
         if not contract or contract.status != "approved":
             return None # Must be approved first
             
-        contract = self.repository.update_contract_status(contract_id, "active")
+        contract = await self.repository.update_contract_status(contract_id, "active")
         if contract:
             self.event_bus.publish(
                 "contract.activated",

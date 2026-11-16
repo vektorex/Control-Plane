@@ -3,7 +3,7 @@ Pydantic schemas for Step 34: AI Security Operations, Threat Detection & Inciden
 """
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ---------------------------------------------------------------------------
@@ -91,9 +91,7 @@ class SecuritySignalResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -144,9 +142,7 @@ class SecurityIncidentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +161,7 @@ class IncidentTimelineEventResponse(BaseModel):
     summary: str
     metadata: Dict[str, Any] = Field(default_factory=dict, alias="metadata_payload")
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class IncidentInvestigationResponse(BaseModel):
@@ -207,8 +201,7 @@ class ContainmentActionResponse(BaseModel):
     result: Dict[str, Any] = Field(default_factory=dict)
     reason: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------------------------------------------------------------------
@@ -237,9 +230,7 @@ class SecurityIndicatorResponse(BaseModel):
     status: str
     metadata: Dict[str, Any] = Field(default_factory=dict, alias="metadata_payload")
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -274,8 +265,7 @@ class SecurityPlaybookResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PlaybookTestRequest(BaseModel):

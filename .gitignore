@@ -54,3 +54,7 @@ env/
 .storage/
 *.storage
 
+# agent workspace customizations
+.agent/
+
+
